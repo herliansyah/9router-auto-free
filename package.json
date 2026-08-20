@@ -1,0 +1,16 @@
+{
+  "name": "openagentic-free-sync",
+  "version": "1.0.0",
+  "description": "Daily automated scraper and injector for OpenAgentic free models into 9router combos",
+  "main": "sync.js",
+  "scripts": {
+    "start": "node sync.js",
+    "sync": "node sync.js",
+    "dry-run": "node sync.js --dry-run",
+    "test": "node test.js",
+    "setup-cron": "node sync.js --setup-cron"
+  },
+  "keywords": ["openagentic", "9router", "openrouter", "free-models", "sync"],
+  "author": "herliansyah@gmail.com",
+  "license": "MIT"
+}
