@@ -12,9 +12,9 @@ Sebelum model dimasukkan ke dalam combo 9router, script menjalankan **live pre-t
 - **Auto-Drop Promo Berakhir (HTTP 401)**: Membuang model yang promo gratisnya sudah habis (misal: `oc/deepseek-v4-flash-free`, `oc/qwen3.6-plus-free`, `oc/minimax-m3-free`, dsb.).
 - **Auto-Drop Model Berbayar / Butuh Kredit (HTTP 402)**: Membuang model yang membutuhkan saldo (misal: `kc/stealth/ox-alpha`).
 - **Auto-Drop Dead / Timeout / 404**: Membuang model yang tidak merespons atau ID-nya sudah tidak tersedia.
-- **Smart Quota Handling (HTTP 429)**: Mempertahankan model valid yang kuota hariannya sedang mencapai limit sementara karena akan aktif kembali saat reset kuota.
+- **Strict Zero-Latency Quota Handling (HTTP 429)**: Membuang model yang kuota hariannya sudah habis (`100/100 quota exceeded`) agar IDE langsung merespons di percobaan pertama tanpa delay fallback. Model akan otomatis dimasukkan kembali saat kuota direset pada sync jam 00:05 WIB.
 
-Hasilnya, combo di 9router selalu **bersih 100%** dari model mati/palsu.
+Hasilnya, combo di 9router selalu **bersih 100% dan Zero-Latency** dari model mati, berbayar, ataupun yang kuota hariannya sudah habis.
 
 ---
 
