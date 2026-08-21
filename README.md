@@ -1,7 +1,7 @@
 # Free Models Sync -> 9router
-### (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + 9router OpenCode Free)
+### (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + 9router OpenCode Free)
 
-Otomasi sinkronisasi, **live pre-test validasi**, pemeringkatan kapabilitas koding, dan injeksi model AI gratis harian langsung ke dalam **9router** combos (`my9model-free`, `openagentic-free`, `kilo-free`, `openrouter-free`, `poolside-free`, `gemini-free`, dan `opencode-free`).
+Otomasi sinkronisasi, **live pre-test validasi**, pemeringkatan kapabilitas koding, dan injeksi model AI gratis harian langsung ke dalam **9router** combos (`my9model-free`, `openagentic-free`, `kilo-free`, `openrouter-free`, `poolside-free`, `gemini-free`, `ollama-free`, `airforce-free`, dan `opencode-free`).
 
 ---
 
@@ -10,7 +10,7 @@ Otomasi sinkronisasi, **live pre-test validasi**, pemeringkatan kapabilitas kodi
 Sebelum model dimasukkan ke dalam combo 9router, script menjalankan **live pre-test** secara paralel (5 worker) ke endpoint internal 9router (`/api/models/test`):
 
 - **Auto-Drop Promo Berakhir (HTTP 401)**: Membuang model yang promo gratisnya sudah habis (misal: `oc/deepseek-v4-flash-free`, `oc/qwen3.6-plus-free`, `oc/minimax-m3-free`, dsb.).
-- **Auto-Drop Model Berbayar / Butuh Kredit (HTTP 402)**: Membuang model yang membutuhkan saldo (misal: `kc/stealth/ox-alpha`).
+- **Auto-Drop Model Butuh Subscription / Berbayar (HTTP 403 / 402)**: Membuang model yang membutuhkan langganan berbayar (misal: model pro di Ollama Cloud atau model berbayar di API.airforce seperti `deepseek-v3.2`).
 - **Auto-Drop Dead / Timeout / 404**: Membuang model yang tidak merespons atau ID-nya sudah tidak tersedia.
 - **Strict Zero-Latency Quota Handling (HTTP 429)**: Membuang model yang kuota hariannya sudah habis (`100/100 quota exceeded` atau upstream rate-limited) agar IDE langsung merespons di percobaan pertama tanpa delay fallback. Model akan otomatis dimasukkan kembali saat kuota direset pada sync jam 00:05 WIB.
 
@@ -35,7 +35,13 @@ Hasilnya, combo di 9router selalu **bersih 100% dan Zero-Latency** dari model ma
 5. **Google Gemini (Google AI Studio Free Tier)**:
    - Google Generative Language API (`https://generativelanguage.googleapis.com/v1beta/models`) via Gemini API Key di 9router.
    - Mengambil model free-tier (misal: `gemini/gemini-3.7-flash`, `gemini/gemini-3.6-flash`, `gemini/gemini-3.5-flash`, `gemini/gemini-3.5-flash-lite`, `gemini/gemini-3.1-flash-lite`).
-6. **9router OpenCode Free (`oc/*`)**:
+6. **Ollama Cloud**:
+   - Ollama Cloud API (`https://api.ollama.com/v1/models`) via Ollama connection di 9router.
+   - Mengambil model gratis tanpa subscription (misal: `ollama/minimax-m3`, `ollama/gpt-oss:120b`, `ollama/gpt-oss:20b`, `ollama/nemotron-3-ultra`, `ollama/gemma4:31b`).
+7. **API.airforce**:
+   - API.airforce API (`https://api.airforce/v1/models`) via API.airforce connection di 9router.
+   - Mengambil model berlabel `tier: "free"` (misal: `api-airforce/qwen3-30b-a3b-fp8`, `api-airforce/llama-3.3-70b-instruct-fp8-fast`, `api-airforce/devstral-latest`, `api-airforce/codestral-latest`, `api-airforce/gemma-4-26b-a4b-it`).
+8. **9router OpenCode Free (`oc/*`)**:
    - Diambil langsung dari routing node OpenCode di 9router.
 
 ---
@@ -84,7 +90,7 @@ Skor kapabilitas model dihitung secara empiris dengan mengambil data langsung da
   2. **Tier A+ / A (Benchmark 65 - 74)**: `deepseek-v4` (74.0), `gemini-3.1-flash-lite` (74.0), `glm-5` (71.0), `step-3.7-flash` (70.0), `qwen3.6-plus` (69.0), `qwen2.5-coder` (68.5).
   3. **Tier B+ / B (Benchmark 50 - 64)**: `minimax-m3` (62.5), `minimax-m2.5` (61.0), `nemotron-3-ultra` (58.5), `hy3` (54.0), `mimo-v2.5` (52.0).
   4. **Tier C+ / C (Benchmark 40 - 49)**: `laguna-s-2.1` (48.0), `ling-3.0-flash` (47.0), `laguna-xs-2.1` (46.0), `lfm-2.5-2.6b` (44.0), `north-mini-code` (43.0).
-  5. **Heuristic Fallback**: Model baru yang belum terdaftar di database benchmark otomatis dinilai berdasarkan formula generasi versi, keluarga arsitektur (Claude/GPT/DeepSeek/Poolside/Gemini), ukuran parameter (70B/32B/8B), dan context window.
+  5. **Heuristic Fallback**: Model baru yang belum terdaftar di database benchmark otomatis dinilai berdasarkan formula generasi versi, keluarga arsitektur (Claude/GPT/DeepSeek/Poolside/Gemini/Ollama), ukuran parameter (70B/32B/8B), dan context window.
 
 ---
 
@@ -132,4 +138,5 @@ Endpoint 9router: `http://localhost:20128/v1`
 - **`openrouter-free`**: Combo model gratis OpenRouter yang aktif.
 - **`poolside-free`**: Combo model gratis Poolside yang aktif.
 - **`gemini-free`**: Combo model gratis Google Gemini yang aktif.
+- **`ollama-free`**: Combo model gratis Ollama Cloud yang aktif.
 - **`opencode-free`**: Combo model gratis OpenCode (`oc/*`) yang aktif.

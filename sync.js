@@ -2,7 +2,7 @@
 
 /**
  * Free Models Sync for 9router
- * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + 9router OpenCode Free)
+ * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + 9router OpenCode Free)
  * 
  * Automatically synchronizes today's free models from:
  *   1. OpenAgentic.id (Web & API /v1/models)
@@ -10,7 +10,9 @@
  *   3. OpenRouter (API /api/v1/models)
  *   4. Poolside (Inference API /v1/models)
  *   5. Google Gemini API (/v1beta/models)
- *   6. 9router OpenCode (oc/* free models directly from 9router)
+ *   6. Ollama Cloud API (api.ollama.com/v1/models)
+ *   7. API.airforce API (api.airforce/v1/models)
+ *   8. 9router OpenCode (oc/* free models directly from 9router)
  * 
  * Pre-tests all candidates against 9router to drop expired/dead/paid models,
  * sorts them by coding capability specification (best to worst),
@@ -21,6 +23,8 @@
  *   - openrouter-free : Dedicated OpenRouter free combo
  *   - poolside-free   : Dedicated Poolside free combo
  *   - gemini-free     : Dedicated Gemini free combo
+ *   - ollama-free     : Dedicated Ollama Cloud free combo
+ *   - airforce-free   : Dedicated API.airforce free combo
  *   - opencode-free   : Dedicated OpenCode free combo
  */
 
@@ -110,7 +114,7 @@ function getBenchmarksDatabase() {
 function findBenchmarkMatch(modelIdentifier, benchmarks) {
   if (!benchmarks || Object.keys(benchmarks).length === 0) return null;
   const str = String(modelIdentifier).toLowerCase()
-    .replace(/^(?:openrouter|kc|oc|openagentic|poolside|gemini)\//, '')
+    .replace(/^(?:openrouter|kc|oc|openagentic|poolside|gemini|ollama|api-airforce|airforce)\//, '')
     .replace(/:(?:free|thinking)$/, '')
     .replace(/-free$/, '');
 
@@ -347,6 +351,52 @@ function getGeminiCredentials() {
   }
 
   return { apiKey: null, prefix: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' };
+}
+
+// Extract Ollama Cloud API Key and Provider Prefix from 9router Database
+function getOllamaCredentials() {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'ollama' AND isActive = 1").get();
+    db.close();
+
+    if (row && row.data) {
+      const parsed = JSON.parse(row.data);
+      return {
+        apiKey: parsed.apiKey || null,
+        prefix: parsed?.providerSpecificData?.prefix || 'ollama',
+        baseUrl: parsed?.providerSpecificData?.baseUrl || 'https://api.ollama.com/v1'
+      };
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for Ollama credentials: ${err.message}`);
+  }
+
+  return { apiKey: null, prefix: 'ollama', baseUrl: 'https://api.ollama.com/v1' };
+}
+
+// Extract API.airforce API Key and Provider Prefix from 9router Database
+function getAirforceCredentials() {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'api-airforce' AND isActive = 1").get();
+    db.close();
+
+    if (row && row.data) {
+      const parsed = JSON.parse(row.data);
+      return {
+        apiKey: parsed.apiKey || null,
+        prefix: parsed?.providerSpecificData?.prefix || 'api-airforce',
+        baseUrl: parsed?.providerSpecificData?.baseUrl || 'https://api.airforce/v1'
+      };
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for API.airforce credentials: ${err.message}`);
+  }
+
+  return { apiKey: null, prefix: 'api-airforce', baseUrl: 'https://api.airforce/v1' };
 }
 
 // Scrape free models from OpenAgentic HTML landing page
@@ -690,6 +740,148 @@ async function getTodaysGeminiFreeModels() {
   };
 }
 
+// Fetch candidate models from Ollama Cloud API
+async function fetchOllamaFreeModels(apiKey, baseUrl = 'https://api.ollama.com/v1') {
+  const freeModels = [];
+  if (!apiKey) return freeModels;
+
+  try {
+    console.log('[-] Fetching model list from Ollama Cloud API (/v1/models)...');
+    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
+    const res = await fetch(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'User-Agent': 'Mozilla/5.0'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const models = Array.isArray(json) ? json : (json.data || json.models || []);
+
+      for (const m of models) {
+        const id = m.id || m.name || m.model || '';
+        if (!id) continue;
+        const name = m.name || id;
+
+        // Skip non-coding / audio / embed / video
+        const lowerId = id.toLowerCase();
+        if (
+          lowerId.includes('embed') ||
+          lowerId.includes('tts') ||
+          lowerId.includes('vision') ||
+          lowerId.includes('flux') ||
+          lowerId.includes('video') ||
+          lowerId.includes('safety')
+        ) {
+          continue;
+        }
+
+        // Skip models that strictly require a paid subscription on Ollama Cloud
+        if (
+          lowerId.includes('deepseek') ||
+          lowerId.includes('kimi') ||
+          lowerId.includes('glm') ||
+          lowerId.includes('mistral') ||
+          lowerId.includes('qwen') ||
+          lowerId.includes('minimax-m2.7')
+        ) {
+          continue;
+        }
+
+        freeModels.push({
+          id: id,
+          name: name,
+          source: 'ollama-cloud-free'
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(`[!] Ollama Cloud fetch notice: ${err.message}`);
+  }
+  return freeModels;
+}
+
+// Merge and discover all free models from Ollama Cloud
+async function getTodaysOllamaFreeModels() {
+  const creds = getOllamaCredentials();
+  const models = await fetchOllamaFreeModels(creds.apiKey, creds.baseUrl);
+
+  return {
+    prefix: creds.prefix || 'ollama',
+    models: sortModelsByCodingQuality(models)
+  };
+}
+
+// Fetch free models from API.airforce API (/v1/models)
+async function fetchAirforceFreeModels(apiKey, baseUrl = 'https://api.airforce/v1') {
+  const freeModels = [];
+  if (!apiKey) return freeModels;
+
+  try {
+    console.log('[-] Fetching free models from API.airforce API (/v1/models)...');
+    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
+    const res = await fetch(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'User-Agent': 'Mozilla/5.0'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const models = json.data || [];
+
+      for (const m of models) {
+        if (m.tier !== 'free' || m.status !== 'operational' || m.supports_chat === false) {
+          continue;
+        }
+
+        const id = m.id || '';
+        const name = m.name || id;
+        const lowerId = id.toLowerCase();
+
+        // Skip non-coding, music, audio, tts, reranker, image, upload
+        if (
+          lowerId.includes('suno') ||
+          lowerId.includes('voxtral') ||
+          lowerId.includes('rnj') ||
+          lowerId.includes('reranker') ||
+          lowerId.includes('embed') ||
+          lowerId.includes('tts') ||
+          lowerId.includes('mj_upload') ||
+          lowerId.includes('diffusion') ||
+          lowerId.includes('image')
+        ) {
+          continue;
+        }
+
+        freeModels.push({
+          id: id,
+          name: name,
+          source: 'airforce-api-free'
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(`[!] API.airforce fetch notice: ${err.message}`);
+  }
+  return freeModels;
+}
+
+// Merge and discover all free models from API.airforce
+async function getTodaysAirforceFreeModels() {
+  const creds = getAirforceCredentials();
+  const models = await fetchAirforceFreeModels(creds.apiKey, creds.baseUrl);
+
+  return {
+    prefix: creds.prefix || 'api-airforce',
+    models: sortModelsByCodingQuality(models)
+  };
+}
+
 /**
  * Pre-test a model via 9router internal test endpoint
  * Filters out dead/expired promotions (401), paid models (402), 404s, and timeouts.
@@ -751,7 +943,7 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
   }
 
   const validModels = [];
-  const concurrency = 5;
+  const concurrency = (prefix === 'ollama' || prefix === 'api-airforce' || prefix === 'airforce') ? 1 : 5;
   const queue = [...nonExcludedModels];
 
   console.log(`[*] Pre-testing ${nonExcludedModels.length} candidate models for [${prefix}]...`);
@@ -760,6 +952,12 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
     while (queue.length > 0) {
       const m = queue.shift();
       const fullId = m.fullId || `${prefix}/${m.id}`;
+
+      // API.airforce has a 1-req/sec global rate limit on free tier
+      if (prefix === 'api-airforce' || prefix === 'airforce') {
+        await new Promise(r => setTimeout(r, 1200));
+      }
+
       const result = await testModelWith9router(fullId, token);
 
       if (result.valid) {
@@ -779,7 +977,7 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
 }
 
 // Inject free models into 9router combos
-async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData) {
+async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData) {
   // Validate each source's free models against 9router live test
   const validOaModels = await validateCandidateModels(oaData.models, oaData.prefix, isSkipTest);
   const validKiloModels = await validateCandidateModels(kiloData.models, kiloData.prefix, isSkipTest);
@@ -787,6 +985,8 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
   const validOrModels = orData ? await validateCandidateModels(orData.models, orData.prefix, isSkipTest) : [];
   const validPoolsideModels = poolsideData ? await validateCandidateModels(poolsideData.models, poolsideData.prefix || 'poolside', isSkipTest) : [];
   const validGeminiModels = geminiData ? await validateCandidateModels(geminiData.models, geminiData.prefix || 'gemini', isSkipTest) : [];
+  const validOllamaModels = ollamaData ? await validateCandidateModels(ollamaData.models, ollamaData.prefix || 'ollama', isSkipTest) : [];
+  const validAirforceModels = airforceData ? await validateCandidateModels(airforceData.models, airforceData.prefix || 'api-airforce', isSkipTest) : [];
 
   const oaPrefixed = validOaModels.map(m => `${oaData.prefix}/${m.id}`);
   const kiloPrefixed = validKiloModels.map(m => `${kiloData.prefix}/${m.id}`);
@@ -794,10 +994,12 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
   const orPrefixed = validOrModels.map(m => m.fullId || `${orData.prefix}/${m.id}`);
   const psPrefixed = validPoolsideModels.map(m => m.fullId || `${poolsideData.prefix || 'poolside'}/${m.id}`);
   const geminiPrefixed = validGeminiModels.map(m => m.fullId || `${geminiData.prefix || 'gemini'}/${m.id}`);
+  const ollamaPrefixed = validOllamaModels.map(m => m.fullId || `${ollamaData.prefix || 'ollama'}/${m.id}`);
+  const airforcePrefixed = validAirforceModels.map(m => m.fullId || `${airforceData.prefix || 'api-airforce'}/${m.id}`);
 
   // Build global latency lookup map for tie-breaking
   const latencyMap = new Map();
-  for (const m of [...validOaModels, ...validKiloModels, ...validOcModels, ...validOrModels, ...validPoolsideModels, ...validGeminiModels]) {
+  for (const m of [...validOaModels, ...validKiloModels, ...validOcModels, ...validOrModels, ...validPoolsideModels, ...validGeminiModels, ...validOllamaModels, ...validAirforceModels]) {
     const key = m.fullId || (m.prefix ? `${m.prefix}/${m.id}` : m.id);
     if (m.latencyMs != null) latencyMap.set(key, m.latencyMs);
   }
@@ -848,12 +1050,30 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
     }
   }
 
+  if (ollamaData) {
+    console.log(`\n[+] Validated Ollama Cloud: ${validOllamaModels.length} models:`);
+    for (const m of validOllamaModels) {
+      const rawId = m.fullId || `${ollamaData.prefix || 'ollama'}/${m.id}`;
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    }
+  }
+
+  if (airforceData) {
+    console.log(`\n[+] Validated API.airforce: ${validAirforceModels.length} models:`);
+    for (const m of validAirforceModels) {
+      const rawId = m.fullId || `${airforceData.prefix || 'api-airforce'}/${m.id}`;
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    }
+  }
+
   if (isDryRun) {
     console.log('\n[*] Dry run mode enabled. No changes written.');
     return;
   }
 
-  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed, ...psPrefixed, ...geminiPrefixed])), latencyMap);
+  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed, ...psPrefixed, ...geminiPrefixed, ...ollamaPrefixed, ...airforcePrefixed])), latencyMap);
 
   // 1. Try updating via 9router API client if server is running
   let updatedViaApi = false;
@@ -891,6 +1111,14 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
           } else if (combo.name === 'gemini-free' && geminiData) {
             await client.updateCombo(combo.id, { name: combo.name, models: geminiPrefixed });
             console.log(`[✓] Updated combo 'gemini-free' via 9router API (${geminiPrefixed.length} models)`);
+            updatedViaApi = true;
+          } else if (combo.name === 'ollama-free' && ollamaData) {
+            await client.updateCombo(combo.id, { name: combo.name, models: ollamaPrefixed });
+            console.log(`[✓] Updated combo 'ollama-free' via 9router API (${ollamaPrefixed.length} models)`);
+            updatedViaApi = true;
+          } else if (combo.name === 'airforce-free' && airforceData) {
+            await client.updateCombo(combo.id, { name: combo.name, models: airforcePrefixed });
+            console.log(`[✓] Updated combo 'airforce-free' via 9router API (${airforcePrefixed.length} models)`);
             updatedViaApi = true;
           }
         }
@@ -935,6 +1163,8 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
     if (orPrefixed.length > 0) upsertCombo('openrouter-free', orPrefixed);
     if (psPrefixed.length > 0) upsertCombo('poolside-free', psPrefixed);
     if (geminiPrefixed.length > 0) upsertCombo('gemini-free', geminiPrefixed);
+    if (ollamaPrefixed.length > 0) upsertCombo('ollama-free', ollamaPrefixed);
+    if (airforcePrefixed.length > 0) upsertCombo('airforce-free', airforcePrefixed);
 
     db.close();
   } catch (err) {
@@ -982,7 +1212,7 @@ function setupDailyCron() {
 async function main() {
   console.log('====================================================');
   console.log('  Free Models Sync -> 9router Combos               ');
-  console.log('  Sources: OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + OC');
+  console.log('  Sources: OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama + Airforce + OC');
   console.log('  Account: herliansyah@gmail.com                   ');
   console.log('  Pre-testing: Auto-drop expired & non-free models ');
   console.log(`  Time: ${new Date().toISOString()}`);
@@ -1001,17 +1231,19 @@ async function main() {
     }
   }
 
-  const [oaData, kiloData, orData, poolsideData, geminiData] = await Promise.all([
+  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData] = await Promise.all([
     getTodaysOpenAgenticFreeModels(),
     getTodaysKiloFreeModels(),
     getTodaysOpenRouterFreeModels(),
     getTodaysPoolsideFreeModels(),
-    getTodaysGeminiFreeModels()
+    getTodaysGeminiFreeModels(),
+    getTodaysOllamaFreeModels(),
+    getTodaysAirforceFreeModels()
   ]);
 
   const ocData = getTodaysOpenCodeFreeModels();
 
-  await injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData);
+  await injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData);
 }
 
 if (require.main === module) {
@@ -1033,11 +1265,15 @@ module.exports = {
   getOpenRouterCredentials,
   getPoolsideCredentials,
   getGeminiCredentials,
+  getOllamaCredentials,
+  getAirforceCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
   getTodaysPoolsideFreeModels,
   getTodaysGeminiFreeModels,
+  getTodaysOllamaFreeModels,
+  getTodaysAirforceFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels,
@@ -1047,5 +1283,7 @@ module.exports = {
   fetchOpenRouterFreeModels,
   fetchPoolsideFreeModels,
   fetchGeminiFreeModels,
+  fetchOllamaFreeModels,
+  fetchAirforceFreeModels,
   injectInto9router
 };

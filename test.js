@@ -12,18 +12,22 @@ const {
   getOpenRouterCredentials,
   getPoolsideCredentials,
   getGeminiCredentials,
+  getOllamaCredentials,
+  getAirforceCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
   getTodaysPoolsideFreeModels,
   getTodaysGeminiFreeModels,
+  getTodaysOllamaFreeModels,
+  getTodaysAirforceFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels
 } = require('./sync.js');
 
 async function runTests() {
-  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + 9router OpenCode)...');
+  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + 9router OpenCode)...');
 
   // 1. Coding score & Benchmark tests
   console.log('[-] Testing coding benchmark score & sorting...');
@@ -78,13 +82,29 @@ async function runTests() {
   console.log(`    Found ${geminiData.models.length} Gemini candidate free models`);
   assert.ok(geminiData.models.length > 0, 'Should find Gemini free models');
 
-  // 7. OpenCode from 9router Discovery Test
+  // 7. Ollama Cloud Credential & Discovery Test
+  console.log('[-] Testing Ollama Cloud discovery...');
+  const ollamaCreds = getOllamaCredentials();
+  assert.strictEqual(ollamaCreds.prefix, 'ollama', 'Ollama prefix must be ollama');
+  const ollamaData = await getTodaysOllamaFreeModels();
+  console.log(`    Found ${ollamaData.models.length} Ollama candidate free models`);
+  assert.ok(ollamaData.models.length > 0, 'Should find Ollama free models');
+
+  // 8. API.airforce Credential & Discovery Test
+  console.log('[-] Testing API.airforce discovery...');
+  const airforceCreds = getAirforceCredentials();
+  assert.ok(airforceCreds.prefix.length > 0, 'Airforce prefix must not be empty');
+  const airforceData = await getTodaysAirforceFreeModels();
+  console.log(`    Found ${airforceData.models.length} API.airforce candidate free models`);
+  assert.ok(airforceData.models.length > 0, 'Should find API.airforce free models');
+
+  // 9. OpenCode from 9router Discovery Test
   console.log('[-] Testing 9router OpenCode free extraction...');
   const ocData = getTodaysOpenCodeFreeModels();
   console.log(`    Found ${ocData.models.length} OpenCode candidate free models`);
   assert.ok(ocData.models.length > 0, 'Should find OpenCode free models');
 
-  // 8. Exclusion Rules Check
+  // 10. Exclusion Rules Check
   console.log('[-] Testing exclusions filter engine...');
   const { getExclusionList, isModelExcluded } = require('./sync.js');
   const exclusions = getExclusionList();
@@ -94,7 +114,7 @@ async function runTests() {
   assert.ok(isModelExcluded('kc/dots-studio/dots-3-note-preview:free', exclusions), 'dots-3-note must be excluded');
   assert.strictEqual(isModelExcluded('kc/stepfun/step-3.7-flash:free', exclusions), false, 'step-3.7 must not be excluded');
 
-  // 9. Pre-test Validation Engine Check
+  // 11. Pre-test Validation Engine Check
   console.log('[-] Testing pre-test validation engine...');
   const sampleModels = [
     { id: 'stepfun/step-3.7-flash:free', name: 'Step 3.7 Flash' },
@@ -105,7 +125,7 @@ async function runTests() {
   assert.strictEqual(filtered.length, 1, 'Only non-excluded models should remain');
   assert.strictEqual(filtered[0].id, 'stepfun/step-3.7-flash:free');
 
-  // 10. Combined sorting test
+  // 12. Combined sorting test
   console.log('[-] Testing combined priority sorting across all providers...');
   const allPrefixed = [
     ...oaData.models.map(m => `openagentic/${m.id}`),
@@ -113,6 +133,8 @@ async function runTests() {
     ...orData.models.map(m => `openrouter/${m.id}`),
     ...psData.models.map(m => `poolside/${m.id}`),
     ...geminiData.models.map(m => `gemini/${m.id}`),
+    ...ollamaData.models.map(m => `ollama/${m.id}`),
+    ...airforceData.models.map(m => `api-airforce/${m.id}`),
     ...ocData.models.map(m => m.fullId || `oc/${m.id}`)
   ];
   const sortedUnified = sortModelsByCodingQuality(allPrefixed);
@@ -124,7 +146,7 @@ async function runTests() {
     assert.ok(scoreA >= scoreB, `Model ${sortedUnified[i]} (${scoreA}) must score >= ${sortedUnified[i + 1]} (${scoreB})`);
   }
 
-  // 11. Latency Tie-Breaker Test
+  // 12. Latency Tie-Breaker Test
   console.log('[-] Testing latency tie-breaker sorting...');
   const tieCandidates = [
     { id: 'poolside/laguna-s-2.1:free', name: 'Laguna S Slow', latencyMs: 2500 },
