@@ -1270,7 +1270,7 @@ function setupDailyCron() {
     } catch {}
 
     const filtered = currentCrontab.split('\n')
-      .filter(line => !line.includes('openagentic-free-sync') && !line.includes(scriptPath))
+      .filter(line => !line.includes('9router-auto-free') && !line.includes(scriptPath))
       .filter(line => line.trim().length > 0);
 
     filtered.push(`# Daily Free Models Sync for 9router (herliansyah@gmail.com)`);

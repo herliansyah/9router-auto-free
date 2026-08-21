@@ -48,7 +48,7 @@ Hasilnya, combo di 9router selalu **bersih 100% dan Zero-Latency** dari model ma
 
 ## 🚫 Pengecualian / Blacklist Model & Provider (`exclusions.json`)
 
-Anda dapat mengecualikan provider tertentu atau model-model tertentu yang kualitasnya jelek/kurang bagus, model berukuran kecil (*nano*, *tiny*, *xs*, *lfm*), atau non-coding (TTS, embed, video, dsb.) dengan mendaftarkannya di [exclusions.json](file:///home/ian/openagentic-free-sync/exclusions.json):
+Anda dapat mengecualikan provider tertentu atau model-model tertentu yang kualitasnya jelek/kurang bagus, model berukuran kecil (*nano*, *tiny*, *xs*, *lfm*), atau non-coding (TTS, embed, video, dsb.) dengan mendaftarkannya di [exclusions.json](file:///home/ian/9router-auto-free/exclusions.json):
 
 ```json
 {
