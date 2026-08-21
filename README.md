@@ -1,7 +1,7 @@
 # Free Models Sync -> 9router
-### (OpenAgentic.id + Kilo.ai + OpenRouter + 9router OpenCode Free)
+### (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + 9router OpenCode Free)
 
-Otomasi sinkronisasi, **live pre-test validasi**, pemeringkatan kapabilitas koding, dan injeksi model AI gratis harian langsung ke dalam **9router** combos (`my9model-free`, `openagentic-free`, `kilo-free`, `openrouter-free`, dan `opencode-free`).
+Otomasi sinkronisasi, **live pre-test validasi**, pemeringkatan kapabilitas koding, dan injeksi model AI gratis harian langsung ke dalam **9router** combos (`my9model-free`, `openagentic-free`, `kilo-free`, `openrouter-free`, `poolside-free`, `gemini-free`, dan `opencode-free`).
 
 ---
 
@@ -29,7 +29,13 @@ Hasilnya, combo di 9router selalu **bersih 100% dan Zero-Latency** dari model ma
 3. **OpenRouter**:
    - OpenRouter API (`https://openrouter.ai/api/v1/models`) via OpenRouter connection di 9router.
    - Mengambil model berharga 0 / `:free` (misal: `openrouter/nvidia/nemotron-3-nano-30b-a3b:free`, `openrouter/liquid/lfm-2.5-2.6b:free`, `openrouter/cohere/north-mini-code:free`, dsb.).
-4. **9router OpenCode Free (`oc/*`)**:
+4. **Poolside**:
+   - Poolside Inference API (`https://inference.poolside.ai/v1/models`) via Poolside connection di 9router.
+   - Mengambil model berharga 0 / `is_free: true` (misal: `poolside/poolside/laguna-s-2.1`, `poolside/poolside/laguna-xs-2.1`).
+5. **Google Gemini (Google AI Studio Free Tier)**:
+   - Google Generative Language API (`https://generativelanguage.googleapis.com/v1beta/models`) via Gemini API Key di 9router.
+   - Mengambil model free-tier (misal: `gemini/gemini-3.7-flash`, `gemini/gemini-3.6-flash`, `gemini/gemini-3.5-flash`, `gemini/gemini-3.5-flash-lite`, `gemini/gemini-3.1-flash-lite`).
+6. **9router OpenCode Free (`oc/*`)**:
    - Diambil langsung dari routing node OpenCode di 9router.
 
 ---
@@ -70,26 +76,21 @@ Skor kapabilitas model dihitung secara empiris dengan mengambil data langsung da
 
 - **Live Benchmark Updater (`update-benchmarks.js`)**:
   - Mengambil data skor valid secara langsung dari repository resmi [EvalPlus Leaderboard](https://raw.githubusercontent.com/evalplus/evalplus.github.io/main/results.json) (125+ model coding).
-  - Menggabungkannya dengan *calibrated baseline* untuk model-model frontier/proprietary (seperti Claude Sonnet 4.5 Thinking, DeepSeek R1, DeepSeek V4 Flash, GLM-5, Step 3.7 Flash).
+  - Menggabungkannya dengan *calibrated baseline* untuk model-model frontier/proprietary (seperti Gemini 3.7 Flash, Claude Sonnet 4.5 Thinking, DeepSeek R1, DeepSeek V4 Flash, GLM-5, Step 3.7 Flash).
   - Menyimpan cache terpadu ke [`benchmarks.json`](file:///home/ian/openagentic-free-sync/benchmarks.json) (150+ model).
 
 - **Tingkatan Skor (Tiering)**:
-  1. **Tier S+ / S (Benchmark 75 - 85+)**: `assistant-sonnet-4.5-thinking` (84.0), `claude-sonnet-4.5` (82.5), `deepseek-r1` (76.5).
-  2. **Tier A+ / A (Benchmark 65 - 74)**: `deepseek-v4` (74.0), `glm-5` (71.0), `step-3.7-flash` (70.0), `qwen3.6-plus` (69.0), `qwen2.5-coder` (68.5).
+  1. **Tier S+ / S (Benchmark 75 - 85+)**: `gemini-3.1-pro-preview` (85.0), `assistant-sonnet-4.5-thinking` (84.0), `gemini-3.7-flash` (83.0), `claude-sonnet-4.5` (82.5), `gemini-3.6-flash` (81.0), `gemini-3.5-flash` (79.0), `deepseek-r1` (76.5), `gemini-3.5-flash-lite` (76.0).
+  2. **Tier A+ / A (Benchmark 65 - 74)**: `deepseek-v4` (74.0), `gemini-3.1-flash-lite` (74.0), `glm-5` (71.0), `step-3.7-flash` (70.0), `qwen3.6-plus` (69.0), `qwen2.5-coder` (68.5).
   3. **Tier B+ / B (Benchmark 50 - 64)**: `minimax-m3` (62.5), `minimax-m2.5` (61.0), `nemotron-3-ultra` (58.5), `hy3` (54.0), `mimo-v2.5` (52.0).
   4. **Tier C+ / C (Benchmark 40 - 49)**: `laguna-s-2.1` (48.0), `ling-3.0-flash` (47.0), `laguna-xs-2.1` (46.0), `lfm-2.5-2.6b` (44.0), `north-mini-code` (43.0).
-  5. **Heuristic Fallback**: Model baru yang belum terdaftar di database benchmark otomatis dinilai berdasarkan formula generasi versi, keluarga arsitektur (Claude/GPT/DeepSeek), ukuran parameter (70B/32B/8B), dan context window.
+  5. **Heuristic Fallback**: Model baru yang belum terdaftar di database benchmark otomatis dinilai berdasarkan formula generasi versi, keluarga arsitektur (Claude/GPT/DeepSeek/Poolside/Gemini), ukuran parameter (70B/32B/8B), dan context window.
 
 ---
 
 ## ⚡ Prioritas Kecepatan Koneksi (Latency Tie-Breaker)
 
 Ketika dua atau lebih model memiliki **skor benchmark yang sama**, sistem secara otomatis mengukur waktu respons riil (*round-trip latency* dalam milidetik) dan **memprioritaskan model dengan koneksi paling cepat di urutan teratas**.
-
-Contoh pengurutan riil saat skor benchmark sama:
-1. `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` (**1576ms** - Paling Cepat)
-2. `kc/nvidia/nemotron-3-ultra-550b-a55b:free` (**2607ms**)
-3. `oc/nemotron-3-ultra-free` (**6728ms**)
 
 ---
 
@@ -129,4 +130,6 @@ Endpoint 9router: `http://localhost:20128/v1`
 - **`openagentic-free`**: Combo model gratis OpenAgentic.id yang aktif.
 - **`kilo-free`**: Combo model gratis Kilo.ai yang aktif.
 - **`openrouter-free`**: Combo model gratis OpenRouter yang aktif.
+- **`poolside-free`**: Combo model gratis Poolside yang aktif.
+- **`gemini-free`**: Combo model gratis Google Gemini yang aktif.
 - **`opencode-free`**: Combo model gratis OpenCode (`oc/*`) yang aktif.

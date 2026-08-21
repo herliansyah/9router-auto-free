@@ -2,13 +2,15 @@
 
 /**
  * Free Models Sync for 9router
- * (OpenAgentic.id + Kilo.ai + OpenRouter + 9router OpenCode Free)
+ * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + 9router OpenCode Free)
  * 
  * Automatically synchronizes today's free models from:
  *   1. OpenAgentic.id (Web & API /v1/models)
  *   2. Kilo.ai (Gateway API /api/gateway/models)
  *   3. OpenRouter (API /api/v1/models)
- *   4. 9router OpenCode (oc/* free models directly from 9router)
+ *   4. Poolside (Inference API /v1/models)
+ *   5. Google Gemini API (/v1beta/models)
+ *   6. 9router OpenCode (oc/* free models directly from 9router)
  * 
  * Pre-tests all candidates against 9router to drop expired/dead/paid models,
  * sorts them by coding capability specification (best to worst),
@@ -17,6 +19,8 @@
  *   - openagentic-free: Dedicated OpenAgentic free combo
  *   - kilo-free       : Dedicated Kilo.ai free combo
  *   - openrouter-free : Dedicated OpenRouter free combo
+ *   - poolside-free   : Dedicated Poolside free combo
+ *   - gemini-free     : Dedicated Gemini free combo
  *   - opencode-free   : Dedicated OpenCode free combo
  */
 
@@ -106,7 +110,7 @@ function getBenchmarksDatabase() {
 function findBenchmarkMatch(modelIdentifier, benchmarks) {
   if (!benchmarks || Object.keys(benchmarks).length === 0) return null;
   const str = String(modelIdentifier).toLowerCase()
-    .replace(/^(?:openrouter|kc|oc|openagentic)\//, '')
+    .replace(/^(?:openrouter|kc|oc|openagentic|poolside|gemini)\//, '')
     .replace(/:(?:free|thinking)$/, '')
     .replace(/-free$/, '');
 
@@ -160,6 +164,8 @@ function getCodingScore(modelIdentifier, customBenchmarks = null) {
     score += 4200;
   } else if (str.includes('kimi') || str.includes('moonshot') || str.includes('step')) {
     score += 4200;
+  } else if (str.includes('poolside') || str.includes('laguna')) {
+    score += 4100;
   } else if (str.includes('minimax')) {
     score += 3800;
   } else if (str.includes('nemotron')) {
@@ -295,6 +301,52 @@ function getOpenRouterCredentials() {
   }
 
   return { apiKey: null, prefix: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1' };
+}
+
+// Extract Poolside API Key and Provider Prefix from 9router Database
+function getPoolsideCredentials() {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'poolside' AND isActive = 1").get();
+    db.close();
+
+    if (row && row.data) {
+      const parsed = JSON.parse(row.data);
+      return {
+        apiKey: parsed.apiKey || null,
+        prefix: parsed?.providerSpecificData?.prefix || 'poolside',
+        baseUrl: parsed?.providerSpecificData?.baseUrl || 'https://inference.poolside.ai/v1'
+      };
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for Poolside credentials: ${err.message}`);
+  }
+
+  return { apiKey: null, prefix: 'poolside', baseUrl: 'https://inference.poolside.ai/v1' };
+}
+
+// Extract Gemini API Key and Provider Prefix from 9router Database
+function getGeminiCredentials() {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'gemini' AND isActive = 1").get();
+    db.close();
+
+    if (row && row.data) {
+      const parsed = JSON.parse(row.data);
+      return {
+        apiKey: parsed.apiKey || null,
+        prefix: parsed?.providerSpecificData?.prefix || 'gemini',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta'
+      };
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for Gemini credentials: ${err.message}`);
+  }
+
+  return { apiKey: null, prefix: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' };
 }
 
 // Scrape free models from OpenAgentic HTML landing page
@@ -446,6 +498,48 @@ async function fetchOpenRouterFreeModels(apiKey, baseUrl = 'https://openrouter.a
   return freeModels;
 }
 
+// Fetch free models from Poolside Inference API
+async function fetchPoolsideFreeModels(apiKey, baseUrl = 'https://inference.poolside.ai/v1') {
+  const freeModels = [];
+  if (!apiKey) return freeModels;
+
+  try {
+    console.log('[-] Fetching free models from Poolside API (/v1/models)...');
+    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
+    const res = await fetch(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'User-Agent': 'Mozilla/5.0'
+      },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const models = json.data || [];
+
+      for (const m of models) {
+        const id = m.id || '';
+        const name = m.name || id;
+        const promptPrice = m.pricing?.prompt;
+        const isZeroPrice = promptPrice === '0' || promptPrice === '0.000000000000' || parseFloat(promptPrice) === 0;
+        const isFree = m.is_free === true || isZeroPrice || id.endsWith(':free') || id.includes('/free');
+
+        if (isFree && !id.includes('content-safety') && !id.includes('lyria') && !id.includes('embed') && !id.includes('tts')) {
+          freeModels.push({
+            id: id,
+            name: name,
+            source: 'poolside-api-free'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[!] Poolside fetch notice: ${err.message}`);
+  }
+  return freeModels;
+}
+
 // Extract OpenCode free models directly from 9router (oc/*)
 function getTodaysOpenCodeFreeModels() {
   console.log('[-] Extracting OpenCode free models directly from 9router...');
@@ -518,6 +612,80 @@ async function getTodaysOpenRouterFreeModels() {
 
   return {
     prefix: creds.prefix || 'openrouter',
+    models: sortModelsByCodingQuality(models)
+  };
+}
+
+// Merge and discover all free models from Poolside
+async function getTodaysPoolsideFreeModels() {
+  const creds = getPoolsideCredentials();
+  const models = await fetchPoolsideFreeModels(creds.apiKey, creds.baseUrl);
+
+  return {
+    prefix: creds.prefix || 'poolside',
+    models: sortModelsByCodingQuality(models)
+  };
+}
+
+// Fetch free models from Google Gemini API
+async function fetchGeminiFreeModels(apiKey, baseUrl = 'https://generativelanguage.googleapis.com/v1beta') {
+  const freeModels = [];
+  if (!apiKey) return freeModels;
+
+  try {
+    console.log('[-] Fetching model list from Google Gemini API (/v1beta/models)...');
+    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models?key=${apiKey}`;
+    const res = await fetch(endpoint, {
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const models = json.models || [];
+
+      for (const m of models) {
+        if (!m.supportedGenerationMethods || !m.supportedGenerationMethods.includes('generateContent')) {
+          continue;
+        }
+
+        const rawName = m.name || '';
+        const id = rawName.replace(/^models\//, '');
+        const name = m.displayName || id;
+        const lowerId = id.toLowerCase();
+
+        // Skip non-coding / audio / preview image / tts / robotics / custom tools
+        if (
+          lowerId.includes('image') ||
+          lowerId.includes('banana') ||
+          lowerId.includes('tts') ||
+          lowerId.includes('lyria') ||
+          lowerId.includes('robotics') ||
+          lowerId.includes('customtools') ||
+          lowerId.includes('embed')
+        ) {
+          continue;
+        }
+
+        freeModels.push({
+          id: id,
+          name: name,
+          source: 'gemini-api-free'
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(`[!] Gemini API fetch notice: ${err.message}`);
+  }
+  return freeModels;
+}
+
+// Merge and discover all free models from Gemini
+async function getTodaysGeminiFreeModels() {
+  const creds = getGeminiCredentials();
+  const models = await fetchGeminiFreeModels(creds.apiKey, creds.baseUrl);
+
+  return {
+    prefix: creds.prefix || 'gemini',
     models: sortModelsByCodingQuality(models)
   };
 }
@@ -611,21 +779,25 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
 }
 
 // Inject free models into 9router combos
-async function injectInto9router(oaData, kiloData, ocData, orData) {
+async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData) {
   // Validate each source's free models against 9router live test
   const validOaModels = await validateCandidateModels(oaData.models, oaData.prefix, isSkipTest);
   const validKiloModels = await validateCandidateModels(kiloData.models, kiloData.prefix, isSkipTest);
   const validOcModels = await validateCandidateModels(ocData.models, ocData.prefix, isSkipTest);
   const validOrModels = orData ? await validateCandidateModels(orData.models, orData.prefix, isSkipTest) : [];
+  const validPoolsideModels = poolsideData ? await validateCandidateModels(poolsideData.models, poolsideData.prefix || 'poolside', isSkipTest) : [];
+  const validGeminiModels = geminiData ? await validateCandidateModels(geminiData.models, geminiData.prefix || 'gemini', isSkipTest) : [];
 
   const oaPrefixed = validOaModels.map(m => `${oaData.prefix}/${m.id}`);
   const kiloPrefixed = validKiloModels.map(m => `${kiloData.prefix}/${m.id}`);
   const ocPrefixed = validOcModels.map(m => m.fullId || `${ocData.prefix}/${m.id}`);
   const orPrefixed = validOrModels.map(m => m.fullId || `${orData.prefix}/${m.id}`);
+  const psPrefixed = validPoolsideModels.map(m => m.fullId || `${poolsideData.prefix || 'poolside'}/${m.id}`);
+  const geminiPrefixed = validGeminiModels.map(m => m.fullId || `${geminiData.prefix || 'gemini'}/${m.id}`);
 
   // Build global latency lookup map for tie-breaking
   const latencyMap = new Map();
-  for (const m of [...validOaModels, ...validKiloModels, ...validOcModels, ...validOrModels]) {
+  for (const m of [...validOaModels, ...validKiloModels, ...validOcModels, ...validOrModels, ...validPoolsideModels, ...validGeminiModels]) {
     const key = m.fullId || (m.prefix ? `${m.prefix}/${m.id}` : m.id);
     if (m.latencyMs != null) latencyMap.set(key, m.latencyMs);
   }
@@ -658,12 +830,30 @@ async function injectInto9router(oaData, kiloData, ocData, orData) {
     }
   }
 
+  if (poolsideData) {
+    console.log(`\n[+] Validated Poolside: ${validPoolsideModels.length} models:`);
+    for (const m of validPoolsideModels) {
+      const rawId = m.fullId || `${poolsideData.prefix || 'poolside'}/${m.id}`;
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    }
+  }
+
+  if (geminiData) {
+    console.log(`\n[+] Validated Gemini: ${validGeminiModels.length} models:`);
+    for (const m of validGeminiModels) {
+      const rawId = m.fullId || `${geminiData.prefix || 'gemini'}/${m.id}`;
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    }
+  }
+
   if (isDryRun) {
     console.log('\n[*] Dry run mode enabled. No changes written.');
     return;
   }
 
-  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed])), latencyMap);
+  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed, ...psPrefixed, ...geminiPrefixed])), latencyMap);
 
   // 1. Try updating via 9router API client if server is running
   let updatedViaApi = false;
@@ -693,6 +883,14 @@ async function injectInto9router(oaData, kiloData, ocData, orData) {
           } else if (combo.name === 'openrouter-free' && orData) {
             await client.updateCombo(combo.id, { name: combo.name, models: orPrefixed });
             console.log(`[✓] Updated combo 'openrouter-free' via 9router API (${orPrefixed.length} models)`);
+            updatedViaApi = true;
+          } else if (combo.name === 'poolside-free' && poolsideData) {
+            await client.updateCombo(combo.id, { name: combo.name, models: psPrefixed });
+            console.log(`[✓] Updated combo 'poolside-free' via 9router API (${psPrefixed.length} models)`);
+            updatedViaApi = true;
+          } else if (combo.name === 'gemini-free' && geminiData) {
+            await client.updateCombo(combo.id, { name: combo.name, models: geminiPrefixed });
+            console.log(`[✓] Updated combo 'gemini-free' via 9router API (${geminiPrefixed.length} models)`);
             updatedViaApi = true;
           }
         }
@@ -735,6 +933,8 @@ async function injectInto9router(oaData, kiloData, ocData, orData) {
     if (kiloPrefixed.length > 0) upsertCombo('kilo-free', kiloPrefixed);
     if (ocPrefixed.length > 0) upsertCombo('opencode-free', ocPrefixed);
     if (orPrefixed.length > 0) upsertCombo('openrouter-free', orPrefixed);
+    if (psPrefixed.length > 0) upsertCombo('poolside-free', psPrefixed);
+    if (geminiPrefixed.length > 0) upsertCombo('gemini-free', geminiPrefixed);
 
     db.close();
   } catch (err) {
@@ -782,7 +982,7 @@ function setupDailyCron() {
 async function main() {
   console.log('====================================================');
   console.log('  Free Models Sync -> 9router Combos               ');
-  console.log('  Sources: OpenAgentic + Kilo.ai + OpenRouter + OC  ');
+  console.log('  Sources: OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + OC');
   console.log('  Account: herliansyah@gmail.com                   ');
   console.log('  Pre-testing: Auto-drop expired & non-free models ');
   console.log(`  Time: ${new Date().toISOString()}`);
@@ -801,15 +1001,17 @@ async function main() {
     }
   }
 
-  const [oaData, kiloData, orData] = await Promise.all([
+  const [oaData, kiloData, orData, poolsideData, geminiData] = await Promise.all([
     getTodaysOpenAgenticFreeModels(),
     getTodaysKiloFreeModels(),
-    getTodaysOpenRouterFreeModels()
+    getTodaysOpenRouterFreeModels(),
+    getTodaysPoolsideFreeModels(),
+    getTodaysGeminiFreeModels()
   ]);
 
   const ocData = getTodaysOpenCodeFreeModels();
 
-  await injectInto9router(oaData, kiloData, ocData, orData);
+  await injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData);
 }
 
 if (require.main === module) {
@@ -829,9 +1031,13 @@ module.exports = {
   getOpenAgenticCredentials,
   getKiloCredentials,
   getOpenRouterCredentials,
+  getPoolsideCredentials,
+  getGeminiCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
+  getTodaysPoolsideFreeModels,
+  getTodaysGeminiFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels,
@@ -839,5 +1045,7 @@ module.exports = {
   fetchFreeModelsFromApi,
   fetchKiloFreeModels,
   fetchOpenRouterFreeModels,
+  fetchPoolsideFreeModels,
+  fetchGeminiFreeModels,
   injectInto9router
 };

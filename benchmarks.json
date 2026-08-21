@@ -1,4 +1,11 @@
 {
+  "gemini-3.1-pro-preview": {
+    "name": "Gemini 3.1 Pro Preview",
+    "score": 85,
+    "swe_bench": 81,
+    "livecodebench": 84.5,
+    "tier": "S+"
+  },
   "assistant-sonnet-4.5-thinking": {
     "name": "Claude Sonnet 4.5 Thinking",
     "score": 84,
@@ -6,11 +13,32 @@
     "livecodebench": 83.5,
     "tier": "S+"
   },
+  "gemini-3.7-flash": {
+    "name": "Gemini 3.7 Flash",
+    "score": 83,
+    "swe_bench": 78.5,
+    "livecodebench": 82,
+    "tier": "S"
+  },
   "claude-sonnet-4.5": {
     "name": "Claude Sonnet 4.5",
     "score": 82.5,
     "swe_bench": 78,
     "livecodebench": 81,
+    "tier": "S"
+  },
+  "gemini-3.6-flash": {
+    "name": "Gemini 3.6 Flash",
+    "score": 81,
+    "swe_bench": 76,
+    "livecodebench": 80,
+    "tier": "S"
+  },
+  "gemini-3.5-flash": {
+    "name": "Gemini 3.5 Flash",
+    "score": 79,
+    "swe_bench": 74,
+    "livecodebench": 78,
     "tier": "S"
   },
   "claude-3.5-sonnet": {
@@ -26,6 +54,20 @@
     "swe_bench": 71,
     "livecodebench": 75.8,
     "tier": "S"
+  },
+  "gemini-3.5-flash-lite": {
+    "name": "Gemini 3.5 Flash Lite",
+    "score": 76,
+    "swe_bench": 70,
+    "livecodebench": 75,
+    "tier": "S"
+  },
+  "gemini-3.1-flash-lite": {
+    "name": "Gemini 3.1 Flash Lite",
+    "score": 74,
+    "swe_bench": 68,
+    "livecodebench": 73,
+    "tier": "A+"
   },
   "deepseek-v4": {
     "name": "DeepSeek V4 Flash",

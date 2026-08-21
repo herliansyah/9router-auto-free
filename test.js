@@ -10,16 +10,20 @@ const {
   getOpenAgenticCredentials,
   getKiloCredentials,
   getOpenRouterCredentials,
+  getPoolsideCredentials,
+  getGeminiCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
+  getTodaysPoolsideFreeModels,
+  getTodaysGeminiFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels
 } = require('./sync.js');
 
 async function runTests() {
-  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + 9router OpenCode)...');
+  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + 9router OpenCode)...');
 
   // 1. Coding score & Benchmark tests
   console.log('[-] Testing coding benchmark score & sorting...');
@@ -58,13 +62,29 @@ async function runTests() {
   console.log(`    Found ${orData.models.length} OpenRouter candidate free models`);
   assert.ok(orData.models.length > 0, 'Should find OpenRouter free models');
 
-  // 5. OpenCode from 9router Discovery Test
+  // 5. Poolside Credential & Discovery Test
+  console.log('[-] Testing Poolside discovery...');
+  const psCreds = getPoolsideCredentials();
+  assert.strictEqual(psCreds.prefix, 'poolside', 'Poolside prefix must be poolside');
+  const psData = await getTodaysPoolsideFreeModels();
+  console.log(`    Found ${psData.models.length} Poolside candidate free models`);
+  assert.ok(psData.models.length > 0, 'Should find Poolside free models');
+
+  // 6. Gemini Credential & Discovery Test
+  console.log('[-] Testing Gemini discovery...');
+  const geminiCreds = getGeminiCredentials();
+  assert.strictEqual(geminiCreds.prefix, 'gemini', 'Gemini prefix must be gemini');
+  const geminiData = await getTodaysGeminiFreeModels();
+  console.log(`    Found ${geminiData.models.length} Gemini candidate free models`);
+  assert.ok(geminiData.models.length > 0, 'Should find Gemini free models');
+
+  // 7. OpenCode from 9router Discovery Test
   console.log('[-] Testing 9router OpenCode free extraction...');
   const ocData = getTodaysOpenCodeFreeModels();
   console.log(`    Found ${ocData.models.length} OpenCode candidate free models`);
   assert.ok(ocData.models.length > 0, 'Should find OpenCode free models');
 
-  // 6. Exclusion Rules Check
+  // 8. Exclusion Rules Check
   console.log('[-] Testing exclusions filter engine...');
   const { getExclusionList, isModelExcluded } = require('./sync.js');
   const exclusions = getExclusionList();
@@ -74,7 +94,7 @@ async function runTests() {
   assert.ok(isModelExcluded('kc/dots-studio/dots-3-note-preview:free', exclusions), 'dots-3-note must be excluded');
   assert.strictEqual(isModelExcluded('kc/stepfun/step-3.7-flash:free', exclusions), false, 'step-3.7 must not be excluded');
 
-  // 7. Pre-test Validation Engine Check
+  // 9. Pre-test Validation Engine Check
   console.log('[-] Testing pre-test validation engine...');
   const sampleModels = [
     { id: 'stepfun/step-3.7-flash:free', name: 'Step 3.7 Flash' },
@@ -85,12 +105,14 @@ async function runTests() {
   assert.strictEqual(filtered.length, 1, 'Only non-excluded models should remain');
   assert.strictEqual(filtered[0].id, 'stepfun/step-3.7-flash:free');
 
-  // 7. Combined sorting test
+  // 10. Combined sorting test
   console.log('[-] Testing combined priority sorting across all providers...');
   const allPrefixed = [
     ...oaData.models.map(m => `openagentic/${m.id}`),
     ...kiloData.models.map(m => `kc/${m.id}`),
     ...orData.models.map(m => `openrouter/${m.id}`),
+    ...psData.models.map(m => `poolside/${m.id}`),
+    ...geminiData.models.map(m => `gemini/${m.id}`),
     ...ocData.models.map(m => m.fullId || `oc/${m.id}`)
   ];
   const sortedUnified = sortModelsByCodingQuality(allPrefixed);
@@ -102,7 +124,7 @@ async function runTests() {
     assert.ok(scoreA >= scoreB, `Model ${sortedUnified[i]} (${scoreA}) must score >= ${sortedUnified[i + 1]} (${scoreB})`);
   }
 
-  // 8. Latency Tie-Breaker Test
+  // 11. Latency Tie-Breaker Test
   console.log('[-] Testing latency tie-breaker sorting...');
   const tieCandidates = [
     { id: 'poolside/laguna-s-2.1:free', name: 'Laguna S Slow', latencyMs: 2500 },
