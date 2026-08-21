@@ -70,17 +70,64 @@ function get9routerCliToken() {
 
 // Load blacklist / exclusion rules from exclusions.json
 const EXCLUSIONS_PATH = path.join(__dirname, 'exclusions.json');
-function getExclusionList() {
+
+function getExclusionConfig() {
+  let excludedModels = [];
+  let excludedProviders = [];
+
   try {
     if (fs.existsSync(EXCLUSIONS_PATH)) {
       const content = fs.readFileSync(EXCLUSIONS_PATH, 'utf8');
-      const list = JSON.parse(content);
-      if (Array.isArray(list)) return list.map(item => String(item).trim().toLowerCase()).filter(Boolean);
+      const data = JSON.parse(content);
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          const str = String(item).trim().toLowerCase();
+          if (str.startsWith('provider:')) {
+            excludedProviders.push(str.replace(/^provider:/, '').trim());
+          } else if (str) {
+            excludedModels.push(str);
+          }
+        }
+      } else if (typeof data === 'object' && data !== null) {
+        if (Array.isArray(data.excludedModels)) {
+          excludedModels = data.excludedModels.map(m => String(m).trim().toLowerCase()).filter(Boolean);
+        }
+        if (Array.isArray(data.excludedProviders)) {
+          excludedProviders = data.excludedProviders.map(p => String(p).trim().toLowerCase()).filter(Boolean);
+        }
+      }
     }
   } catch (err) {
     console.warn(`[!] Warning: Could not read exclusions.json: ${err.message}`);
   }
-  return [];
+
+  // CLI argument support: --exclude-provider=api-airforce,ollama
+  const cliExcludeArg = args.find(a => a.startsWith('--exclude-provider='));
+  if (cliExcludeArg) {
+    const list = cliExcludeArg.split('=')[1].split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    excludedProviders.push(...list);
+  }
+
+  return {
+    excludedModels,
+    excludedProviders: Array.from(new Set(excludedProviders))
+  };
+}
+
+function getExclusionList() {
+  return getExclusionConfig().excludedModels;
+}
+
+function getExcludedProviders() {
+  return getExclusionConfig().excludedProviders;
+}
+
+// Check if a provider is excluded
+function isProviderExcluded(providerName, excludedProviders = null) {
+  const list = excludedProviders || getExcludedProviders();
+  if (!list || list.length === 0) return false;
+  const name = String(providerName).trim().toLowerCase();
+  return list.some(p => p === name || name.includes(p) || (p === 'airforce' && name === 'api-airforce'));
 }
 
 // Check if a model matches any exclusion rule (exact or substring)
@@ -978,15 +1025,15 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
 
 // Inject free models into 9router combos
 async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData) {
-  // Validate each source's free models against 9router live test
-  const validOaModels = await validateCandidateModels(oaData.models, oaData.prefix, isSkipTest);
-  const validKiloModels = await validateCandidateModels(kiloData.models, kiloData.prefix, isSkipTest);
-  const validOcModels = await validateCandidateModels(ocData.models, ocData.prefix, isSkipTest);
-  const validOrModels = orData ? await validateCandidateModels(orData.models, orData.prefix, isSkipTest) : [];
-  const validPoolsideModels = poolsideData ? await validateCandidateModels(poolsideData.models, poolsideData.prefix || 'poolside', isSkipTest) : [];
-  const validGeminiModels = geminiData ? await validateCandidateModels(geminiData.models, geminiData.prefix || 'gemini', isSkipTest) : [];
-  const validOllamaModels = ollamaData ? await validateCandidateModels(ollamaData.models, ollamaData.prefix || 'ollama', isSkipTest) : [];
-  const validAirforceModels = airforceData ? await validateCandidateModels(airforceData.models, airforceData.prefix || 'api-airforce', isSkipTest) : [];
+  // Validate each source's free models against 9router live test (skip if provider is excluded)
+  const validOaModels = oaData?.excluded ? [] : await validateCandidateModels(oaData.models, oaData.prefix, isSkipTest);
+  const validKiloModels = kiloData?.excluded ? [] : await validateCandidateModels(kiloData.models, kiloData.prefix, isSkipTest);
+  const validOcModels = ocData?.excluded ? [] : await validateCandidateModels(ocData.models, ocData.prefix, isSkipTest);
+  const validOrModels = orData?.excluded ? [] : (orData ? await validateCandidateModels(orData.models, orData.prefix, isSkipTest) : []);
+  const validPoolsideModels = poolsideData?.excluded ? [] : (poolsideData ? await validateCandidateModels(poolsideData.models, poolsideData.prefix || 'poolside', isSkipTest) : []);
+  const validGeminiModels = geminiData?.excluded ? [] : (geminiData ? await validateCandidateModels(geminiData.models, geminiData.prefix || 'gemini', isSkipTest) : []);
+  const validOllamaModels = ollamaData?.excluded ? [] : (ollamaData ? await validateCandidateModels(ollamaData.models, ollamaData.prefix || 'ollama', isSkipTest) : []);
+  const validAirforceModels = airforceData?.excluded ? [] : (airforceData ? await validateCandidateModels(airforceData.models, airforceData.prefix || 'api-airforce', isSkipTest) : []);
 
   const oaPrefixed = validOaModels.map(m => `${oaData.prefix}/${m.id}`);
   const kiloPrefixed = validKiloModels.map(m => `${kiloData.prefix}/${m.id}`);
@@ -1004,67 +1051,99 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
     if (m.latencyMs != null) latencyMap.set(key, m.latencyMs);
   }
 
-  console.log(`\n[+] Validated OpenAgentic: ${validOaModels.length} models:`);
-  for (const m of validOaModels) {
-    const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-    console.log(`    - ${oaData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+  if (!oaData?.excluded) {
+    console.log(`\n[+] Validated OpenAgentic: ${validOaModels.length} models:`);
+    for (const m of validOaModels) {
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      console.log(`    - ${oaData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    }
+  } else {
+    console.log(`\n[⊘] OpenAgentic: Skipped (provider excluded)`);
   }
 
-  console.log(`\n[+] Validated Kilo.ai: ${validKiloModels.length} models:`);
-  for (const m of validKiloModels) {
-    const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-    console.log(`    - ${kiloData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+  if (!kiloData?.excluded) {
+    console.log(`\n[+] Validated Kilo.ai: ${validKiloModels.length} models:`);
+    for (const m of validKiloModels) {
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      console.log(`    - ${kiloData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    }
+  } else {
+    console.log(`\n[⊘] Kilo.ai: Skipped (provider excluded)`);
   }
 
-  console.log(`\n[+] Validated 9router OpenCode: ${validOcModels.length} models:`);
-  for (const m of validOcModels) {
-    const rawId = m.fullId || `${ocData.prefix}/${m.id}`;
-    const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-    console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+  if (!ocData?.excluded) {
+    console.log(`\n[+] Validated 9router OpenCode: ${validOcModels.length} models:`);
+    for (const m of validOcModels) {
+      const rawId = m.fullId || `${ocData.prefix}/${m.id}`;
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    }
+  } else {
+    console.log(`\n[⊘] 9router OpenCode: Skipped (provider excluded)`);
   }
 
   if (orData) {
-    console.log(`\n[+] Validated OpenRouter: ${validOrModels.length} models:`);
-    for (const m of validOrModels) {
-      const rawId = m.fullId || `${orData.prefix}/${m.id}`;
-      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    if (!orData.excluded) {
+      console.log(`\n[+] Validated OpenRouter: ${validOrModels.length} models:`);
+      for (const m of validOrModels) {
+        const rawId = m.fullId || `${orData.prefix}/${m.id}`;
+        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+      }
+    } else {
+      console.log(`\n[⊘] OpenRouter: Skipped (provider excluded)`);
     }
   }
 
   if (poolsideData) {
-    console.log(`\n[+] Validated Poolside: ${validPoolsideModels.length} models:`);
-    for (const m of validPoolsideModels) {
-      const rawId = m.fullId || `${poolsideData.prefix || 'poolside'}/${m.id}`;
-      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    if (!poolsideData.excluded) {
+      console.log(`\n[+] Validated Poolside: ${validPoolsideModels.length} models:`);
+      for (const m of validPoolsideModels) {
+        const rawId = m.fullId || `${poolsideData.prefix || 'poolside'}/${m.id}`;
+        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+      }
+    } else {
+      console.log(`\n[⊘] Poolside: Skipped (provider excluded)`);
     }
   }
 
   if (geminiData) {
-    console.log(`\n[+] Validated Gemini: ${validGeminiModels.length} models:`);
-    for (const m of validGeminiModels) {
-      const rawId = m.fullId || `${geminiData.prefix || 'gemini'}/${m.id}`;
-      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    if (!geminiData.excluded) {
+      console.log(`\n[+] Validated Gemini: ${validGeminiModels.length} models:`);
+      for (const m of validGeminiModels) {
+        const rawId = m.fullId || `${geminiData.prefix || 'gemini'}/${m.id}`;
+        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+      }
+    } else {
+      console.log(`\n[⊘] Gemini: Skipped (provider excluded)`);
     }
   }
 
   if (ollamaData) {
-    console.log(`\n[+] Validated Ollama Cloud: ${validOllamaModels.length} models:`);
-    for (const m of validOllamaModels) {
-      const rawId = m.fullId || `${ollamaData.prefix || 'ollama'}/${m.id}`;
-      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    if (!ollamaData.excluded) {
+      console.log(`\n[+] Validated Ollama Cloud: ${validOllamaModels.length} models:`);
+      for (const m of validOllamaModels) {
+        const rawId = m.fullId || `${ollamaData.prefix || 'ollama'}/${m.id}`;
+        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+      }
+    } else {
+      console.log(`\n[⊘] Ollama Cloud: Skipped (provider excluded)`);
     }
   }
 
   if (airforceData) {
-    console.log(`\n[+] Validated API.airforce: ${validAirforceModels.length} models:`);
-    for (const m of validAirforceModels) {
-      const rawId = m.fullId || `${airforceData.prefix || 'api-airforce'}/${m.id}`;
-      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+    if (!airforceData.excluded) {
+      console.log(`\n[+] Validated API.airforce: ${validAirforceModels.length} models:`);
+      for (const m of validAirforceModels) {
+        const rawId = m.fullId || `${airforceData.prefix || 'api-airforce'}/${m.id}`;
+        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+      }
+    } else {
+      console.log(`\n[⊘] API.airforce: Skipped (provider excluded)`);
     }
   }
 
@@ -1088,35 +1167,35 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
             await client.updateCombo(combo.id, { name: combo.name, models: unifiedList });
             console.log(`[✓] Updated combo '${combo.name}' via 9router API (${unifiedList.length} models)`);
             updatedViaApi = true;
-          } else if (combo.name === 'openagentic-free') {
+          } else if (combo.name === 'openagentic-free' && !oaData?.excluded) {
             await client.updateCombo(combo.id, { name: combo.name, models: oaPrefixed });
             console.log(`[✓] Updated combo 'openagentic-free' via 9router API (${oaPrefixed.length} models)`);
             updatedViaApi = true;
-          } else if (combo.name === 'kilo-free') {
+          } else if (combo.name === 'kilo-free' && !kiloData?.excluded) {
             await client.updateCombo(combo.id, { name: combo.name, models: kiloPrefixed });
             console.log(`[✓] Updated combo 'kilo-free' via 9router API (${kiloPrefixed.length} models)`);
             updatedViaApi = true;
-          } else if (combo.name === 'opencode-free') {
+          } else if (combo.name === 'opencode-free' && !ocData?.excluded) {
             await client.updateCombo(combo.id, { name: combo.name, models: ocPrefixed });
             console.log(`[✓] Updated combo 'opencode-free' via 9router API (${ocPrefixed.length} models)`);
             updatedViaApi = true;
-          } else if (combo.name === 'openrouter-free' && orData) {
+          } else if (combo.name === 'openrouter-free' && orData && !orData.excluded) {
             await client.updateCombo(combo.id, { name: combo.name, models: orPrefixed });
             console.log(`[✓] Updated combo 'openrouter-free' via 9router API (${orPrefixed.length} models)`);
             updatedViaApi = true;
-          } else if (combo.name === 'poolside-free' && poolsideData) {
+          } else if (combo.name === 'poolside-free' && poolsideData && !poolsideData.excluded) {
             await client.updateCombo(combo.id, { name: combo.name, models: psPrefixed });
             console.log(`[✓] Updated combo 'poolside-free' via 9router API (${psPrefixed.length} models)`);
             updatedViaApi = true;
-          } else if (combo.name === 'gemini-free' && geminiData) {
+          } else if (combo.name === 'gemini-free' && geminiData && !geminiData.excluded) {
             await client.updateCombo(combo.id, { name: combo.name, models: geminiPrefixed });
             console.log(`[✓] Updated combo 'gemini-free' via 9router API (${geminiPrefixed.length} models)`);
             updatedViaApi = true;
-          } else if (combo.name === 'ollama-free' && ollamaData) {
+          } else if (combo.name === 'ollama-free' && ollamaData && !ollamaData.excluded) {
             await client.updateCombo(combo.id, { name: combo.name, models: ollamaPrefixed });
             console.log(`[✓] Updated combo 'ollama-free' via 9router API (${ollamaPrefixed.length} models)`);
             updatedViaApi = true;
-          } else if (combo.name === 'airforce-free' && airforceData) {
+          } else if (combo.name === 'airforce-free' && airforceData && !airforceData.excluded) {
             await client.updateCombo(combo.id, { name: combo.name, models: airforcePrefixed });
             console.log(`[✓] Updated combo 'airforce-free' via 9router API (${airforcePrefixed.length} models)`);
             updatedViaApi = true;
@@ -1157,14 +1236,14 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
     }
 
     upsertCombo('my9model-free', unifiedList);
-    upsertCombo('openagentic-free', oaPrefixed);
-    if (kiloPrefixed.length > 0) upsertCombo('kilo-free', kiloPrefixed);
-    if (ocPrefixed.length > 0) upsertCombo('opencode-free', ocPrefixed);
-    if (orPrefixed.length > 0) upsertCombo('openrouter-free', orPrefixed);
-    if (psPrefixed.length > 0) upsertCombo('poolside-free', psPrefixed);
-    if (geminiPrefixed.length > 0) upsertCombo('gemini-free', geminiPrefixed);
-    if (ollamaPrefixed.length > 0) upsertCombo('ollama-free', ollamaPrefixed);
-    if (airforcePrefixed.length > 0) upsertCombo('airforce-free', airforcePrefixed);
+    if (!oaData?.excluded) upsertCombo('openagentic-free', oaPrefixed);
+    if (kiloPrefixed.length > 0 && !kiloData?.excluded) upsertCombo('kilo-free', kiloPrefixed);
+    if (ocPrefixed.length > 0 && !ocData?.excluded) upsertCombo('opencode-free', ocPrefixed);
+    if (orPrefixed.length > 0 && !orData?.excluded) upsertCombo('openrouter-free', orPrefixed);
+    if (psPrefixed.length > 0 && !poolsideData?.excluded) upsertCombo('poolside-free', psPrefixed);
+    if (geminiPrefixed.length > 0 && !geminiData?.excluded) upsertCombo('gemini-free', geminiPrefixed);
+    if (ollamaPrefixed.length > 0 && !ollamaData?.excluded) upsertCombo('ollama-free', ollamaPrefixed);
+    if (airforcePrefixed.length > 0 && !airforceData?.excluded) upsertCombo('airforce-free', airforcePrefixed);
 
     db.close();
   } catch (err) {
@@ -1231,17 +1310,38 @@ async function main() {
     }
   }
 
+  const excludedProviders = getExcludedProviders();
+  if (excludedProviders.length > 0) {
+    console.log(`[⊘] Excluded providers via config (${excludedProviders.length}): ${excludedProviders.join(', ')}\n`);
+  }
+
   const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData] = await Promise.all([
-    getTodaysOpenAgenticFreeModels(),
-    getTodaysKiloFreeModels(),
-    getTodaysOpenRouterFreeModels(),
-    getTodaysPoolsideFreeModels(),
-    getTodaysGeminiFreeModels(),
-    getTodaysOllamaFreeModels(),
-    getTodaysAirforceFreeModels()
+    isProviderExcluded('openagentic', excludedProviders)
+      ? Promise.resolve({ prefix: 'openagentic', models: [], excluded: true })
+      : getTodaysOpenAgenticFreeModels(),
+    isProviderExcluded('kilocode', excludedProviders) || isProviderExcluded('kilo', excludedProviders)
+      ? Promise.resolve({ prefix: 'kc', models: [], excluded: true })
+      : getTodaysKiloFreeModels(),
+    isProviderExcluded('openrouter', excludedProviders)
+      ? Promise.resolve({ prefix: 'openrouter', models: [], excluded: true })
+      : getTodaysOpenRouterFreeModels(),
+    isProviderExcluded('poolside', excludedProviders)
+      ? Promise.resolve({ prefix: 'poolside', models: [], excluded: true })
+      : getTodaysPoolsideFreeModels(),
+    isProviderExcluded('gemini', excludedProviders)
+      ? Promise.resolve({ prefix: 'gemini', models: [], excluded: true })
+      : getTodaysGeminiFreeModels(),
+    isProviderExcluded('ollama', excludedProviders)
+      ? Promise.resolve({ prefix: 'ollama', models: [], excluded: true })
+      : getTodaysOllamaFreeModels(),
+    isProviderExcluded('api-airforce', excludedProviders) || isProviderExcluded('airforce', excludedProviders)
+      ? Promise.resolve({ prefix: 'api-airforce', models: [], excluded: true })
+      : getTodaysAirforceFreeModels()
   ]);
 
-  const ocData = getTodaysOpenCodeFreeModels();
+  const ocData = isProviderExcluded('opencode', excludedProviders) || isProviderExcluded('oc', excludedProviders)
+    ? { prefix: 'oc', models: [], excluded: true }
+    : getTodaysOpenCodeFreeModels();
 
   await injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData);
 }
@@ -1258,7 +1358,10 @@ module.exports = {
   sortModelsByCodingQuality,
   getBenchmarksDatabase,
   findBenchmarkMatch,
+  getExclusionConfig,
   getExclusionList,
+  getExcludedProviders,
+  isProviderExcluded,
   isModelExcluded,
   getOpenAgenticCredentials,
   getKiloCredentials,

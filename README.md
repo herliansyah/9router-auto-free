@@ -46,33 +46,38 @@ Hasilnya, combo di 9router selalu **bersih 100% dan Zero-Latency** dari model ma
 
 ---
 
-## 🚫 Pengecualian / Blacklist Model (`exclusions.json`)
+## 🚫 Pengecualian / Blacklist Model & Provider (`exclusions.json`)
 
-Anda dapat mengecualikan model-model tertentu yang kualitasnya jelek/kurang bagus atau model non-coding (TTS, embed, video, dsb.) dengan mendaftarkannya di [exclusions.json](file:///home/ian/openagentic-free-sync/exclusions.json). 
-
-Sistem akan otomatis mencocokkan **ID lengkap** maupun **kata kunci**:
+Anda dapat mengecualikan provider tertentu atau model-model tertentu yang kualitasnya jelek/kurang bagus atau non-coding (TTS, embed, video, dsb.) dengan mendaftarkannya di [exclusions.json](file:///home/ian/openagentic-free-sync/exclusions.json):
 
 ```json
-[
-  "stealth/ox-alpha",
-  "dots-studio/dots-3-note-preview:free",
-  "openrouter/free",
-  "content-safety",
-  "tts",
-  "embed",
-  "image",
-  "flux",
-  "wan2",
-  "video",
-  "lyria",
-  "nvidia/nemotron-nano-9b-v2:free",
-  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-  "kilo-auto/free",
-  "nvidia/nemotron-nano-12b-v2-vl:free"
-]
+{
+  "excludedProviders": [
+    "api-airforce"
+  ],
+  "excludedModels": [
+    "stealth/ox-alpha",
+    "dots-studio/dots-3-note-preview:free",
+    "openrouter/free",
+    "content-safety",
+    "tts",
+    "embed",
+    "image",
+    "flux",
+    "wan2",
+    "video",
+    "lyria",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "kilo-auto/free",
+    "nvidia/nemotron-nano-12b-v2-vl:free"
+  ]
+}
 ```
 
-Model yang cocok dengan aturan di atas akan **otomatis di-skip sejak awal** sebelum live test dijalankan, sehingga menghemat waktu dan kuota.
+- **`excludedProviders`**: Provider yang terdaftar di sini (misal: `"api-airforce"`) akan **langsung di-skip total** (tidak di-query dan tidak dimasukkan ke dalam super-combo `my9model-free`).
+- Anda juga dapat mengecualikan provider via parameter CLI: `node sync.js --exclude-provider=api-airforce,ollama`.
+- **`excludedModels`**: Model yang cocok dengan aturan substring/ID akan **otomatis di-skip sejak awal** sebelum live test dijalankan.
 
 ---
 

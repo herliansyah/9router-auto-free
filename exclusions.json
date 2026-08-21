@@ -1,17 +1,22 @@
-[
-  "stealth/ox-alpha",
-  "dots-studio/dots-3-note-preview:free",
-  "openrouter/free",
-  "content-safety",
-  "tts",
-  "embed",
-  "image",
-  "flux",
-  "wan2",
-  "video",
-  "lyria",
-  "nvidia/nemotron-nano-9b-v2:free",
-  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-  "kilo-auto/free",
-  "nvidia/nemotron-nano-12b-v2-vl:free"
-]
+{
+  "excludedProviders": [
+    "api-airforce"
+  ],
+  "excludedModels": [
+    "stealth/ox-alpha",
+    "dots-studio/dots-3-note-preview:free",
+    "openrouter/free",
+    "content-safety",
+    "tts",
+    "embed",
+    "image",
+    "flux",
+    "wan2",
+    "video",
+    "lyria",
+    "nvidia/nemotron-nano-9b-v2:free",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "kilo-auto/free",
+    "nvidia/nemotron-nano-12b-v2-vl:free"
+  ]
+}

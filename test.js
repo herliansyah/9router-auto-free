@@ -104,11 +104,15 @@ async function runTests() {
   console.log(`    Found ${ocData.models.length} OpenCode candidate free models`);
   assert.ok(ocData.models.length > 0, 'Should find OpenCode free models');
 
-  // 10. Exclusion Rules Check
-  console.log('[-] Testing exclusions filter engine...');
-  const { getExclusionList, isModelExcluded } = require('./sync.js');
+  // 10. Exclusion Rules Check (Models & Providers)
+  console.log('[-] Testing exclusions filter engine (models & providers)...');
+  const { getExclusionList, getExcludedProviders, isProviderExcluded, isModelExcluded } = require('./sync.js');
   const exclusions = getExclusionList();
+  const excludedProviders = getExcludedProviders();
   assert.ok(Array.isArray(exclusions) && exclusions.length > 0, 'Exclusions list must not be empty');
+  assert.ok(Array.isArray(excludedProviders) && excludedProviders.includes('api-airforce'), 'api-airforce must be in excludedProviders');
+  assert.strictEqual(isProviderExcluded('api-airforce'), true, 'api-airforce must be reported as excluded');
+  assert.strictEqual(isProviderExcluded('gemini'), false, 'gemini must not be excluded');
   assert.ok(isModelExcluded('openrouter/stealth/ox-alpha', exclusions), 'ox-alpha must be excluded');
   assert.ok(isModelExcluded('openrouter/free', exclusions), 'openrouter/free must be excluded');
   assert.ok(isModelExcluded('kc/dots-studio/dots-3-note-preview:free', exclusions), 'dots-3-note must be excluded');
