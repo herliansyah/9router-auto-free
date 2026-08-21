@@ -1,5 +1,5 @@
 /**
- * Ponytail test check for 9router free sync (OpenAgentic + Kilo.ai + 9router OpenCode)
+ * Ponytail test check for 9router free sync (OpenAgentic + Kilo.ai + OpenRouter + 9router OpenCode)
  * Minimal assert-based self check.
  */
 
@@ -9,15 +9,17 @@ const {
   sortModelsByCodingQuality,
   getOpenAgenticCredentials,
   getKiloCredentials,
+  getOpenRouterCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
+  getTodaysOpenRouterFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels
 } = require('./sync.js');
 
 async function runTests() {
-  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + 9router OpenCode)...');
+  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + 9router OpenCode)...');
 
   // 1. Coding score tests
   console.log('[-] Testing coding spec score & sorting...');
@@ -41,27 +43,47 @@ async function runTests() {
   console.log(`    Found ${kiloData.models.length} Kilo.ai candidate free models`);
   assert.ok(kiloData.models.length > 0, 'Should find Kilo.ai free models');
 
-  // 4. OpenCode from 9router Discovery Test
+  // 4. OpenRouter Credential & Discovery Test
+  console.log('[-] Testing OpenRouter discovery...');
+  const orCreds = getOpenRouterCredentials();
+  assert.strictEqual(orCreds.prefix, 'openrouter', 'OpenRouter prefix must be openrouter');
+  const orData = await getTodaysOpenRouterFreeModels();
+  console.log(`    Found ${orData.models.length} OpenRouter candidate free models`);
+  assert.ok(orData.models.length > 0, 'Should find OpenRouter free models');
+
+  // 5. OpenCode from 9router Discovery Test
   console.log('[-] Testing 9router OpenCode free extraction...');
   const ocData = getTodaysOpenCodeFreeModels();
   console.log(`    Found ${ocData.models.length} OpenCode candidate free models`);
   assert.ok(ocData.models.length > 0, 'Should find OpenCode free models');
 
-  // 5. Pre-test Validation Engine Check
+  // 6. Exclusion Rules Check
+  console.log('[-] Testing exclusions filter engine...');
+  const { getExclusionList, isModelExcluded } = require('./sync.js');
+  const exclusions = getExclusionList();
+  assert.ok(Array.isArray(exclusions) && exclusions.length > 0, 'Exclusions list must not be empty');
+  assert.ok(isModelExcluded('openrouter/stealth/ox-alpha', exclusions), 'ox-alpha must be excluded');
+  assert.ok(isModelExcluded('openrouter/free', exclusions), 'openrouter/free must be excluded');
+  assert.ok(isModelExcluded('kc/dots-studio/dots-3-note-preview:free', exclusions), 'dots-3-note must be excluded');
+  assert.strictEqual(isModelExcluded('kc/stepfun/step-3.7-flash:free', exclusions), false, 'step-3.7 must not be excluded');
+
+  // 7. Pre-test Validation Engine Check
   console.log('[-] Testing pre-test validation engine...');
   const sampleModels = [
     { id: 'stepfun/step-3.7-flash:free', name: 'Step 3.7 Flash' },
-    { id: 'deepseek-v4-flash-free', name: 'Deepseek V4 (Expired)' }
+    { id: 'stealth/ox-alpha', name: 'Ox Alpha (Jelek / Excluded)' }
   ];
-  // Test skip mode (must retain all)
-  const skipped = await validateCandidateModels(sampleModels, 'kc', true);
-  assert.strictEqual(skipped.length, 2, 'Skip mode should keep all models');
+  // Test skip mode with exclusion (ox-alpha dropped, stepfun kept)
+  const filtered = await validateCandidateModels(sampleModels, 'kc', true);
+  assert.strictEqual(filtered.length, 1, 'Only non-excluded models should remain');
+  assert.strictEqual(filtered[0].id, 'stepfun/step-3.7-flash:free');
 
-  // 6. Combined sorting test
+  // 7. Combined sorting test
   console.log('[-] Testing combined priority sorting across all providers...');
   const allPrefixed = [
     ...oaData.models.map(m => `openagentic/${m.id}`),
     ...kiloData.models.map(m => `kc/${m.id}`),
+    ...orData.models.map(m => `openrouter/${m.id}`),
     ...ocData.models.map(m => m.fullId || `oc/${m.id}`)
   ];
   const sortedUnified = sortModelsByCodingQuality(allPrefixed);

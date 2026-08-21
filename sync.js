@@ -2,12 +2,13 @@
 
 /**
  * Free Models Sync for 9router
- * (OpenAgentic.id + Kilo.ai + 9router OpenCode Free)
+ * (OpenAgentic.id + Kilo.ai + OpenRouter + 9router OpenCode Free)
  * 
  * Automatically synchronizes today's free models from:
  *   1. OpenAgentic.id (Web & API /v1/models)
  *   2. Kilo.ai (Gateway API /api/gateway/models)
- *   3. 9router OpenCode (oc/* free models directly from 9router)
+ *   3. OpenRouter (API /api/v1/models)
+ *   4. 9router OpenCode (oc/* free models directly from 9router)
  * 
  * Pre-tests all candidates against 9router to drop expired/dead/paid models,
  * sorts them by coding capability specification (best to worst),
@@ -15,6 +16,7 @@
  *   - my9model-free   : Unified super-combo across all providers
  *   - openagentic-free: Dedicated OpenAgentic free combo
  *   - kilo-free       : Dedicated Kilo.ai free combo
+ *   - openrouter-free : Dedicated OpenRouter free combo
  *   - opencode-free   : Dedicated OpenCode free combo
  */
 
@@ -55,6 +57,34 @@ function get9routerCliToken() {
   } catch {
     return '';
   }
+}
+
+// Load blacklist / exclusion rules from exclusions.json
+const EXCLUSIONS_PATH = path.join(__dirname, 'exclusions.json');
+function getExclusionList() {
+  try {
+    if (fs.existsSync(EXCLUSIONS_PATH)) {
+      const content = fs.readFileSync(EXCLUSIONS_PATH, 'utf8');
+      const list = JSON.parse(content);
+      if (Array.isArray(list)) return list.map(item => String(item).trim().toLowerCase()).filter(Boolean);
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read exclusions.json: ${err.message}`);
+  }
+  return [];
+}
+
+// Check if a model matches any exclusion rule (exact or substring)
+function isModelExcluded(modelIdentifier, exclusions) {
+  if (!exclusions || exclusions.length === 0) return false;
+  const str = String(modelIdentifier).toLowerCase();
+  for (const item of exclusions) {
+    if (!item) continue;
+    if (str === item || str.includes(item)) {
+      return item;
+    }
+  }
+  return false;
 }
 
 // Coding capability scoring engine
@@ -184,6 +214,29 @@ function getKiloCredentials() {
   return { accessToken: null, prefix: 'kc', gatewayUrl: 'https://api.kilo.ai/api/gateway' };
 }
 
+// Extract OpenRouter API Key and Provider Prefix from 9router Database
+function getOpenRouterCredentials() {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'openrouter' AND isActive = 1").get();
+    db.close();
+
+    if (row && row.data) {
+      const parsed = JSON.parse(row.data);
+      return {
+        apiKey: parsed.apiKey || null,
+        prefix: parsed?.providerSpecificData?.prefix || 'openrouter',
+        baseUrl: 'https://openrouter.ai/api/v1'
+      };
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for OpenRouter credentials: ${err.message}`);
+  }
+
+  return { apiKey: null, prefix: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1' };
+}
+
 // Scrape free models from OpenAgentic HTML landing page
 async function scrapeFreeModelsFromWeb() {
   const freeModels = new Set();
@@ -293,6 +346,46 @@ async function fetchKiloFreeModels(accessToken, gatewayUrl) {
   return freeModels;
 }
 
+// Fetch free models from OpenRouter API
+async function fetchOpenRouterFreeModels(apiKey, baseUrl = 'https://openrouter.ai/api/v1') {
+  const freeModels = [];
+  try {
+    console.log('[-] Fetching free models from OpenRouter API (/api/v1/models)...');
+    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
+    const headers = { 'User-Agent': 'Mozilla/5.0' };
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+    const res = await fetch(endpoint, {
+      headers,
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const models = Array.isArray(json) ? json : (json.data || []);
+
+      for (const m of models) {
+        const id = m.id || '';
+        const name = m.name || id;
+        const promptPrice = m.pricing?.prompt;
+        const isZeroPrice = promptPrice === '0' || promptPrice === '0.000000000000' || parseFloat(promptPrice) === 0;
+        const isFree = m.isFree === true || isZeroPrice || id.endsWith(':free') || id.includes('/free');
+
+        if (isFree && !id.includes('content-safety') && !id.includes('lyria') && !id.includes('embed') && !id.includes('tts')) {
+          freeModels.push({
+            id: id,
+            name: name,
+            source: 'openrouter-api-free'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[!] OpenRouter fetch notice: ${err.message}`);
+  }
+  return freeModels;
+}
+
 // Extract OpenCode free models directly from 9router (oc/*)
 function getTodaysOpenCodeFreeModels() {
   console.log('[-] Extracting OpenCode free models directly from 9router...');
@@ -358,6 +451,17 @@ async function getTodaysKiloFreeModels() {
   };
 }
 
+// Merge and discover all free models from OpenRouter
+async function getTodaysOpenRouterFreeModels() {
+  const creds = getOpenRouterCredentials();
+  const models = await fetchOpenRouterFreeModels(creds.apiKey, creds.baseUrl);
+
+  return {
+    prefix: creds.prefix || 'openrouter',
+    models: sortModelsByCodingQuality(models)
+  };
+}
+
 /**
  * Pre-test a model via 9router internal test endpoint
  * Filters out dead/expired promotions (401), paid models (402), 404s, and timeouts.
@@ -390,22 +494,35 @@ async function testModelWith9router(fullModelId, token) {
 }
 
 /**
- * Filter model candidate list using concurrency pool testing
+ * Filter model candidate list using exclusions and concurrency pool testing
  */
 async function validateCandidateModels(models, prefix, skipTest = false) {
-  if (skipTest) return models;
+  const exclusions = getExclusionList();
+  const nonExcludedModels = [];
+
+  for (const m of models) {
+    const fullId = m.fullId || `${prefix}/${m.id}`;
+    const matchedRule = isModelExcluded(fullId, exclusions) || isModelExcluded(m.id, exclusions);
+    if (matchedRule) {
+      console.log(`    [⊘ Excluded] ${fullId} -> Matched rule "${matchedRule}"`);
+    } else {
+      nonExcludedModels.push(m);
+    }
+  }
+
+  if (skipTest) return nonExcludedModels;
 
   const token = get9routerCliToken();
   if (!token) {
     console.log('[-] 9router CLI auth token not found or server offline, skipping live test.');
-    return models;
+    return nonExcludedModels;
   }
 
   const validModels = [];
   const concurrency = 5;
-  const queue = [...models];
+  const queue = [...nonExcludedModels];
 
-  console.log(`[*] Pre-testing ${models.length} candidate models for [${prefix}]...`);
+  console.log(`[*] Pre-testing ${nonExcludedModels.length} candidate models for [${prefix}]...`);
 
   async function worker() {
     while (queue.length > 0) {
@@ -422,22 +539,24 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
     }
   }
 
-  const workers = Array.from({ length: Math.min(concurrency, models.length) }, () => worker());
+  const workers = Array.from({ length: Math.min(concurrency, nonExcludedModels.length) }, () => worker());
   await Promise.all(workers);
 
   return sortModelsByCodingQuality(validModels);
 }
 
 // Inject free models into 9router combos
-async function injectInto9router(oaData, kiloData, ocData) {
+async function injectInto9router(oaData, kiloData, ocData, orData) {
   // Validate each source's free models against 9router live test
   const validOaModels = await validateCandidateModels(oaData.models, oaData.prefix, isSkipTest);
   const validKiloModels = await validateCandidateModels(kiloData.models, kiloData.prefix, isSkipTest);
   const validOcModels = await validateCandidateModels(ocData.models, ocData.prefix, isSkipTest);
+  const validOrModels = orData ? await validateCandidateModels(orData.models, orData.prefix, isSkipTest) : [];
 
   const oaPrefixed = validOaModels.map(m => `${oaData.prefix}/${m.id}`);
   const kiloPrefixed = validKiloModels.map(m => `${kiloData.prefix}/${m.id}`);
   const ocPrefixed = validOcModels.map(m => m.fullId || `${ocData.prefix}/${m.id}`);
+  const orPrefixed = validOrModels.map(m => m.fullId || `${orData.prefix}/${m.id}`);
 
   console.log(`\n[+] Validated OpenAgentic: ${validOaModels.length} models:`);
   for (const m of validOaModels) {
@@ -455,12 +574,20 @@ async function injectInto9router(oaData, kiloData, ocData) {
     console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}] (${m.name})`);
   }
 
+  if (orData) {
+    console.log(`\n[+] Validated OpenRouter: ${validOrModels.length} models:`);
+    for (const m of validOrModels) {
+      const rawId = m.fullId || `${orData.prefix}/${m.id}`;
+      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}] (${m.name})`);
+    }
+  }
+
   if (isDryRun) {
     console.log('\n[*] Dry run mode enabled. No changes written.');
     return;
   }
 
-  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed])));
+  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed])));
 
   // 1. Try updating via 9router API client if server is running
   let updatedViaApi = false;
@@ -486,6 +613,10 @@ async function injectInto9router(oaData, kiloData, ocData) {
           } else if (combo.name === 'opencode-free') {
             await client.updateCombo(combo.id, { name: combo.name, models: ocPrefixed });
             console.log(`[✓] Updated combo 'opencode-free' via 9router API (${ocPrefixed.length} models)`);
+            updatedViaApi = true;
+          } else if (combo.name === 'openrouter-free' && orData) {
+            await client.updateCombo(combo.id, { name: combo.name, models: orPrefixed });
+            console.log(`[✓] Updated combo 'openrouter-free' via 9router API (${orPrefixed.length} models)`);
             updatedViaApi = true;
           }
         }
@@ -527,6 +658,7 @@ async function injectInto9router(oaData, kiloData, ocData) {
     upsertCombo('openagentic-free', oaPrefixed);
     if (kiloPrefixed.length > 0) upsertCombo('kilo-free', kiloPrefixed);
     if (ocPrefixed.length > 0) upsertCombo('opencode-free', ocPrefixed);
+    if (orPrefixed.length > 0) upsertCombo('openrouter-free', orPrefixed);
 
     db.close();
   } catch (err) {
@@ -574,7 +706,7 @@ function setupDailyCron() {
 async function main() {
   console.log('====================================================');
   console.log('  Free Models Sync -> 9router Combos               ');
-  console.log('  Sources: OpenAgentic + Kilo.ai + 9router OpenCode');
+  console.log('  Sources: OpenAgentic + Kilo.ai + OpenRouter + OC  ');
   console.log('  Account: herliansyah@gmail.com                   ');
   console.log('  Pre-testing: Auto-drop expired & non-free models ');
   console.log(`  Time: ${new Date().toISOString()}`);
@@ -584,14 +716,15 @@ async function main() {
     setupDailyCron();
   }
 
-  const [oaData, kiloData] = await Promise.all([
+  const [oaData, kiloData, orData] = await Promise.all([
     getTodaysOpenAgenticFreeModels(),
-    getTodaysKiloFreeModels()
+    getTodaysKiloFreeModels(),
+    getTodaysOpenRouterFreeModels()
   ]);
 
   const ocData = getTodaysOpenCodeFreeModels();
 
-  await injectInto9router(oaData, kiloData, ocData);
+  await injectInto9router(oaData, kiloData, ocData, orData);
 }
 
 if (require.main === module) {
@@ -604,15 +737,20 @@ if (require.main === module) {
 module.exports = {
   getCodingScore,
   sortModelsByCodingQuality,
+  getExclusionList,
+  isModelExcluded,
   getOpenAgenticCredentials,
   getKiloCredentials,
+  getOpenRouterCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
+  getTodaysOpenRouterFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels,
   scrapeFreeModelsFromWeb,
   fetchFreeModelsFromApi,
   fetchKiloFreeModels,
+  fetchOpenRouterFreeModels,
   injectInto9router
 };
