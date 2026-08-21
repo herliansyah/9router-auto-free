@@ -48,7 +48,7 @@ Hasilnya, combo di 9router selalu **bersih 100% dan Zero-Latency** dari model ma
 
 ## 🚫 Pengecualian / Blacklist Model & Provider (`exclusions.json`)
 
-Anda dapat mengecualikan provider tertentu atau model-model tertentu yang kualitasnya jelek/kurang bagus atau non-coding (TTS, embed, video, dsb.) dengan mendaftarkannya di [exclusions.json](file:///home/ian/openagentic-free-sync/exclusions.json):
+Anda dapat mengecualikan provider tertentu atau model-model tertentu yang kualitasnya jelek/kurang bagus, model berukuran kecil (*nano*, *tiny*, *xs*, *lfm*), atau non-coding (TTS, embed, video, dsb.) dengan mendaftarkannya di [exclusions.json](file:///home/ian/openagentic-free-sync/exclusions.json):
 
 ```json
 {
@@ -56,8 +56,15 @@ Anda dapat mengecualikan provider tertentu atau model-model tertentu yang kualit
     "api-airforce"
   ],
   "excludedModels": [
+    "nano",
+    "tiny",
+    "laguna-xs",
+    "north-mini",
+    "lfm",
+    "gemma",
+    "gpt-oss",
     "stealth/ox-alpha",
-    "dots-studio/dots-3-note-preview:free",
+    "dots-studio",
     "openrouter/free",
     "content-safety",
     "tts",
@@ -67,17 +74,14 @@ Anda dapat mengecualikan provider tertentu atau model-model tertentu yang kualit
     "wan2",
     "video",
     "lyria",
-    "nvidia/nemotron-nano-9b-v2:free",
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-    "kilo-auto/free",
-    "nvidia/nemotron-nano-12b-v2-vl:free"
+    "kilo-auto/free"
   ]
 }
 ```
 
 - **`excludedProviders`**: Provider yang terdaftar di sini (misal: `"api-airforce"`) akan **langsung di-skip total** (tidak di-query dan tidak dimasukkan ke dalam super-combo `my9model-free`).
 - Anda juga dapat mengecualikan provider via parameter CLI: `node sync.js --exclude-provider=api-airforce,ollama`.
-- **`excludedModels`**: Model yang cocok dengan aturan substring/ID akan **otomatis di-skip sejak awal** sebelum live test dijalankan.
+- **`excludedModels`**: Model yang cocok dengan aturan substring/ID (seperti model *nano*, *tiny*, *xs*, *lfm*, *gemma*, *gpt-oss*, non-coding) akan **otomatis di-skip sejak awal** sebelum live test dijalankan, sehingga super-combo `my9model-free` **hanya diisi oleh model-model frontier & high-tier coding (Tier S/A/B+)**.
 
 ---
 

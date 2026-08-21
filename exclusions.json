@@ -3,8 +3,15 @@
     "api-airforce"
   ],
   "excludedModels": [
+    "nano",
+    "tiny",
+    "laguna-xs",
+    "north-mini",
+    "lfm",
+    "gemma",
+    "gpt-oss",
     "stealth/ox-alpha",
-    "dots-studio/dots-3-note-preview:free",
+    "dots-studio",
     "openrouter/free",
     "content-safety",
     "tts",
@@ -14,9 +21,6 @@
     "wan2",
     "video",
     "lyria",
-    "nvidia/nemotron-nano-9b-v2:free",
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
-    "kilo-auto/free",
-    "nvidia/nemotron-nano-12b-v2-vl:free"
+    "kilo-auto/free"
   ]
 }

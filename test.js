@@ -113,10 +113,19 @@ async function runTests() {
   assert.ok(Array.isArray(excludedProviders) && excludedProviders.includes('api-airforce'), 'api-airforce must be in excludedProviders');
   assert.strictEqual(isProviderExcluded('api-airforce'), true, 'api-airforce must be reported as excluded');
   assert.strictEqual(isProviderExcluded('gemini'), false, 'gemini must not be excluded');
+  assert.ok(isModelExcluded('ollama/nemotron-3-nano:30b', exclusions), 'nano models must be excluded');
+  assert.ok(isModelExcluded('openrouter/liquid/lfm-2.5-2.6b:free', exclusions), 'lfm small models must be excluded');
+  assert.ok(isModelExcluded('poolside/poolside/laguna-xs-2.1', exclusions), 'laguna-xs models must be excluded');
+  assert.ok(isModelExcluded('openrouter/cohere/north-mini-code:free', exclusions), 'north-mini models must be excluded');
+  assert.ok(isModelExcluded('gemini/gemma-4-31b-it', exclusions), 'gemma models must be excluded');
+  assert.ok(isModelExcluded('ollama/gpt-oss:120b', exclusions), 'gpt-oss models must be excluded');
   assert.ok(isModelExcluded('openrouter/stealth/ox-alpha', exclusions), 'ox-alpha must be excluded');
   assert.ok(isModelExcluded('openrouter/free', exclusions), 'openrouter/free must be excluded');
-  assert.ok(isModelExcluded('kc/dots-studio/dots-3-note-preview:free', exclusions), 'dots-3-note must be excluded');
+  assert.ok(isModelExcluded('kc/dots-studio/dots-3-note-preview:free', exclusions), 'dots-studio must be excluded');
   assert.strictEqual(isModelExcluded('kc/stepfun/step-3.7-flash:free', exclusions), false, 'step-3.7 must not be excluded');
+  assert.strictEqual(isModelExcluded('ollama/minimax-m3', exclusions), false, 'minimax-m3 must not be excluded');
+  assert.strictEqual(isModelExcluded('gemini/gemini-3.5-flash-lite', exclusions), false, 'gemini-3.5-flash-lite must not be excluded');
+  assert.strictEqual(isModelExcluded('poolside/poolside/laguna-s-2.1', exclusions), false, 'laguna-s-2.1 must not be excluded');
 
   // 11. Pre-test Validation Engine Check
   console.log('[-] Testing pre-test validation engine...');
