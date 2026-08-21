@@ -11,7 +11,9 @@ const {
   getKiloCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
-  getTodaysOpenCodeFreeModels
+  getTodaysOpenCodeFreeModels,
+  testModelWith9router,
+  validateCandidateModels
 } = require('./sync.js');
 
 async function runTests() {
@@ -28,7 +30,7 @@ async function runTests() {
   const oaCreds = getOpenAgenticCredentials();
   assert.ok(oaCreds.prefix.length > 0, 'OpenAgentic prefix must not be empty');
   const oaData = await getTodaysOpenAgenticFreeModels();
-  console.log(`    Found ${oaData.models.length} OpenAgentic free models`);
+  console.log(`    Found ${oaData.models.length} OpenAgentic candidate free models`);
   assert.ok(oaData.models.length > 0, 'Should find OpenAgentic free models');
 
   // 3. Kilo.ai Credential & Discovery Test
@@ -36,16 +38,26 @@ async function runTests() {
   const kiloCreds = getKiloCredentials();
   assert.strictEqual(kiloCreds.prefix, 'kc', 'Kilo prefix must be kc');
   const kiloData = await getTodaysKiloFreeModels();
-  console.log(`    Found ${kiloData.models.length} Kilo.ai free models`);
+  console.log(`    Found ${kiloData.models.length} Kilo.ai candidate free models`);
   assert.ok(kiloData.models.length > 0, 'Should find Kilo.ai free models');
 
   // 4. OpenCode from 9router Discovery Test
   console.log('[-] Testing 9router OpenCode free extraction...');
   const ocData = getTodaysOpenCodeFreeModels();
-  console.log(`    Found ${ocData.models.length} OpenCode free models from 9router`);
+  console.log(`    Found ${ocData.models.length} OpenCode candidate free models`);
   assert.ok(ocData.models.length > 0, 'Should find OpenCode free models');
 
-  // 5. Combined sorting test
+  // 5. Pre-test Validation Engine Check
+  console.log('[-] Testing pre-test validation engine...');
+  const sampleModels = [
+    { id: 'stepfun/step-3.7-flash:free', name: 'Step 3.7 Flash' },
+    { id: 'deepseek-v4-flash-free', name: 'Deepseek V4 (Expired)' }
+  ];
+  // Test skip mode (must retain all)
+  const skipped = await validateCandidateModels(sampleModels, 'kc', true);
+  assert.strictEqual(skipped.length, 2, 'Skip mode should keep all models');
+
+  // 6. Combined sorting test
   console.log('[-] Testing combined priority sorting across all providers...');
   const allPrefixed = [
     ...oaData.models.map(m => `openagentic/${m.id}`),

@@ -9,22 +9,22 @@
  *   2. Kilo.ai (Gateway API /api/gateway/models)
  *   3. 9router OpenCode (oc/* free models directly from 9router)
  * 
- * Sorts them by coding capability specification (best to worst),
- * and injects them into 9router combos:
+ * Pre-tests all candidates against 9router to drop expired/dead/paid models,
+ * sorts them by coding capability specification (best to worst),
+ * and injects valid models into 9router combos:
  *   - my9model-free   : Unified super-combo across all providers
  *   - openagentic-free: Dedicated OpenAgentic free combo
  *   - kilo-free       : Dedicated Kilo.ai free combo
  *   - opencode-free   : Dedicated OpenCode free combo
  */
 
-const https = require('node:https');
-const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const crypto = require('node:crypto');
 const { execSync } = require('node:child_process');
 
-// Database, 9router, and paths
+// Database and 9router paths
 const HOME = os.homedir();
 const NINE_ROUTER_DIR = path.join(HOME, '.9router');
 const DB_PATH = path.join(NINE_ROUTER_DIR, 'db', 'data.sqlite');
@@ -35,7 +35,27 @@ const CLIENT_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', '9rout
 const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
 const isCronSetup = args.includes('--setup-cron');
-const isDaemon = args.includes('--daemon');
+const isSkipTest = args.includes('--skip-test');
+
+// ponytail: shared better-sqlite3 loader helper
+function getDbClass() {
+  try {
+    return require(BETTER_SQLITE_PATH);
+  } catch {
+    return require('better-sqlite3');
+  }
+}
+
+// Read 9router internal CLI auth token for API calls
+function get9routerCliToken() {
+  try {
+    const machineId = fs.readFileSync(path.join(NINE_ROUTER_DIR, 'machine-id'), 'utf8').trim();
+    const secret = fs.readFileSync(path.join(NINE_ROUTER_DIR, 'auth', 'cli-secret'), 'utf8').trim();
+    return crypto.createHash('sha256').update(machineId + '9r-cli-auth' + secret).digest('hex').substring(0, 16);
+  } catch {
+    return '';
+  }
+}
 
 // Coding capability scoring engine
 // Higher score = better coding specification & benchmark performance
@@ -90,24 +110,12 @@ function getCodingScore(modelIdentifier) {
   }
 
   // 3. Coding and Reasoning Specific Modifiers
-  if (str.includes('codex') || str.includes('code') || str.includes('coder')) {
-    score += 1200;
-  }
-  if (str.includes('thinking') || str.includes('reasoning') || str.includes('reasoner')) {
-    score += 400;
-  }
-  if (str.includes('opus') || str.includes('sol') || str.includes('terra') || str.includes('luna') || str.includes('max')) {
-    score += 500;
-  }
-  if (str.includes('sonnet') || str.includes('pro')) {
-    score += 350;
-  }
-  if (str.includes('plus') || str.includes('flash') || str.includes('lightning')) {
-    score += 150;
-  }
-  if (str.includes('ultra') || str.includes('super')) {
-    score += 100;
-  }
+  if (str.includes('codex') || str.includes('code') || str.includes('coder')) score += 1200;
+  if (str.includes('thinking') || str.includes('reasoning') || str.includes('reasoner')) score += 400;
+  if (str.includes('opus') || str.includes('sol') || str.includes('terra') || str.includes('luna') || str.includes('max')) score += 500;
+  if (str.includes('sonnet') || str.includes('pro')) score += 350;
+  if (str.includes('plus') || str.includes('flash') || str.includes('lightning')) score += 150;
+  if (str.includes('ultra') || str.includes('super')) score += 100;
 
   return score;
 }
@@ -121,39 +129,10 @@ function sortModelsByCodingQuality(models) {
   });
 }
 
-// Fetch URL with Promise (using Node stdlib)
-function fetchUrl(url, headers = {}) {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const client = parsed.protocol === 'https:' ? https : http;
-    const req = client.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)', ...headers }, timeout: 10000 }, (res) => {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 400) {
-          resolve({ status: res.statusCode, body: data });
-        } else {
-          resolve({ status: res.statusCode, body: data, error: `HTTP ${res.statusCode}` });
-        }
-      });
-    });
-    req.on('error', reject);
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error(`Timeout fetching ${url}`));
-    });
-  });
-}
-
 // Extract OpenAgentic API Key and Provider Prefix from 9router Database
 function getOpenAgenticCredentials() {
   try {
-    let Database;
-    try {
-      Database = require(BETTER_SQLITE_PATH);
-    } catch {
-      Database = require('better-sqlite3');
-    }
+    const Database = getDbClass();
     const db = new Database(DB_PATH, { readonly: true });
     const rows = db.prepare("SELECT * FROM providerConnections WHERE isActive = 1").all();
     db.close();
@@ -177,22 +156,13 @@ function getOpenAgenticCredentials() {
     console.warn(`[!] Warning: Could not read 9router DB for OpenAgentic credentials: ${err.message}`);
   }
 
-  return {
-    apiKey: null,
-    prefix: 'openagentic',
-    baseUrl: 'https://openagentic.id/api/v1'
-  };
+  return { apiKey: null, prefix: 'openagentic', baseUrl: 'https://openagentic.id/api/v1' };
 }
 
 // Extract Kilo.ai (KiloCode) Access Token from 9router Database
 function getKiloCredentials() {
   try {
-    let Database;
-    try {
-      Database = require(BETTER_SQLITE_PATH);
-    } catch {
-      Database = require('better-sqlite3');
-    }
+    const Database = getDbClass();
     const db = new Database(DB_PATH, { readonly: true });
     const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'kilocode' AND isActive = 1").get();
     db.close();
@@ -211,11 +181,7 @@ function getKiloCredentials() {
     console.warn(`[!] Warning: Could not read 9router DB for Kilo credentials: ${err.message}`);
   }
 
-  return {
-    accessToken: null,
-    prefix: 'kc',
-    gatewayUrl: 'https://api.kilo.ai/api/gateway'
-  };
+  return { accessToken: null, prefix: 'kc', gatewayUrl: 'https://api.kilo.ai/api/gateway' };
 }
 
 // Scrape free models from OpenAgentic HTML landing page
@@ -223,16 +189,16 @@ async function scrapeFreeModelsFromWeb() {
   const freeModels = new Set();
   try {
     console.log('[-] Scraping OpenAgentic.id web for free tier models...');
-    const res = await fetchUrl('https://openagentic.id/');
-    if (res.status === 200 && res.body) {
-      const html = res.body;
-
-      // Extract cards with data-tier="free"
+    const res = await fetch('https://openagentic.id/', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)' },
+      signal: AbortSignal.timeout(10000)
+    });
+    if (res.ok) {
+      const html = await res.text();
       const freeCardRegex = /data-tier="free"[\s\S]*?<div class="truncate text-sm font-medium text-stone-100">([^<]+)<\/div>/g;
       let match;
       while ((match = freeCardRegex.exec(html)) !== null) {
         const rawName = match[1].trim();
-        // Standardize model name to model slug
         const slug = rawName.toLowerCase()
           .replace(/\s*\(thinking\)/i, '-thinking')
           .replace(/\s*\(free\)/i, '-free')
@@ -241,7 +207,6 @@ async function scrapeFreeModelsFromWeb() {
         freeModels.add({ id: slug, name: rawName, source: 'oa-web-free-tier' });
       }
 
-      // Check hero banner announcements (e.g. Claude Sonnet 4.5 Free promotion)
       if (html.includes('Gratis Claude Sonnet 4.5') || html.includes('claude-sonnet-4.5')) {
         freeModels.add({ id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5', source: 'oa-web-hero-promo' });
       }
@@ -260,12 +225,13 @@ async function fetchFreeModelsFromApi(apiKey, baseUrl) {
   try {
     console.log('[-] Fetching model list from OpenAgentic API (/v1/models)...');
     const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
-    const res = await fetchUrl(endpoint, {
-      'Authorization': `Bearer ${apiKey}`
+    const res = await fetch(endpoint, {
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000)
     });
 
-    if (res.status === 200 && res.body) {
-      const json = JSON.parse(res.body);
+    if (res.ok) {
+      const json = await res.json();
       const data = json.data || [];
 
       for (const m of data) {
@@ -296,12 +262,13 @@ async function fetchKiloFreeModels(accessToken, gatewayUrl) {
   try {
     console.log('[-] Fetching free models from Kilo.ai Gateway (/api/gateway/models)...');
     const endpoint = `${gatewayUrl.replace(/\/+$/, '')}/models`;
-    const res = await fetchUrl(endpoint, {
-      'Authorization': `Bearer ${accessToken}`
+    const res = await fetch(endpoint, {
+      headers: { 'Authorization': `Bearer ${accessToken}`, 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(10000)
     });
 
-    if (res.status === 200 && res.body) {
-      const json = JSON.parse(res.body);
+    if (res.ok) {
+      const json = await res.json();
       const models = Array.isArray(json) ? json : (json.data || []);
 
       for (const m of models) {
@@ -311,7 +278,6 @@ async function fetchKiloFreeModels(accessToken, gatewayUrl) {
         const isZeroPrice = promptPrice === '0' || promptPrice === '0.000000000000';
         const isFree = m.isFree === true || isZeroPrice || id.endsWith(':free') || id.includes('/free');
 
-        // Skip non-text or pure content safety filters
         if (isFree && !id.includes('content-safety') && !id.includes('lyria')) {
           freeModels.push({
             id: id,
@@ -331,13 +297,13 @@ async function fetchKiloFreeModels(accessToken, gatewayUrl) {
 function getTodaysOpenCodeFreeModels() {
   console.log('[-] Extracting OpenCode free models directly from 9router...');
   const baseOcFree = [
+    'oc/mimo-v2.5-free',
+    'oc/laguna-s-2.1-free',
     'oc/deepseek-v4-flash-free',
     'oc/qwen3.6-plus-free',
     'oc/minimax-m3-free',
     'oc/nemotron-3-ultra-free',
     'oc/ling-3.0-flash-free',
-    'oc/mimo-v2.5-free',
-    'oc/laguna-s-2.1-free',
     'oc/north-mini-code-free'
   ];
 
@@ -392,24 +358,104 @@ async function getTodaysKiloFreeModels() {
   };
 }
 
+/**
+ * Pre-test a model via 9router internal test endpoint
+ * Filters out dead/expired promotions (401), paid models (402), 404s, and timeouts.
+ */
+async function testModelWith9router(fullModelId, token) {
+  if (!token) return { valid: true, ok: true, note: '9router token unavailable' };
+
+  try {
+    const res = await fetch('http://127.0.0.1:20128/api/models/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-9r-cli-token': token
+      },
+      body: JSON.stringify({ model: fullModelId, kind: 'llm' }),
+      signal: AbortSignal.timeout(10000)
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    // 200 OK -> Reachable & Active
+    if (data.ok) return { valid: true, ok: true };
+
+    // 429 -> Daily quota reached on provider, but model & credentials are valid
+    if (data.status === 429 || (data.error && data.error.includes('quota'))) {
+      return { valid: true, ok: false, status: 429, note: 'quota reached (model valid)' };
+    }
+
+    // Permanent failures: 401 (promo ended), 402 (paid/credits needed), 404 (not found), timeout
+    const reason = (data.error || `HTTP ${data.status || res.status}`).replace(/\n/g, ' ').slice(0, 75);
+    return { valid: false, ok: false, status: data.status || res.status, reason };
+  } catch (err) {
+    return { valid: false, ok: false, reason: err.message.slice(0, 75) };
+  }
+}
+
+/**
+ * Filter model candidate list using concurrency pool testing
+ */
+async function validateCandidateModels(models, prefix, skipTest = false) {
+  if (skipTest) return models;
+
+  const token = get9routerCliToken();
+  if (!token) {
+    console.log('[-] 9router CLI auth token not found or server offline, skipping live test.');
+    return models;
+  }
+
+  const validModels = [];
+  const concurrency = 5;
+  const queue = [...models];
+
+  console.log(`[*] Pre-testing ${models.length} candidate models for [${prefix}]...`);
+
+  async function worker() {
+    while (queue.length > 0) {
+      const m = queue.shift();
+      const fullId = m.fullId || `${prefix}/${m.id}`;
+      const result = await testModelWith9router(fullId, token);
+
+      if (result.valid) {
+        console.log(`    [✓ Active] ${fullId} ${result.note ? '(' + result.note + ')' : ''}`);
+        validModels.push(m);
+      } else {
+        console.log(`    [✗ Dropped] ${fullId} -> ${result.reason}`);
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, models.length) }, () => worker());
+  await Promise.all(workers);
+
+  return sortModelsByCodingQuality(validModels);
+}
+
 // Inject free models into 9router combos
 async function injectInto9router(oaData, kiloData, ocData) {
-  const oaPrefixed = oaData.models.map(m => `${oaData.prefix}/${m.id}`);
-  const kiloPrefixed = kiloData.models.map(m => `${kiloData.prefix}/${m.id}`);
-  const ocPrefixed = ocData.models.map(m => m.fullId || `${ocData.prefix}/${m.id}`);
+  // Validate each source's free models against 9router live test
+  const validOaModels = await validateCandidateModels(oaData.models, oaData.prefix, isSkipTest);
+  const validKiloModels = await validateCandidateModels(kiloData.models, kiloData.prefix, isSkipTest);
+  const validOcModels = await validateCandidateModels(ocData.models, ocData.prefix, isSkipTest);
 
-  console.log(`\n[+] OpenAgentic: ${oaData.models.length} free models (sorted by coding spec):`);
-  for (const m of oaData.models) {
+  const oaPrefixed = validOaModels.map(m => `${oaData.prefix}/${m.id}`);
+  const kiloPrefixed = validKiloModels.map(m => `${kiloData.prefix}/${m.id}`);
+  const ocPrefixed = validOcModels.map(m => m.fullId || `${ocData.prefix}/${m.id}`);
+
+  console.log(`\n[+] Validated OpenAgentic: ${validOaModels.length} models:`);
+  for (const m of validOaModels) {
     console.log(`    - ${oaData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}] (${m.name})`);
   }
 
-  console.log(`\n[+] Kilo.ai: ${kiloData.models.length} free models (sorted by coding spec):`);
-  for (const m of kiloData.models) {
+  console.log(`\n[+] Validated Kilo.ai: ${validKiloModels.length} models:`);
+  for (const m of validKiloModels) {
     console.log(`    - ${kiloData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}] (${m.name})`);
   }
 
-  console.log(`\n[+] 9router OpenCode: ${ocData.models.length} free models (sorted by coding spec):`);
-  for (const m of ocData.models) {
+  console.log(`\n[+] Validated 9router OpenCode: ${validOcModels.length} models:`);
+  for (const m of validOcModels) {
     const rawId = m.fullId || `${ocData.prefix}/${m.id}`;
     console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}] (${m.name})`);
   }
@@ -419,62 +465,45 @@ async function injectInto9router(oaData, kiloData, ocData) {
     return;
   }
 
-  let client;
-  try {
-    client = require(CLIENT_PATH);
-  } catch {}
-
   const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed])));
 
   // 1. Try updating via 9router API client if server is running
   let updatedViaApi = false;
-  if (client && typeof client.getCombos === 'function') {
-    try {
+  try {
+    const client = require(CLIENT_PATH);
+    if (client && typeof client.getCombos === 'function') {
       const res = await client.getCombos();
       if (res.success && res.data && res.data.combos) {
         const combos = res.data.combos;
-
         for (const combo of combos) {
           if (combo.name === 'my9model-free') {
             await client.updateCombo(combo.id, { name: combo.name, models: unifiedList });
-            console.log(`[✓] Updated combo '${combo.name}' via 9router API (${unifiedList.length} models total)`);
+            console.log(`[✓] Updated combo '${combo.name}' via 9router API (${unifiedList.length} models)`);
             updatedViaApi = true;
           } else if (combo.name === 'openagentic-free') {
-            const newComboList = sortModelsByCodingQuality(oaPrefixed);
-            await client.updateCombo(combo.id, { name: combo.name, models: newComboList });
-            console.log(`[✓] Updated combo 'openagentic-free' via 9router API (${newComboList.length} models)`);
+            await client.updateCombo(combo.id, { name: combo.name, models: oaPrefixed });
+            console.log(`[✓] Updated combo 'openagentic-free' via 9router API (${oaPrefixed.length} models)`);
             updatedViaApi = true;
           } else if (combo.name === 'kilo-free') {
-            const newComboList = sortModelsByCodingQuality(kiloPrefixed);
-            await client.updateCombo(combo.id, { name: combo.name, models: newComboList });
-            console.log(`[✓] Updated combo 'kilo-free' via 9router API (${newComboList.length} models)`);
+            await client.updateCombo(combo.id, { name: combo.name, models: kiloPrefixed });
+            console.log(`[✓] Updated combo 'kilo-free' via 9router API (${kiloPrefixed.length} models)`);
             updatedViaApi = true;
           } else if (combo.name === 'opencode-free') {
-            const newComboList = sortModelsByCodingQuality(ocPrefixed);
-            await client.updateCombo(combo.id, { name: combo.name, models: newComboList });
-            console.log(`[✓] Updated combo 'opencode-free' via 9router API (${newComboList.length} models)`);
+            await client.updateCombo(combo.id, { name: combo.name, models: ocPrefixed });
+            console.log(`[✓] Updated combo 'opencode-free' via 9router API (${ocPrefixed.length} models)`);
             updatedViaApi = true;
           }
         }
       }
-    } catch (err) {
-      console.log(`[-] 9router API update notice (${err.message}). Updating SQLite DB...`);
     }
-  }
+  } catch {}
 
   // 2. Direct SQLite update
   try {
-    let Database;
-    try {
-      Database = require(BETTER_SQLITE_PATH);
-    } catch {
-      Database = require('better-sqlite3');
-    }
-
+    const Database = getDbClass();
     const db = new Database(DB_PATH);
     const existingCombos = db.prepare("SELECT * FROM combos").all();
     const now = new Date().toISOString();
-    const { randomUUID } = require('node:crypto');
 
     function upsertCombo(comboName, modelList) {
       const found = existingCombos.find(c => c.name === comboName);
@@ -484,9 +513,9 @@ async function injectInto9router(oaData, kiloData, ocData) {
           now,
           found.id
         );
-        console.log(`[✓] Synchronized combo '${comboName}' in 9router SQLite database (${modelList.length} models)`);
+        console.log(`[✓] Synchronized combo '${comboName}' in 9router SQLite (${modelList.length} models)`);
       } else {
-        const newId = randomUUID();
+        const newId = crypto.randomUUID();
         db.prepare("INSERT INTO combos (id, name, kind, models, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)").run(
           newId,
           comboName,
@@ -495,25 +524,14 @@ async function injectInto9router(oaData, kiloData, ocData) {
           now,
           now
         );
-        console.log(`[✓] Created new combo '${comboName}' in 9router SQLite database (${modelList.length} models)`);
+        console.log(`[✓] Created combo '${comboName}' in 9router SQLite (${modelList.length} models)`);
       }
     }
 
-    // Unified super-combo (my9model-free)
     upsertCombo('my9model-free', unifiedList);
-
-    // Dedicated OpenAgentic combo
-    upsertCombo('openagentic-free', sortModelsByCodingQuality(oaPrefixed));
-
-    // Dedicated Kilo.ai combo
-    if (kiloPrefixed.length > 0) {
-      upsertCombo('kilo-free', sortModelsByCodingQuality(kiloPrefixed));
-    }
-
-    // Dedicated OpenCode free combo
-    if (ocPrefixed.length > 0) {
-      upsertCombo('opencode-free', sortModelsByCodingQuality(ocPrefixed));
-    }
+    upsertCombo('openagentic-free', oaPrefixed);
+    if (kiloPrefixed.length > 0) upsertCombo('kilo-free', kiloPrefixed);
+    if (ocPrefixed.length > 0) upsertCombo('opencode-free', ocPrefixed);
 
     db.close();
   } catch (err) {
@@ -563,9 +581,9 @@ async function main() {
   console.log('  Free Models Sync -> 9router Combos               ');
   console.log('  Sources: OpenAgentic + Kilo.ai + 9router OpenCode');
   console.log('  Account: herliansyah@gmail.com                   ');
-  console.log('  Prioritizing: Best Coding Models First           ');
+  console.log('  Pre-testing: Auto-drop expired & non-free models ');
   console.log(`  Time: ${new Date().toISOString()}`);
-  console.log('====================================================');
+  console.log('====================================================\n');
 
   if (isCronSetup) {
     setupDailyCron();
@@ -579,23 +597,6 @@ async function main() {
   const ocData = getTodaysOpenCodeFreeModels();
 
   await injectInto9router(oaData, kiloData, ocData);
-
-  if (isDaemon) {
-    console.log('\n[*] Running in daemon mode. Syncing every 24 hours...');
-    setInterval(async () => {
-      try {
-        console.log(`\n[${new Date().toISOString()}] Running periodic sync...`);
-        const [oa, kilo] = await Promise.all([
-          getTodaysOpenAgenticFreeModels(),
-          getTodaysKiloFreeModels()
-        ]);
-        const oc = getTodaysOpenCodeFreeModels();
-        await injectInto9router(oa, kilo, oc);
-      } catch (e) {
-        console.error(`[X] Daemon sync error: ${e.message}`);
-      }
-    }, 24 * 60 * 60 * 1000);
-  }
 }
 
 if (require.main === module) {
@@ -613,6 +614,8 @@ module.exports = {
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenCodeFreeModels,
+  testModelWith9router,
+  validateCandidateModels,
   scrapeFreeModelsFromWeb,
   fetchFreeModelsFromApi,
   fetchKiloFreeModels,
