@@ -60,22 +60,22 @@ Model yang cocok dengan aturan di atas akan **otomatis di-skip sejak awal** sebe
 
 ---
 
-## 🧠 Pemeringkatan Koding (Coding Spec Priority)
+## 🧠 Pemeringkatan Berbasis Benchmark Valid (`benchmarks.json`)
 
-Seluruh model gratis yang lolos uji validasi diurutkan secara otomatis dari skor kapabilitas koding tertinggi:
+Skor kapabilitas model ditentukan langsung dari database acuan benchmark empiris software engineering terpercaya (**SWE-bench Verified**, **LiveCodeBench**, **EvalPlus**, dan **Aider Leaderboard**):
 
-1. **Tier S (Claude & Frontier Reasoning)**: `assistant-sonnet-4.5-thinking`, `claude-sonnet-4.5`, `glm-5`, dsb.
-2. **Tier A (High Coding & Flash Specs)**: `step-3.7-flash`, `nemotron-3-super`, `nemotron-3-nano-30b-a3b:free`, `minimax-m2.5`, dsb.
-3. **Tier B (Standard Free LLMs)**: `hy3`, `dots-3-note-preview`, `mimo-v2.5`, `laguna-s-2.1`, `lfm-2.5-2.6b`, `north-mini-code:free`, dsb.
-4. **Tier C (Auto & Router Fallbacks)**: `kilo-auto/free`, `openrouter/free`, `open-agentic`.
-5. **Tier Non-Coding (Image/Media)**: Ditempatkan di urutan terbawah (`z-image-turbo-free`).
+1. **Tier S+ / S (Benchmark 75 - 85+)**: `assistant-sonnet-4.5-thinking` (84.0), `claude-sonnet-4.5` (82.5), `deepseek-r1` (76.5).
+2. **Tier A+ / A (Benchmark 65 - 74)**: `deepseek-v4` (74.0), `glm-5` (71.0), `step-3.7-flash` (70.0), `qwen3.6-plus` (69.0), `qwen2.5-coder` (68.5).
+3. **Tier B+ / B (Benchmark 50 - 64)**: `minimax-m3` (62.5), `minimax-m2.5` (61.0), `nemotron-3-ultra` (58.5), `hy3` (54.0), `mimo-v2.5` (52.0).
+4. **Tier C+ / C (Benchmark 40 - 49)**: `laguna-s-2.1` (48.0), `ling-3.0-flash` (47.0), `laguna-xs-2.1` (46.0), `lfm-2.5-2.6b` (44.0), `north-mini-code` (43.0).
+5. **Heuristic Fallback**: Model baru yang belum terdaftar di database benchmark otomatis dinilai berdasarkan formula generasi versi dan tag spesialisasi arsitektur.
 
 ---
 
 ## ⚡ Perintah & Penggunaan
 
 ```bash
-# Sinkronisasi harian dengan live pre-testing
+# Sinkronisasi harian dengan live pre-testing & benchmark ranking
 npm run sync
 
 # Jalankan simulasi (Dry Run) tanpa mengubah database
@@ -83,6 +83,9 @@ npm run dry-run
 
 # Sinkronisasi cepat tanpa pre-test
 node sync.js --skip-test
+
+# Perbarui database benchmark coding
+npm run update-benchmarks
 
 # Jalankan Unit Test Self-Check
 npm test

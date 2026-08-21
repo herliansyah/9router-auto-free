@@ -9,6 +9,7 @@
     "sync:fast": "node sync.js --skip-test",
     "dry-run": "node sync.js --dry-run",
     "test": "node test.js",
+    "update-benchmarks": "node update-benchmarks.js",
     "setup-cron": "node sync.js --setup-cron"
   },
   "keywords": ["openagentic", "9router", "openrouter", "free-models", "sync"],

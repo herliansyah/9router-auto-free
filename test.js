@@ -21,11 +21,18 @@ const {
 async function runTests() {
   console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + 9router OpenCode)...');
 
-  // 1. Coding score tests
-  console.log('[-] Testing coding spec score & sorting...');
-  const scoreSol = getCodingScore('gpt-5.6-sol');
-  const scoreGpt4 = getCodingScore('gpt-4.1');
-  assert.ok(scoreSol > scoreGpt4, 'GPT-5.6-SOL must score higher than GPT-4.1');
+  // 1. Coding score & Benchmark tests
+  console.log('[-] Testing coding benchmark score & sorting...');
+  const { getBenchmarksDatabase, findBenchmarkMatch } = require('./sync.js');
+  const bDb = getBenchmarksDatabase();
+  assert.ok(Object.keys(bDb).length > 0, 'Benchmarks database must not be empty');
+
+  const matchSonnet = findBenchmarkMatch('assistant-sonnet-4.5-thinking', bDb);
+  assert.ok(matchSonnet && matchSonnet.score >= 80, 'Claude Sonnet 4.5 must have benchmark score >= 80');
+
+  const scoreSonnet = getCodingScore('assistant-sonnet-4.5-thinking', bDb);
+  const scoreStep = getCodingScore('stepfun/step-3.7-flash:free', bDb);
+  assert.ok(scoreSonnet > scoreStep, 'Claude Sonnet 4.5 must score higher than Step 3.7 Flash');
 
   // 2. OpenAgentic Credential & Discovery Test
   console.log('[-] Testing OpenAgentic discovery...');

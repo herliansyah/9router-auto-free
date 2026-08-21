@@ -1,0 +1,177 @@
+{
+  "claude-sonnet-4.5": {
+    "name": "Claude Sonnet 4.5",
+    "score": 82.5,
+    "swe_bench": 78,
+    "livecodebench": 81,
+    "tier": "S"
+  },
+  "assistant-sonnet-4.5-thinking": {
+    "name": "Claude Sonnet 4.5 Thinking",
+    "score": 84,
+    "swe_bench": 80,
+    "livecodebench": 83.5,
+    "tier": "S+"
+  },
+  "deepseek-r1": {
+    "name": "DeepSeek R1",
+    "score": 76.5,
+    "swe_bench": 71,
+    "livecodebench": 75.8,
+    "tier": "S"
+  },
+  "deepseek-v3": {
+    "name": "DeepSeek V3",
+    "score": 72,
+    "swe_bench": 65,
+    "livecodebench": 70.5,
+    "tier": "A+"
+  },
+  "deepseek-v4": {
+    "name": "DeepSeek V4 Flash",
+    "score": 74,
+    "swe_bench": 68,
+    "livecodebench": 73,
+    "tier": "A+"
+  },
+  "step-3.7-flash": {
+    "name": "StepFun Step 3.7 Flash",
+    "score": 70,
+    "swe_bench": 64.5,
+    "livecodebench": 70.2,
+    "tier": "A+"
+  },
+  "glm-5": {
+    "name": "Zhipu GLM 5",
+    "score": 71,
+    "swe_bench": 65,
+    "livecodebench": 71.5,
+    "tier": "A+"
+  },
+  "qwen2.5-coder": {
+    "name": "Qwen 2.5 Coder 32B",
+    "score": 68.5,
+    "swe_bench": 63,
+    "livecodebench": 67.5,
+    "tier": "A"
+  },
+  "qwen3.6-plus": {
+    "name": "Qwen 3.6 Plus",
+    "score": 69,
+    "swe_bench": 64,
+    "livecodebench": 68,
+    "tier": "A"
+  },
+  "gpt-4o": {
+    "name": "GPT-4o",
+    "score": 66,
+    "swe_bench": 60,
+    "livecodebench": 65,
+    "tier": "A"
+  },
+  "gemini-2.0-flash": {
+    "name": "Gemini 2.0 Flash",
+    "score": 65,
+    "swe_bench": 58.5,
+    "livecodebench": 64,
+    "tier": "A"
+  },
+  "minimax-m3": {
+    "name": "MiniMax M3",
+    "score": 62.5,
+    "swe_bench": 55,
+    "livecodebench": 61,
+    "tier": "B+"
+  },
+  "minimax-m2.5": {
+    "name": "MiniMax M2.5",
+    "score": 61,
+    "swe_bench": 53,
+    "livecodebench": 59.5,
+    "tier": "B+"
+  },
+  "nemotron-3-ultra": {
+    "name": "NVIDIA Nemotron 3 Ultra",
+    "score": 58.5,
+    "swe_bench": 50,
+    "livecodebench": 57,
+    "tier": "B+"
+  },
+  "nemotron-3-super": {
+    "name": "NVIDIA Nemotron 3 Super",
+    "score": 56,
+    "swe_bench": 48,
+    "livecodebench": 55,
+    "tier": "B"
+  },
+  "nemotron-3-nano": {
+    "name": "NVIDIA Nemotron 3 Nano",
+    "score": 50,
+    "swe_bench": 42,
+    "livecodebench": 49,
+    "tier": "B"
+  },
+  "nemotron-3.5-lightning": {
+    "name": "NVIDIA Nemotron 3.5 Lightning",
+    "score": 57,
+    "swe_bench": 49,
+    "livecodebench": 56,
+    "tier": "B+"
+  },
+  "hy3": {
+    "name": "Tencent HY3",
+    "score": 54,
+    "swe_bench": 46,
+    "livecodebench": 52.5,
+    "tier": "B"
+  },
+  "mimo-v2.5": {
+    "name": "Xiaomi MiMo V2.5",
+    "score": 52,
+    "swe_bench": 44,
+    "livecodebench": 50.5,
+    "tier": "B"
+  },
+  "laguna-s-2.1": {
+    "name": "Poolside Laguna S 2.1",
+    "score": 48,
+    "swe_bench": 40,
+    "livecodebench": 46,
+    "tier": "C+"
+  },
+  "laguna-xs-2.1": {
+    "name": "Poolside Laguna XS 2.1",
+    "score": 46,
+    "swe_bench": 38,
+    "livecodebench": 44,
+    "tier": "C+"
+  },
+  "lfm-2.5-2.6b": {
+    "name": "LiquidAI LFM 2.5 2.6B",
+    "score": 44,
+    "swe_bench": 35,
+    "livecodebench": 42,
+    "tier": "C"
+  },
+  "north-mini-code": {
+    "name": "Cohere North Mini Code",
+    "score": 43,
+    "swe_bench": 34,
+    "livecodebench": 41,
+    "tier": "C"
+  },
+  "gpt-oss-20b": {
+    "name": "OpenAI GPT OSS 20B",
+    "score": 45,
+    "swe_bench": 36,
+    "livecodebench": 43,
+    "tier": "C+"
+  },
+  "ling-3.0-flash": {
+    "name": "Ling 3.0 Flash",
+    "score": 47,
+    "swe_bench": 39,
+    "livecodebench": 45,
+    "tier": "C+"
+  }
+}

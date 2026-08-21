@@ -87,9 +87,43 @@ function isModelExcluded(modelIdentifier, exclusions) {
   return false;
 }
 
+// Load empirical benchmarks database
+const BENCHMARKS_PATH = path.join(__dirname, 'benchmarks.json');
+function getBenchmarksDatabase() {
+  try {
+    if (fs.existsSync(BENCHMARKS_PATH)) {
+      const content = fs.readFileSync(BENCHMARKS_PATH, 'utf8');
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read benchmarks.json: ${err.message}`);
+  }
+  return {};
+}
+
+// Find matched benchmark item for a given model identifier
+function findBenchmarkMatch(modelIdentifier, benchmarks) {
+  if (!benchmarks || Object.keys(benchmarks).length === 0) return null;
+  const str = String(modelIdentifier).toLowerCase()
+    .replace(/^(?:openrouter|kc|oc|openagentic)\//, '')
+    .replace(/:(?:free|thinking)$/, '')
+    .replace(/-free$/, '');
+
+  // 1. Direct exact key match
+  if (benchmarks[str]) return benchmarks[str];
+
+  // 2. Substring / slug matching
+  for (const [key, data] of Object.entries(benchmarks)) {
+    if (str === key || str.includes(key) || key.includes(str)) {
+      return data;
+    }
+  }
+  return null;
+}
+
 // Coding capability scoring engine
-// Higher score = better coding specification & benchmark performance
-function getCodingScore(modelIdentifier) {
+// Uses Empirical Benchmarks (SWE-bench / LiveCodeBench) with Heuristic Spec fallback
+function getCodingScore(modelIdentifier, customBenchmarks = null) {
   const str = String(modelIdentifier).toLowerCase();
 
   // Heavy penalty for image / non-coding models
@@ -97,6 +131,17 @@ function getCodingScore(modelIdentifier) {
     return -10000;
   }
 
+  const benchmarks = customBenchmarks || getBenchmarksDatabase();
+  const benchmarkMatch = findBenchmarkMatch(modelIdentifier, benchmarks);
+
+  if (benchmarkMatch && typeof benchmarkMatch.score === 'number') {
+    let score = Math.round(benchmarkMatch.score * 100);
+    if (str.includes('thinking') || str.includes('reasoning') || str.includes('reasoner')) score += 400;
+    if (str.includes('flash') || str.includes('lightning')) score += 150;
+    return score;
+  }
+
+  // Heuristic Fallback
   let score = 0;
 
   // 1. Family Base Score
@@ -152,10 +197,11 @@ function getCodingScore(modelIdentifier) {
 
 // Sort models array from best coding capability to lowest
 function sortModelsByCodingQuality(models) {
+  const benchmarks = getBenchmarksDatabase();
   return [...models].sort((a, b) => {
     const idA = typeof a === 'string' ? a : (a.fullId || a.id || a.name || '');
     const idB = typeof b === 'string' ? b : (b.fullId || b.id || b.name || '');
-    return getCodingScore(idB) - getCodingScore(idA);
+    return getCodingScore(idB, benchmarks) - getCodingScore(idA, benchmarks);
   });
 }
 
@@ -737,6 +783,8 @@ if (require.main === module) {
 module.exports = {
   getCodingScore,
   sortModelsByCodingQuality,
+  getBenchmarksDatabase,
+  findBenchmarkMatch,
   getExclusionList,
   isModelExcluded,
   getOpenAgenticCredentials,
