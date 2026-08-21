@@ -102,6 +102,15 @@ async function runTests() {
     assert.ok(scoreA >= scoreB, `Model ${sortedUnified[i]} (${scoreA}) must score >= ${sortedUnified[i + 1]} (${scoreB})`);
   }
 
+  // 8. Latency Tie-Breaker Test
+  console.log('[-] Testing latency tie-breaker sorting...');
+  const tieCandidates = [
+    { id: 'poolside/laguna-s-2.1:free', name: 'Laguna S Slow', latencyMs: 2500 },
+    { id: 'poolside/laguna-s-2.1:free', name: 'Laguna S Fast', latencyMs: 350 }
+  ];
+  const sortedTies = sortModelsByCodingQuality(tieCandidates);
+  assert.strictEqual(sortedTies[0].latencyMs, 350, 'Fastest latency must be prioritized on identical score');
+
   console.log('[✓] All tests passed successfully!');
 }
 

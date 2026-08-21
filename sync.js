@@ -195,13 +195,26 @@ function getCodingScore(modelIdentifier, customBenchmarks = null) {
   return score;
 }
 
-// Sort models array from best coding capability to lowest
-function sortModelsByCodingQuality(models) {
+// Sort models array from best coding capability to lowest (with latency tie-breaker)
+function sortModelsByCodingQuality(models, latencyMap = null) {
   const benchmarks = getBenchmarksDatabase();
   return [...models].sort((a, b) => {
     const idA = typeof a === 'string' ? a : (a.fullId || a.id || a.name || '');
     const idB = typeof b === 'string' ? b : (b.fullId || b.id || b.name || '');
-    return getCodingScore(idB, benchmarks) - getCodingScore(idA, benchmarks);
+
+    const scoreA = getCodingScore(idA, benchmarks);
+    const scoreB = getCodingScore(idB, benchmarks);
+
+    // Primary: Higher benchmark/coding score wins
+    if (scoreB !== scoreA) {
+      return scoreB - scoreA;
+    }
+
+    // Secondary / Tie-breaker: If benchmark/spec score is identical, prioritize fastest response latency
+    const latA = typeof a === 'object' && a.latencyMs != null ? a.latencyMs : (latencyMap ? latencyMap.get(idA) ?? 99999 : 99999);
+    const latB = typeof b === 'object' && b.latencyMs != null ? b.latencyMs : (latencyMap ? latencyMap.get(idB) ?? 99999 : 99999);
+
+    return latA - latB;
   });
 }
 
@@ -511,10 +524,12 @@ async function getTodaysOpenRouterFreeModels() {
 /**
  * Pre-test a model via 9router internal test endpoint
  * Filters out dead/expired promotions (401), paid models (402), 404s, and timeouts.
+ * Measures response latency (ms) to prioritize faster connections.
  */
 async function testModelWith9router(fullModelId, token) {
-  if (!token) return { valid: true, ok: true, note: '9router token unavailable' };
+  if (!token) return { valid: true, ok: true, latencyMs: 9999, note: '9router token unavailable' };
 
+  const startTime = Date.now();
   try {
     const res = await fetch('http://127.0.0.1:20128/api/models/test', {
       method: 'POST',
@@ -526,16 +541,18 @@ async function testModelWith9router(fullModelId, token) {
       signal: AbortSignal.timeout(10000)
     });
 
+    const latencyMs = Date.now() - startTime;
     const data = await res.json().catch(() => ({}));
 
     // 200 OK -> Reachable & Active
-    if (data.ok) return { valid: true, ok: true };
+    if (data.ok) return { valid: true, ok: true, latencyMs };
 
     // Any non-200 (429 quota exceeded, 401 promo ended, 402 paid, 404, timeout) -> Dropped
     const reason = (data.error || `HTTP ${data.status || res.status}`).replace(/\n/g, ' ').slice(0, 75);
-    return { valid: false, ok: false, status: data.status || res.status, reason };
+    return { valid: false, ok: false, latencyMs, status: data.status || res.status, reason };
   } catch (err) {
-    return { valid: false, ok: false, reason: err.message.slice(0, 75) };
+    const latencyMs = Date.now() - startTime;
+    return { valid: false, ok: false, latencyMs, reason: err.message.slice(0, 75) };
   }
 }
 
@@ -577,8 +594,9 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
       const result = await testModelWith9router(fullId, token);
 
       if (result.valid) {
-        console.log(`    [✓ Active] ${fullId} ${result.note ? '(' + result.note + ')' : ''}`);
-        validModels.push(m);
+        const msText = `${result.latencyMs}ms`;
+        console.log(`    [✓ Active] ${fullId} (${msText}) ${result.note ? '(' + result.note + ')' : ''}`);
+        validModels.push({ ...m, latencyMs: result.latencyMs });
       } else {
         console.log(`    [✗ Dropped] ${fullId} -> ${result.reason}`);
       }
@@ -604,27 +622,38 @@ async function injectInto9router(oaData, kiloData, ocData, orData) {
   const ocPrefixed = validOcModels.map(m => m.fullId || `${ocData.prefix}/${m.id}`);
   const orPrefixed = validOrModels.map(m => m.fullId || `${orData.prefix}/${m.id}`);
 
+  // Build global latency lookup map for tie-breaking
+  const latencyMap = new Map();
+  for (const m of [...validOaModels, ...validKiloModels, ...validOcModels, ...validOrModels]) {
+    const key = m.fullId || (m.prefix ? `${m.prefix}/${m.id}` : m.id);
+    if (m.latencyMs != null) latencyMap.set(key, m.latencyMs);
+  }
+
   console.log(`\n[+] Validated OpenAgentic: ${validOaModels.length} models:`);
   for (const m of validOaModels) {
-    console.log(`    - ${oaData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}] (${m.name})`);
+    const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+    console.log(`    - ${oaData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
   }
 
   console.log(`\n[+] Validated Kilo.ai: ${validKiloModels.length} models:`);
   for (const m of validKiloModels) {
-    console.log(`    - ${kiloData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}] (${m.name})`);
+    const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+    console.log(`    - ${kiloData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
   }
 
   console.log(`\n[+] Validated 9router OpenCode: ${validOcModels.length} models:`);
   for (const m of validOcModels) {
     const rawId = m.fullId || `${ocData.prefix}/${m.id}`;
-    console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}] (${m.name})`);
+    const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+    console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
   }
 
   if (orData) {
     console.log(`\n[+] Validated OpenRouter: ${validOrModels.length} models:`);
     for (const m of validOrModels) {
       const rawId = m.fullId || `${orData.prefix}/${m.id}`;
-      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}] (${m.name})`);
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
     }
   }
 
@@ -633,7 +662,7 @@ async function injectInto9router(oaData, kiloData, ocData, orData) {
     return;
   }
 
-  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed])));
+  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed])), latencyMap);
 
   // 1. Try updating via 9router API client if server is running
   let updatedViaApi = false;

@@ -52,7 +52,11 @@ Sistem akan otomatis mencocokkan **ID lengkap** maupun **kata kunci**:
   "flux",
   "wan2",
   "video",
-  "lyria"
+  "lyria",
+  "nvidia/nemotron-nano-9b-v2:free",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  "kilo-auto/free",
+  "nvidia/nemotron-nano-12b-v2-vl:free"
 ]
 ```
 
@@ -72,17 +76,29 @@ Skor kapabilitas model ditentukan langsung dari database acuan benchmark empiris
 
 ---
 
+## ⚡ Prioritas Kecepatan Koneksi (Latency Tie-Breaker)
+
+Ketika dua atau lebih model memiliki **skor benchmark yang sama**, sistem secara otomatis mengukur waktu respons riil (*round-trip latency* dalam milidetik) dan **memprioritaskan model dengan koneksi paling cepat di urutan teratas**.
+
+Contoh pengurutan riil saat skor benchmark sama:
+1. `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` (**1576ms** - Paling Cepat)
+2. `kc/nvidia/nemotron-3-ultra-550b-a55b:free` (**2607ms**)
+3. `oc/nemotron-3-ultra-free` (**6728ms**)
+
+---
+
 ## ⚡ Perintah & Penggunaan
 
 ```bash
-# Sinkronisasi harian dengan live pre-testing & benchmark ranking
+# Sinkronisasi harian dengan live pre-testing, benchmark ranking & latency tie-breaker
 npm run sync
 
 # Jalankan simulasi (Dry Run) tanpa mengubah database
 npm run dry-run
 
 # Sinkronisasi cepat tanpa pre-test
-node sync.js --skip-test
+npm run sync:fast
+# atau: node sync.js --skip-test
 
 # Perbarui database benchmark coding
 npm run update-benchmarks
@@ -100,7 +116,7 @@ npm run setup-cron
 
 Endpoint 9router: `http://localhost:20128/v1`
 
-- **`my9model-free`**: Super-combo seluruh model gratis yang terbukti aktif dari semua provider, terurut prioritas koding.
+- **`my9model-free`**: Super-combo seluruh model gratis aktif dari seluruh provider, terurut prioritas benchmark koding & latensi tercepat.
 - **`openagentic-free`**: Combo model gratis OpenAgentic.id yang aktif.
 - **`kilo-free`**: Combo model gratis Kilo.ai yang aktif.
 - **`openrouter-free`**: Combo model gratis OpenRouter yang aktif.
