@@ -144,4 +144,5 @@ Endpoint 9router: `http://localhost:20128/v1`
 - **`poolside-free`**: Combo model gratis Poolside yang aktif.
 - **`gemini-free`**: Combo model gratis Google Gemini yang aktif.
 - **`ollama-free`**: Combo model gratis Ollama Cloud yang aktif.
+- **`airforce-free`**: Combo model gratis API.airforce yang aktif (jika tidak di-exclude).
 - **`opencode-free`**: Combo model gratis OpenCode (`oc/*`) yang aktif.
