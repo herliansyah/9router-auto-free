@@ -66,13 +66,19 @@ Model yang cocok dengan aturan di atas akan **otomatis di-skip sejak awal** sebe
 
 ## 🧠 Pemeringkatan Berbasis Benchmark Valid (`benchmarks.json`)
 
-Skor kapabilitas model ditentukan langsung dari database acuan benchmark empiris software engineering terpercaya (**SWE-bench Verified**, **LiveCodeBench**, **EvalPlus**, dan **Aider Leaderboard**):
+Skor kapabilitas model dihitung secara empiris dengan mengambil data langsung dari leaderboard coding publik (**EvalPlus HumanEval+ / MBPP+**, **LiveCodeBench**, dan **SWE-bench Verified**):
 
-1. **Tier S+ / S (Benchmark 75 - 85+)**: `assistant-sonnet-4.5-thinking` (84.0), `claude-sonnet-4.5` (82.5), `deepseek-r1` (76.5).
-2. **Tier A+ / A (Benchmark 65 - 74)**: `deepseek-v4` (74.0), `glm-5` (71.0), `step-3.7-flash` (70.0), `qwen3.6-plus` (69.0), `qwen2.5-coder` (68.5).
-3. **Tier B+ / B (Benchmark 50 - 64)**: `minimax-m3` (62.5), `minimax-m2.5` (61.0), `nemotron-3-ultra` (58.5), `hy3` (54.0), `mimo-v2.5` (52.0).
-4. **Tier C+ / C (Benchmark 40 - 49)**: `laguna-s-2.1` (48.0), `ling-3.0-flash` (47.0), `laguna-xs-2.1` (46.0), `lfm-2.5-2.6b` (44.0), `north-mini-code` (43.0).
-5. **Heuristic Fallback**: Model baru yang belum terdaftar di database benchmark otomatis dinilai berdasarkan formula generasi versi dan tag spesialisasi arsitektur.
+- **Live Benchmark Updater (`update-benchmarks.js`)**:
+  - Mengambil data skor valid secara langsung dari repository resmi [EvalPlus Leaderboard](https://raw.githubusercontent.com/evalplus/evalplus.github.io/main/results.json) (125+ model coding).
+  - Menggabungkannya dengan *calibrated baseline* untuk model-model frontier/proprietary (seperti Claude Sonnet 4.5 Thinking, DeepSeek R1, DeepSeek V4 Flash, GLM-5, Step 3.7 Flash).
+  - Menyimpan cache terpadu ke [`benchmarks.json`](file:///home/ian/openagentic-free-sync/benchmarks.json) (150+ model).
+
+- **Tingkatan Skor (Tiering)**:
+  1. **Tier S+ / S (Benchmark 75 - 85+)**: `assistant-sonnet-4.5-thinking` (84.0), `claude-sonnet-4.5` (82.5), `deepseek-r1` (76.5).
+  2. **Tier A+ / A (Benchmark 65 - 74)**: `deepseek-v4` (74.0), `glm-5` (71.0), `step-3.7-flash` (70.0), `qwen3.6-plus` (69.0), `qwen2.5-coder` (68.5).
+  3. **Tier B+ / B (Benchmark 50 - 64)**: `minimax-m3` (62.5), `minimax-m2.5` (61.0), `nemotron-3-ultra` (58.5), `hy3` (54.0), `mimo-v2.5` (52.0).
+  4. **Tier C+ / C (Benchmark 40 - 49)**: `laguna-s-2.1` (48.0), `ling-3.0-flash` (47.0), `laguna-xs-2.1` (46.0), `lfm-2.5-2.6b` (44.0), `north-mini-code` (43.0).
+  5. **Heuristic Fallback**: Model baru yang belum terdaftar di database benchmark otomatis dinilai berdasarkan formula generasi versi, keluarga arsitektur (Claude/GPT/DeepSeek), ukuran parameter (70B/32B/8B), dan context window.
 
 ---
 
@@ -100,8 +106,11 @@ npm run dry-run
 npm run sync:fast
 # atau: node sync.js --skip-test
 
-# Perbarui database benchmark coding
+# Perbarui database benchmark coding secara live dari leaderboard (EvalPlus / SWE-bench)
 npm run update-benchmarks
+
+# Sinkronisasi harian sekaligus update benchmark live
+node sync.js --live-benchmarks
 
 # Jalankan Unit Test Self-Check
 npm test

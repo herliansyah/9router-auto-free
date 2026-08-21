@@ -1,4 +1,11 @@
 {
+  "assistant-sonnet-4.5-thinking": {
+    "name": "Claude Sonnet 4.5 Thinking",
+    "score": 84,
+    "swe_bench": 80,
+    "livecodebench": 83.5,
+    "tier": "S+"
+  },
   "claude-sonnet-4.5": {
     "name": "Claude Sonnet 4.5",
     "score": 82.5,
@@ -6,12 +13,12 @@
     "livecodebench": 81,
     "tier": "S"
   },
-  "assistant-sonnet-4.5-thinking": {
-    "name": "Claude Sonnet 4.5 Thinking",
-    "score": 84,
-    "swe_bench": 80,
-    "livecodebench": 83.5,
-    "tier": "S+"
+  "claude-3.5-sonnet": {
+    "name": "Claude 3.5 Sonnet",
+    "score": 79,
+    "swe_bench": 74,
+    "livecodebench": 78,
+    "tier": "S"
   },
   "deepseek-r1": {
     "name": "DeepSeek R1",
@@ -20,13 +27,6 @@
     "livecodebench": 75.8,
     "tier": "S"
   },
-  "deepseek-v3": {
-    "name": "DeepSeek V3",
-    "score": 72,
-    "swe_bench": 65,
-    "livecodebench": 70.5,
-    "tier": "A+"
-  },
   "deepseek-v4": {
     "name": "DeepSeek V4 Flash",
     "score": 74,
@@ -34,11 +34,11 @@
     "livecodebench": 73,
     "tier": "A+"
   },
-  "step-3.7-flash": {
-    "name": "StepFun Step 3.7 Flash",
-    "score": 70,
-    "swe_bench": 64.5,
-    "livecodebench": 70.2,
+  "deepseek-v3": {
+    "name": "DeepSeek V3",
+    "score": 72,
+    "swe_bench": 65,
+    "livecodebench": 70.5,
     "tier": "A+"
   },
   "glm-5": {
@@ -48,18 +48,25 @@
     "livecodebench": 71.5,
     "tier": "A+"
   },
-  "qwen2.5-coder": {
-    "name": "Qwen 2.5 Coder 32B",
-    "score": 68.5,
-    "swe_bench": 63,
-    "livecodebench": 67.5,
-    "tier": "A"
+  "step-3.7-flash": {
+    "name": "StepFun Step 3.7 Flash",
+    "score": 70,
+    "swe_bench": 64.5,
+    "livecodebench": 70.2,
+    "tier": "A+"
   },
   "qwen3.6-plus": {
     "name": "Qwen 3.6 Plus",
     "score": 69,
     "swe_bench": 64,
     "livecodebench": 68,
+    "tier": "A"
+  },
+  "qwen2.5-coder": {
+    "name": "Qwen 2.5 Coder 32B",
+    "score": 68.5,
+    "swe_bench": 63,
+    "livecodebench": 67.5,
     "tier": "A"
   },
   "gpt-4o": {
@@ -97,26 +104,19 @@
     "livecodebench": 57,
     "tier": "B+"
   },
-  "nemotron-3-super": {
-    "name": "NVIDIA Nemotron 3 Super",
-    "score": 56,
-    "swe_bench": 48,
-    "livecodebench": 55,
-    "tier": "B"
-  },
-  "nemotron-3-nano": {
-    "name": "NVIDIA Nemotron 3 Nano",
-    "score": 50,
-    "swe_bench": 42,
-    "livecodebench": 49,
-    "tier": "B"
-  },
   "nemotron-3.5-lightning": {
     "name": "NVIDIA Nemotron 3.5 Lightning",
     "score": 57,
     "swe_bench": 49,
     "livecodebench": 56,
     "tier": "B+"
+  },
+  "nemotron-3-super": {
+    "name": "NVIDIA Nemotron 3 Super",
+    "score": 56,
+    "swe_bench": 48,
+    "livecodebench": 55,
+    "tier": "B"
   },
   "hy3": {
     "name": "Tencent HY3",
@@ -132,6 +132,13 @@
     "livecodebench": 50.5,
     "tier": "B"
   },
+  "nemotron-3-nano": {
+    "name": "NVIDIA Nemotron 3 Nano",
+    "score": 50,
+    "swe_bench": 42,
+    "livecodebench": 49,
+    "tier": "B"
+  },
   "laguna-s-2.1": {
     "name": "Poolside Laguna S 2.1",
     "score": 48,
@@ -139,11 +146,25 @@
     "livecodebench": 46,
     "tier": "C+"
   },
+  "ling-3.0-flash": {
+    "name": "Ling 3.0 Flash",
+    "score": 47,
+    "swe_bench": 39,
+    "livecodebench": 45,
+    "tier": "C+"
+  },
   "laguna-xs-2.1": {
     "name": "Poolside Laguna XS 2.1",
     "score": 46,
     "swe_bench": 38,
     "livecodebench": 44,
+    "tier": "C+"
+  },
+  "gpt-oss-20b": {
+    "name": "OpenAI GPT OSS 20B",
+    "score": 45,
+    "swe_bench": 36,
+    "livecodebench": 43,
     "tier": "C+"
   },
   "lfm-2.5-2.6b": {
@@ -160,18 +181,1004 @@
     "livecodebench": 41,
     "tier": "C"
   },
-  "gpt-oss-20b": {
-    "name": "OpenAI GPT OSS 20B",
-    "score": 45,
-    "swe_bench": 36,
-    "livecodebench": 43,
-    "tier": "C+"
+  "opencoder-8b-instruct": {
+    "name": "OpenCoder-8B-Instruct",
+    "score": 75,
+    "humaneval_plus": 77.4,
+    "mbpp_plus": 71.4,
+    "tier": "A+",
+    "source": "evalplus"
   },
-  "ling-3.0-flash": {
-    "name": "Ling 3.0 Flash",
-    "score": 47,
-    "swe_bench": 39,
-    "livecodebench": 45,
-    "tier": "C+"
+  "artigenz-coder-ds-6.7b": {
+    "name": "Artigenz-Coder-DS-6.7B",
+    "score": 71.4,
+    "humaneval_plus": 72.6,
+    "mbpp_plus": 69.6,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "code-13b": {
+    "name": "Code-13B",
+    "score": 31.4,
+    "humaneval_plus": 52.4,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "code-290k-6.7b-instruct": {
+    "name": "Code-290k-6.7B-Instruct",
+    "score": 35.8,
+    "humaneval_plus": 59.7,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "code-33b": {
+    "name": "Code-33B",
+    "score": 29.6,
+    "humaneval_plus": 49.4,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codegen-16b": {
+    "name": "CodeGen-16B",
+    "score": 35,
+    "humaneval_plus": 28,
+    "mbpp_plus": 45.5,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codegen-2b": {
+    "name": "CodeGen-2B",
+    "score": 28,
+    "humaneval_plus": 22.6,
+    "mbpp_plus": 36,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codegen-6b": {
+    "name": "CodeGen-6B",
+    "score": 32.5,
+    "humaneval_plus": 25.6,
+    "mbpp_plus": 42.9,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codegen2-16b": {
+    "name": "CodeGen2-16B",
+    "score": 9.9,
+    "humaneval_plus": 16.5,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codegen2-1b": {
+    "name": "CodeGen2-1B",
+    "score": 5.5,
+    "humaneval_plus": 9.1,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codegen2-3b": {
+    "name": "CodeGen2-3B",
+    "score": 7.7,
+    "humaneval_plus": 12.8,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codegen2-7b": {
+    "name": "CodeGen2-7B",
+    "score": 10.6,
+    "humaneval_plus": 17.7,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codellama-13b": {
+    "name": "CodeLlama-13B",
+    "score": 44.1,
+    "humaneval_plus": 38.4,
+    "mbpp_plus": 52.6,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codellama-34b": {
+    "name": "CodeLlama-34B",
+    "score": 48.9,
+    "humaneval_plus": 43.9,
+    "mbpp_plus": 56.3,
+    "tier": "B",
+    "source": "evalplus"
+  },
+  "codellama-70b": {
+    "name": "CodeLlama-70B",
+    "score": 30.4,
+    "humaneval_plus": 50.6,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codellama-70b-instruct": {
+    "name": "CodeLlama-70B-Instruct",
+    "score": 39.5,
+    "humaneval_plus": 65.9,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codellama-7b": {
+    "name": "CodeLlama-7B",
+    "score": 40,
+    "humaneval_plus": 35.4,
+    "mbpp_plus": 46.8,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "qwen2.5-coder-32b-instruct": {
+    "name": "Qwen2.5-Coder-32B-Instruct",
+    "score": 83.1,
+    "humaneval_plus": 87.2,
+    "mbpp_plus": 77,
+    "tier": "S",
+    "source": "evalplus"
+  },
+  "codeqwen1.5-7b": {
+    "name": "CodeQwen1.5-7B",
+    "score": 51.7,
+    "humaneval_plus": 45.7,
+    "mbpp_plus": 60.8,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "codeqwen1.5-7b-chat": {
+    "name": "CodeQwen1.5-7B-Chat",
+    "score": 74.8,
+    "humaneval_plus": 78.7,
+    "mbpp_plus": 69,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "qwen1.5-72b-chat": {
+    "name": "Qwen1.5-72B-Chat",
+    "score": 60.1,
+    "humaneval_plus": 59.1,
+    "mbpp_plus": 61.6,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "codet5--16b": {
+    "name": "CodeT5+-16B",
+    "score": 34.9,
+    "humaneval_plus": 26.8,
+    "mbpp_plus": 47.1,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codet5--2b": {
+    "name": "CodeT5+-2B",
+    "score": 28.4,
+    "humaneval_plus": 22,
+    "mbpp_plus": 38.1,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codet5--6b": {
+    "name": "CodeT5+-6B",
+    "score": 31.2,
+    "humaneval_plus": 24.4,
+    "mbpp_plus": 41.5,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "command-r": {
+    "name": "Command-R+",
+    "score": 59.4,
+    "humaneval_plus": 56.7,
+    "mbpp_plus": 63.5,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "deepseek-v3-nov-2024": {
+    "name": "DeepSeek-V3 (Nov 2024)",
+    "score": 81.2,
+    "humaneval_plus": 86.6,
+    "mbpp_plus": 73,
+    "tier": "S",
+    "source": "evalplus"
+  },
+  "deepseek-v2.5-nov-2024": {
+    "name": "DeepSeek-V2.5 (Nov 2024)",
+    "score": 79.7,
+    "humaneval_plus": 83.5,
+    "mbpp_plus": 74.1,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "gemini-1.5-pro-002": {
+    "name": "Gemini 1.5 Pro 002",
+    "score": 77.4,
+    "humaneval_plus": 79.3,
+    "mbpp_plus": 74.6,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "gemini-1.5-flash-002": {
+    "name": "Gemini 1.5 Flash 002",
+    "score": 72.4,
+    "humaneval_plus": 75.6,
+    "mbpp_plus": 67.5,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "deepseek-coder-v2-instruct": {
+    "name": "DeepSeek-Coder-V2-Instruct",
+    "score": 79.4,
+    "humaneval_plus": 82.3,
+    "mbpp_plus": 75.1,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "deepseek-coder-1.3b-base": {
+    "name": "DeepSeek-Coder-1.3B-base",
+    "score": 34.5,
+    "humaneval_plus": 25.6,
+    "mbpp_plus": 47.9,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "deepseek-coder-1.3b-instruct": {
+    "name": "DeepSeek-Coder-1.3B-instruct",
+    "score": 58.2,
+    "humaneval_plus": 60.4,
+    "mbpp_plus": 54.8,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "deepseek-coder-33b-base": {
+    "name": "DeepSeek-Coder-33B-base",
+    "score": 26.7,
+    "humaneval_plus": 44.5,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "deepseek-coder-33b-instruct": {
+    "name": "DeepSeek-Coder-33B-instruct",
+    "score": 73,
+    "humaneval_plus": 75,
+    "mbpp_plus": 70.1,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "deepseek-coder-6.7b-base": {
+    "name": "DeepSeek-Coder-6.7B-base",
+    "score": 47.2,
+    "humaneval_plus": 39.6,
+    "mbpp_plus": 58.7,
+    "tier": "B",
+    "source": "evalplus"
+  },
+  "deepseek-coder-6.7b-instruct": {
+    "name": "DeepSeek-Coder-6.7B-instruct",
+    "score": 69,
+    "humaneval_plus": 71.3,
+    "mbpp_plus": 65.6,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "deepseek-coder-7b-instruct-v1.5": {
+    "name": "DeepSeek-Coder-7B-instruct-v1.5",
+    "score": 67.7,
+    "humaneval_plus": 71.3,
+    "mbpp_plus": 62.2,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "claude-sonnet-3.5-june-2024": {
+    "name": "Claude Sonnet 3.5 (June 2024)",
+    "score": 78.7,
+    "humaneval_plus": 81.7,
+    "mbpp_plus": 74.3,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "grok-beta": {
+    "name": "Grok Beta",
+    "score": 74.5,
+    "humaneval_plus": 80.5,
+    "mbpp_plus": 65.6,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "o1-preview-sept-2024": {
+    "name": "O1 Preview (Sept 2024)",
+    "score": 85.5,
+    "humaneval_plus": 89,
+    "mbpp_plus": 80.2,
+    "tier": "S",
+    "source": "evalplus"
+  },
+  "o1-mini-sept-2024": {
+    "name": "O1 Mini (Sept 2024)",
+    "score": 84.9,
+    "humaneval_plus": 89,
+    "mbpp_plus": 78.8,
+    "tier": "S",
+    "source": "evalplus"
+  },
+  "gpt-4o-aug-2024": {
+    "name": "GPT 4o (Aug 2024)",
+    "score": 81.2,
+    "humaneval_plus": 87.2,
+    "mbpp_plus": 72.2,
+    "tier": "S",
+    "source": "evalplus"
+  },
+  "gpt-4o-mini-july-2024": {
+    "name": "GPT 4o Mini (July 2024)",
+    "score": 79,
+    "humaneval_plus": 83.5,
+    "mbpp_plus": 72.2,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "gpt-3.5-may-2023": {
+    "name": "GPT-3.5 (May 2023)",
+    "score": 39.9,
+    "humaneval_plus": 66.5,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "gpt-3.5-turbo-nov-2023": {
+    "name": "GPT-3.5-Turbo (Nov 2023)",
+    "score": 70.3,
+    "humaneval_plus": 70.7,
+    "mbpp_plus": 69.7,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "gpt-4-may-2023": {
+    "name": "GPT-4 (May 2023)",
+    "score": 47.6,
+    "humaneval_plus": 79.3,
+    "mbpp_plus": 0,
+    "tier": "B",
+    "source": "evalplus"
+  },
+  "gpt-4-turbo-april-2024": {
+    "name": "GPT-4-Turbo (April 2024)",
+    "score": 52,
+    "humaneval_plus": 86.6,
+    "mbpp_plus": 0,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "gpt-4-turbo-nov-2023": {
+    "name": "GPT-4-Turbo (Nov 2023)",
+    "score": 78.3,
+    "humaneval_plus": 81.7,
+    "mbpp_plus": 73.3,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "gpt-j-6b": {
+    "name": "GPT-J-6B",
+    "score": 6.6,
+    "humaneval_plus": 11,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "gpt-neo-2.7b": {
+    "name": "GPT-Neo-2.7B",
+    "score": 4,
+    "humaneval_plus": 6.7,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "gemini-pro-1.0": {
+    "name": "Gemini Pro 1.0",
+    "score": 57.9,
+    "humaneval_plus": 55.5,
+    "mbpp_plus": 61.4,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "gemini-pro-1.5": {
+    "name": "Gemini Pro 1.5",
+    "score": 36.6,
+    "humaneval_plus": 61,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "incoder-1.3b": {
+    "name": "InCoder-1.3B",
+    "score": 6.6,
+    "humaneval_plus": 11,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "incoder-6.7b": {
+    "name": "InCoder-6.7B",
+    "score": 7.3,
+    "humaneval_plus": 12.2,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "llama3-70b-instruct": {
+    "name": "Llama3-70B-instruct",
+    "score": 70.8,
+    "humaneval_plus": 72,
+    "mbpp_plus": 69,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "llama3-8b-base": {
+    "name": "Llama3-8B-base",
+    "score": 38.2,
+    "humaneval_plus": 29.3,
+    "mbpp_plus": 51.6,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "llama3.1-8b-instruct": {
+    "name": "Llama3.1-8B-instruct",
+    "score": 59.9,
+    "humaneval_plus": 62.8,
+    "mbpp_plus": 55.6,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "llama3-8b-instruct": {
+    "name": "Llama3-8B-instruct",
+    "score": 55.9,
+    "humaneval_plus": 56.7,
+    "mbpp_plus": 54.8,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "wavecoder-ultra-6.7b": {
+    "name": "WaveCoder-Ultra-6.7B",
+    "score": 67.1,
+    "humaneval_plus": 69.5,
+    "mbpp_plus": 63.5,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "magicoder-s-cl-7b": {
+    "name": "Magicoder-S-CL-7B",
+    "score": 64.7,
+    "humaneval_plus": 67.7,
+    "mbpp_plus": 60.1,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "magicoder-s-ds-6.7b": {
+    "name": "Magicoder-S-DS-6.7B",
+    "score": 70.4,
+    "humaneval_plus": 71.3,
+    "mbpp_plus": 69,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "mistral-large-mar-2024": {
+    "name": "Mistral Large (Mar 2024)",
+    "score": 61.1,
+    "humaneval_plus": 62.2,
+    "mbpp_plus": 59.5,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "mistral-7b": {
+    "name": "Mistral-7B",
+    "score": 31.1,
+    "humaneval_plus": 23.8,
+    "mbpp_plus": 42.1,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "mistral-codealpaca-7b": {
+    "name": "Mistral-codealpaca-7B",
+    "score": 25.3,
+    "humaneval_plus": 42.1,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "mistralhermes-codepro-7b-v1": {
+    "name": "MistralHermes-CodePro-7B-v1",
+    "score": 43.8,
+    "humaneval_plus": 42.1,
+    "mbpp_plus": 46.4,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "databricks-dbrx-instruct": {
+    "name": "databricks/dbrx-instruct",
+    "score": 64.4,
+    "humaneval_plus": 70.1,
+    "mbpp_plus": 55.8,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "codestral-22b-v0.1": {
+    "name": "Codestral-22B-v0.1",
+    "score": 69,
+    "humaneval_plus": 73.8,
+    "mbpp_plus": 61.9,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "mistral-7b-instruct-v0.2": {
+    "name": "Mistral-7B-Instruct-v0.2",
+    "score": 36.4,
+    "humaneval_plus": 36,
+    "mbpp_plus": 37,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "mixtral-8x22b-instruct-v0.1": {
+    "name": "Mixtral-8x22B-Instruct-v0.1",
+    "score": 68.9,
+    "humaneval_plus": 72,
+    "mbpp_plus": 64.3,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "mixtral-8x7b-instruct-v0.1": {
+    "name": "Mixtral-8x7B-Instruct-v0.1",
+    "score": 43.6,
+    "humaneval_plus": 39.6,
+    "mbpp_plus": 49.7,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "openchat-3.5-7b-0106": {
+    "name": "OpenChat-3.5-7B-0106",
+    "score": 62.4,
+    "humaneval_plus": 67.7,
+    "mbpp_plus": 54.5,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "opencodeinterpreter-ds-33b": {
+    "name": "OpenCodeInterpreter-DS-33B",
+    "score": 71.7,
+    "humaneval_plus": 73.8,
+    "mbpp_plus": 68.5,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "opencodeinterpreter-ds-6.7b": {
+    "name": "OpenCodeInterpreter-DS-6.7B",
+    "score": 69.8,
+    "humaneval_plus": 72,
+    "mbpp_plus": 66.4,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "openhermes-2.5-code-290k-13b": {
+    "name": "OpenHermes-2.5-Code-290k-13B",
+    "score": 47.6,
+    "humaneval_plus": 48.8,
+    "mbpp_plus": 45.8,
+    "tier": "B",
+    "source": "evalplus"
+  },
+  "phind-codellama-34b-v2": {
+    "name": "Phind-CodeLlama-34B-v2",
+    "score": 40.3,
+    "humaneval_plus": 67.1,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "polycoder-2.7b": {
+    "name": "PolyCoder-2.7B",
+    "score": 3.7,
+    "humaneval_plus": 6.1,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "python-code-13b": {
+    "name": "Python-Code-13B",
+    "score": 18.3,
+    "humaneval_plus": 30.5,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "solar-10.7b-instruct-v1.0": {
+    "name": "SOLAR-10.7B-Instruct-v1.0",
+    "score": 36.8,
+    "humaneval_plus": 37.2,
+    "mbpp_plus": 36.2,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "santacoder-1.1b": {
+    "name": "SantaCoder-1.1B",
+    "score": 8.4,
+    "humaneval_plus": 14,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "stablelm-7b": {
+    "name": "StableLM-7B",
+    "score": 1.4,
+    "humaneval_plus": 2.4,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "starchat2-15b-v0.1": {
+    "name": "starchat2-15b-v0.1",
+    "score": 68.6,
+    "humaneval_plus": 71.3,
+    "mbpp_plus": 64.6,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "starcoder-15b": {
+    "name": "StarCoder-15B",
+    "score": 36,
+    "humaneval_plus": 29.3,
+    "mbpp_plus": 46.1,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "starcoder2-15b-instruct-v0.1": {
+    "name": "starcoder2-15b-instruct-v0.1",
+    "score": 62.3,
+    "humaneval_plus": 60.4,
+    "mbpp_plus": 65.1,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "starcoder2-15b": {
+    "name": "StarCoder2-15B",
+    "score": 22.7,
+    "humaneval_plus": 37.8,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "starcoder2-3b": {
+    "name": "StarCoder2-3B",
+    "score": 16.4,
+    "humaneval_plus": 27.4,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "starcoder2-7b": {
+    "name": "StarCoder2-7B",
+    "score": 17.9,
+    "humaneval_plus": 29.9,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "starcoderbase-1b": {
+    "name": "StarCoderBase-1B",
+    "score": 7.3,
+    "humaneval_plus": 12.2,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "starcoderbase-3b": {
+    "name": "StarCoderBase-3B",
+    "score": 9.5,
+    "humaneval_plus": 15.9,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "starcoderbase-7b": {
+    "name": "StarCoderBase-7B",
+    "score": 12.8,
+    "humaneval_plus": 21.3,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "vicuna-13b": {
+    "name": "Vicuna-13B",
+    "score": 9.5,
+    "humaneval_plus": 15.9,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "vicuna-7b": {
+    "name": "Vicuna-7B",
+    "score": 7,
+    "humaneval_plus": 11.6,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "whiterabbitneo-33b-v1": {
+    "name": "WhiteRabbitNeo-33B-v1",
+    "score": 66.3,
+    "humaneval_plus": 65.9,
+    "mbpp_plus": 66.9,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "wizardcoder-15b-v1.0": {
+    "name": "WizardCoder-15B-V1.0",
+    "score": 52,
+    "humaneval_plus": 50.6,
+    "mbpp_plus": 54.2,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "wizardcoder-33b-v1.1": {
+    "name": "WizardCoder-33B-V1.1",
+    "score": 43.9,
+    "humaneval_plus": 73.2,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "wizardcoder-python-34b-v1.0": {
+    "name": "WizardCoder-Python-34B-V1.0",
+    "score": 64,
+    "humaneval_plus": 64.6,
+    "mbpp_plus": 63.2,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "wizardcoder-python-7b-v1.0": {
+    "name": "WizardCoder-Python-7B-V1.0",
+    "score": 46.9,
+    "humaneval_plus": 45.1,
+    "mbpp_plus": 49.5,
+    "tier": "B",
+    "source": "evalplus"
+  },
+  "xwincoder-34b": {
+    "name": "XwinCoder-34B",
+    "score": 67.6,
+    "humaneval_plus": 69.5,
+    "mbpp_plus": 64.8,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "zephyr--7b": {
+    "name": "Zephyr β-7B",
+    "score": 27.8,
+    "humaneval_plus": 23.2,
+    "mbpp_plus": 34.7,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "claude-2-mar-2024": {
+    "name": "claude-2 (Mar 2024)",
+    "score": 37,
+    "humaneval_plus": 61.6,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "claude-3-haiku-mar-2024": {
+    "name": "claude-3-haiku (Mar 2024)",
+    "score": 68.9,
+    "humaneval_plus": 68.9,
+    "mbpp_plus": 68.8,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "claude-3-opus-mar-2024": {
+    "name": "claude-3-opus (Mar 2024)",
+    "score": 75.8,
+    "humaneval_plus": 77.4,
+    "mbpp_plus": 73.3,
+    "tier": "A+",
+    "source": "evalplus"
+  },
+  "claude-3-sonnet-mar-2024": {
+    "name": "claude-3-sonnet (Mar 2024)",
+    "score": 66.1,
+    "humaneval_plus": 64,
+    "mbpp_plus": 69.3,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "claude-instant-1-mar-2024": {
+    "name": "claude-instant-1 (Mar 2024)",
+    "score": 30.4,
+    "humaneval_plus": 50.6,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "code-millenials-34b": {
+    "name": "code-millenials-34B",
+    "score": 68.3,
+    "humaneval_plus": 70.7,
+    "mbpp_plus": 64.6,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "codegemma-2b": {
+    "name": "codegemma-2b",
+    "score": 31.1,
+    "humaneval_plus": 20.7,
+    "mbpp_plus": 46.6,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "codegemma-7b": {
+    "name": "codegemma-7b",
+    "score": 45.9,
+    "humaneval_plus": 41.5,
+    "mbpp_plus": 52.4,
+    "tier": "B",
+    "source": "evalplus"
+  },
+  "codegemma-7b-it": {
+    "name": "codegemma-7b-it",
+    "score": 53.8,
+    "humaneval_plus": 51.8,
+    "mbpp_plus": 56.9,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "dolphin-2.6-mixtral-8x7b": {
+    "name": "dolphin-2.6-mixtral-8x7b",
+    "score": 58,
+    "humaneval_plus": 57.3,
+    "mbpp_plus": 59,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "gemma-1.1-2b-it": {
+    "name": "gemma-1.1-2b-it",
+    "score": 19.9,
+    "humaneval_plus": 17.7,
+    "mbpp_plus": 23.3,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "gemma-1.1-7b-it": {
+    "name": "gemma-1.1-7b-it",
+    "score": 39.2,
+    "humaneval_plus": 35.4,
+    "mbpp_plus": 45,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "gemma-2b": {
+    "name": "gemma-2b",
+    "score": 26.1,
+    "humaneval_plus": 20.7,
+    "mbpp_plus": 34.1,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "gemma-2b-it": {
+    "name": "gemma-2b-it",
+    "score": 9.1,
+    "humaneval_plus": 15.2,
+    "mbpp_plus": 0,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "gemma-7b": {
+    "name": "gemma-7b",
+    "score": 34.6,
+    "humaneval_plus": 28.7,
+    "mbpp_plus": 43.4,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "gemma-7b-it": {
+    "name": "gemma-7b-it",
+    "score": 29.7,
+    "humaneval_plus": 25,
+    "mbpp_plus": 36.8,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "phi-3-mini-4k-instruct": {
+    "name": "Phi-3-mini-4k-instruct",
+    "score": 57.1,
+    "humaneval_plus": 59.1,
+    "mbpp_plus": 54.2,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "phi-2-2.7b": {
+    "name": "phi-2-2.7B",
+    "score": 48.7,
+    "humaneval_plus": 45.1,
+    "mbpp_plus": 54.2,
+    "tier": "B",
+    "source": "evalplus"
+  },
+  "speechless-code-mistral-7b-v1.0": {
+    "name": "speechless-code-mistral-7B-v1.0",
+    "score": 44.4,
+    "humaneval_plus": 41.5,
+    "mbpp_plus": 48.7,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "speechless-codellama-34b-v2.0": {
+    "name": "speechless-codellama-34B-v2.0",
+    "score": 67.8,
+    "humaneval_plus": 72,
+    "mbpp_plus": 61.4,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "speechless-coder-ds-6.7b": {
+    "name": "speechless-coder-ds-6.7B",
+    "score": 65.3,
+    "humaneval_plus": 65.9,
+    "mbpp_plus": 64.4,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "speechless-coding-7b-16k-tora": {
+    "name": "speechless-coding-7B-16k-tora",
+    "score": 50.6,
+    "humaneval_plus": 50.6,
+    "mbpp_plus": 50.6,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "speechless-starcoder2-15b": {
+    "name": "speechless-starcoder2-15b",
+    "score": 62.6,
+    "humaneval_plus": 62.8,
+    "mbpp_plus": 62.4,
+    "tier": "A",
+    "source": "evalplus"
+  },
+  "speechless-starcoder2-7b": {
+    "name": "speechless-starcoder2-7b",
+    "score": 53.6,
+    "humaneval_plus": 51.8,
+    "mbpp_plus": 56.3,
+    "tier": "B+",
+    "source": "evalplus"
+  },
+  "stable-code-3b": {
+    "name": "stable-code-3B",
+    "score": 33.7,
+    "humaneval_plus": 25.6,
+    "mbpp_plus": 45.8,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "xdan-l1-chat-rl-v1-7b": {
+    "name": "xDAN-L1-Chat-RL-v1-7B",
+    "score": 36.3,
+    "humaneval_plus": 32.9,
+    "mbpp_plus": 41.3,
+    "tier": "C+",
+    "source": "evalplus"
+  },
+  "zyte-1b": {
+    "name": "zyte-1B",
+    "score": 4.1,
+    "humaneval_plus": 1.8,
+    "mbpp_plus": 7.5,
+    "tier": "C+",
+    "source": "evalplus"
   }
 }

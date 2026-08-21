@@ -38,6 +38,7 @@ const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
 const isCronSetup = args.includes('--setup-cron');
 const isSkipTest = args.includes('--skip-test');
+const isLiveBenchmarks = args.includes('--live-benchmarks') || args.includes('--update-benchmarks');
 
 // ponytail: shared better-sqlite3 loader helper
 function getDbClass() {
@@ -789,6 +790,15 @@ async function main() {
 
   if (isCronSetup) {
     setupDailyCron();
+  }
+
+  if (isLiveBenchmarks) {
+    try {
+      const { updateBenchmarks } = require('./update-benchmarks.js');
+      await updateBenchmarks();
+    } catch (err) {
+      console.warn(`[!] Failed to update live benchmarks: ${err.message}`);
+    }
   }
 
   const [oaData, kiloData, orData] = await Promise.all([
