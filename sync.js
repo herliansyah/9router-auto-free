@@ -381,12 +381,7 @@ async function testModelWith9router(fullModelId, token) {
     // 200 OK -> Reachable & Active
     if (data.ok) return { valid: true, ok: true };
 
-    // 429 -> Daily quota reached on provider, but model & credentials are valid
-    if (data.status === 429 || (data.error && data.error.includes('quota'))) {
-      return { valid: true, ok: false, status: 429, note: 'quota reached (model valid)' };
-    }
-
-    // Permanent failures: 401 (promo ended), 402 (paid/credits needed), 404 (not found), timeout
+    // Any non-200 (429 quota exceeded, 401 promo ended, 402 paid, 404, timeout) -> Dropped
     const reason = (data.error || `HTTP ${data.status || res.status}`).replace(/\n/g, ' ').slice(0, 75);
     return { valid: false, ok: false, status: data.status || res.status, reason };
   } catch (err) {
