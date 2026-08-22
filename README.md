@@ -1,5 +1,5 @@
 # Free Models Sync -> 9router
-### (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + Groq + Cerebras + Mistral + Cloudflare AI + 9router OpenCode Free)
+### (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + Groq + Cerebras + Mistral + Cloudflare AI + NVIDIA NIM + 9router OpenCode Free)
 
 Otomasi sinkronisasi, **live pre-test validasi**, pemeringkatan kapabilitas koding, dan injeksi model AI gratis harian langsung ke dalam **9router** combos (`my9model-free`, `openagentic-free`, `kilo-free`, `openrouter-free`, `poolside-free`, `gemini-free`, `ollama-free`, `airforce-free`, `bazaarlink-free`, dan `opencode-free`).
 
@@ -88,6 +88,9 @@ Keduanya fallback ke top-5 super-combo supaya tidak pernah kosong.
 13. **Cloudflare Workers AI** (opsional):
    - Koneksi native `cloudflare-ai` di 9router (apiKey + `accountId` di `providerSpecificData`); fallback koneksi *openai-compatible* ke `api.cloudflare.com` tetap didukung.
    - Hanya model tanpa harga (terbukti 403 di plan gratis untuk model berbayar) dan tanpa flag `require_workers_paid`.
+14. **NVIDIA NIM**:
+   - NVIDIA NIM API (`https://integrate.api.nvidia.com/v1/models`) via koneksi native `nvidia` di 9router (API key `nvapi-...` dari build.nvidia.com).
+   - Free tier untuk member NVIDIA Developer Program (kredit prototyping & testing): katalog tidak memuat kolom harga, jadi semua kandidat teks (embed/rerank/TTS/vision/guardrail dibuang lewat skip pattern) divalidasi oleh live pre-test — model yang butuh pembayaran atau sudah mati otomatis dibuang.
 
 > Catatan: integrasi GitHub Models **tidak ditambahkan** karena layanan ini sudah di-retire GitHub per 30 Juli 2026 (endpoint `models.github.ai` mengembalikan HTTP 410 permanen).
 
@@ -244,3 +247,4 @@ Endpoint 9router: `http://localhost:20128/v1`
 - **`cerebras-free`**: Combo model gratis Cerebras yang aktif.
 - **`mistral-free`**: Combo model gratis Mistral yang aktif.
 - **`cloudflare-free`**: Combo model gratis Cloudflare Workers AI yang aktif (koneksi native `cloudflare-ai`).
+- **`nvidia-free`**: Combo model gratis NVIDIA NIM yang aktif (koneksi native `nvidia`).

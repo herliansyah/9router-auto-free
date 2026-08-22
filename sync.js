@@ -2,7 +2,7 @@
 
 /**
  * Free Models Sync for 9router
- * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + Groq + Cerebras + Mistral + Cloudflare AI + 9router OpenCode Free)
+ * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + Groq + Cerebras + Mistral + Cloudflare AI + NVIDIA NIM + 9router OpenCode Free)
  *
  * Automatically synchronizes today's free models from:
  *   1. OpenAgentic.id (Web & API /v1/models)
@@ -18,6 +18,7 @@
  *   11. Cerebras API (api.cerebras.ai/v1/models)
  *   12. Mistral La Plateforme free tier (api.mistral.ai/v1/models)
  *   13. Cloudflare Workers AI free neurons (native "cloudflare-ai" connection in 9router)
+ *   14. NVIDIA NIM free tier (integrate.api.nvidia.com/v1/models, native "nvidia" connection)
  * 
  * Pre-tests all candidates against 9router to drop expired/dead/paid models,
  * sorts them by coding capability specification (best to worst),
@@ -36,6 +37,7 @@
  *   - cerebras-free   : Dedicated Cerebras free combo
  *   - mistral-free    : Dedicated Mistral free combo (requires Mistral connection)
  *   - cloudflare-free : Dedicated Cloudflare Workers AI free combo ("cloudflare-ai" connection)
+ *   - nvidia-free     : Dedicated NVIDIA NIM free combo ("nvidia" connection)
  *   - my9model-smart  : Thinking / high-benchmark subset of the super-combo
  *   - my9model-fast   : Low-latency non-thinking subset of the super-combo
  *   - my9model-cooldown : Parking combo for temporarily quota-exhausted models;
@@ -334,7 +336,8 @@ const USAGE_PROVIDER_MAP = {
   'groq': 'groq',
   'cerebras': 'cerebras',
   'mistral': 'mistral',
-  'cloudflare': 'cloudflare', 'cloudflare-ai': 'cloudflare', 'cf': 'cloudflare'
+  'cloudflare': 'cloudflare', 'cloudflare-ai': 'cloudflare', 'cf': 'cloudflare',
+  'nvidia': 'nvidia', 'nim': 'nvidia'
 };
 const USAGE_LOOKBACK_DAYS = 7;
 const USAGE_MIN_SAMPLES = 5;
@@ -1234,6 +1237,16 @@ function getMistralCredentials() {
   };
 }
 
+// Extract NVIDIA NIM API Key from 9router Database (native 9router provider type)
+function getNvidiaCredentials() {
+  const parsed = getProviderConnection('nvidia');
+  return {
+    apiKey: parsed?.apiKey || null,
+    prefix: parsed?.providerSpecificData?.prefix || 'nvidia',
+    baseUrl: 'https://integrate.api.nvidia.com/v1'
+  };
+}
+
 // Cloudflare Workers AI credentials. Preferred: the native "cloudflare-ai" provider
 // connection in 9router (apiKey + providerSpecificData.accountId). Fallback: a
 // user-added openai-compatible connection whose baseUrl points at api.cloudflare.com.
@@ -1471,6 +1484,28 @@ async function getTodaysMistralFreeModels() {
   return { prefix: creds.prefix || 'mistral', models: sortModelsByCodingQuality(models) };
 }
 
+// Merge and discover all free models from NVIDIA NIM (build.nvidia.com free credits)
+// The catalog response carries no pricing fields: every model on integrate.api.nvidia.com
+// runs on the account's free developer credits, so usability is decided by the live
+// pre-test. Skip patterns only remove non-LLM entries (embed/rerank/audio/vision/guard).
+async function getTodaysNvidiaFreeModels() {
+  const creds = getNvidiaCredentials();
+  const models = await fetchOpenAiCompatibleFreeModels({
+    label: 'NVIDIA NIM', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
+    skipPatterns: [
+      // embeddings / retrieval / document parsing
+      'embed', 'bge-m3', 'arctic', 'rerank', 'retriever', 'parse',
+      // audio / speech / translation
+      'tts', 'speech', 'audio', 'asr', 'riva', 'parakeet', 'whisper',
+      // vision / image / video
+      'vision', '-vl', 'vlm', 'fuyu', 'kosmos', 'neva', 'vila', 'deplot', 'clip', 'diffusion', 'image', 'video', 'detector',
+      // guardrails / reward models
+      'guard', 'safety', 'topic-control', 'reward', 'moderation'
+    ]
+  });
+  return { prefix: creds.prefix || 'nvidia', models: sortModelsByCodingQuality(models) };
+}
+
 // Merge and discover all free models from Cloudflare Workers AI
 async function getTodaysCloudflareFreeModels() {
   const creds = getCloudflareCredentials();
@@ -1691,7 +1726,8 @@ const MANAGED_COMBOS = [
   'my9model-free', 'my9model-smart', 'my9model-fast',
   'openagentic-free', 'kilo-free', 'opencode-free', 'openrouter-free',
   'poolside-free', 'gemini-free', 'ollama-free', 'airforce-free',
-  'bazaarlink-free', 'groq-free', 'cerebras-free', 'mistral-free', 'cloudflare-free'
+  'bazaarlink-free', 'groq-free', 'cerebras-free', 'mistral-free', 'cloudflare-free',
+  'nvidia-free'
 ];
 
 // Combo name -> model-id prefixes belonging to it (first segment of fullId)
@@ -1708,7 +1744,8 @@ const PROVIDER_COMBO_PREFIXES = {
   'groq-free': ['groq'],
   'cerebras-free': ['cerebras'],
   'mistral-free': ['mistral'],
-  'cloudflare-free': ['cloudflare-ai', 'cloudflare', 'cf']
+  'cloudflare-free': ['cloudflare-ai', 'cloudflare', 'cf'],
+  'nvidia-free': ['nvidia']
 };
 
 function idMatchesPrefixes(fullId, prefixes) {
@@ -1991,7 +2028,7 @@ function passesAgenticGate(meta) {
  * Inject free models into 9router combos.
  * Accepts a single providers object:
  *   { oa, kilo, oc, openrouter, poolside, gemini, ollama, airforce, bazaarlink,
- *     groq, cerebras, mistral, cloudflare }
+ *     groq, cerebras, mistral, cloudflare, nvidia }
  * Each entry: { prefix, models: [...] , excluded?: true }
  */
 async function injectInto9router(providers) {
@@ -2009,7 +2046,8 @@ async function injectInto9router(providers) {
     ['groq', p.groq, 'groq'],
     ['cerebras', p.cerebras, 'cerebras'],
     ['mistral', p.mistral, 'mistral'],
-    ['cloudflare', p.cloudflare, 'cloudflare']
+    ['cloudflare', p.cloudflare, 'cloudflare'],
+    ['nvidia', p.nvidia, 'nvidia']
   ];
 
   // Live-test each source (skipped when the whole provider is excluded)
@@ -2112,7 +2150,8 @@ async function injectInto9router(providers) {
     ['groq-free', (!p.groq?.excluded && (p.groq?.validated?.length || 0) > 0) ? activeByProvider.groq : null],
     ['cerebras-free', (!p.cerebras?.excluded && (p.cerebras?.validated?.length || 0) > 0) ? activeByProvider.cerebras : null],
     ['mistral-free', (!p.mistral?.excluded && (p.mistral?.validated?.length || 0) > 0) ? activeByProvider.mistral : null],
-    ['cloudflare-free', (!p.cloudflare?.excluded && (p.cloudflare?.validated?.length || 0) > 0) ? activeByProvider.cloudflare : null]
+    ['cloudflare-free', (!p.cloudflare?.excluded && (p.cloudflare?.validated?.length || 0) > 0) ? activeByProvider.cloudflare : null],
+    ['nvidia-free', (!p.nvidia?.excluded && (p.nvidia?.validated?.length || 0) > 0) ? activeByProvider.nvidia : null]
   ]);
   for (const [name, list] of Array.from(comboMap)) {
     if (!Array.isArray(list)) comboMap.delete(name);
@@ -2293,7 +2332,7 @@ async function main() {
   console.log('====================================================');
   console.log('  Free Models Sync -> 9router Combos               ');
   console.log('  Sources: OpenAgentic + Kilo + OpenRouter + Poolside + Gemini + Ollama + Airforce + Bazaarlink');
-  console.log('           + Groq + Cerebras + Mistral + Cloudflare AI + OC');
+  console.log('           + Groq + Cerebras + Mistral + Cloudflare AI + NVIDIA NIM + OC');
   console.log(`  Mode: ${mode}  `);
   console.log(`  Time: ${new Date().toISOString()}`);
   console.log('====================================================\n');
@@ -2326,7 +2365,7 @@ async function main() {
   const excludedOr = (name) => isProviderExcluded(name, excludedProviders);
   const skipData = (prefix) => Promise.resolve({ prefix, models: [], excluded: true });
 
-  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData, groqData, cerebrasData, mistralData, cloudflareData] = await Promise.all([
+  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData, groqData, cerebrasData, mistralData, cloudflareData, nvidiaData] = await Promise.all([
     excludedOr('openagentic') ? skipData('openagentic') : getTodaysOpenAgenticFreeModels(),
     (excludedOr('kilocode') || excludedOr('kilo')) ? skipData('kc') : getTodaysKiloFreeModels(),
     excludedOr('openrouter') ? skipData('openrouter') : getTodaysOpenRouterFreeModels(),
@@ -2338,7 +2377,8 @@ async function main() {
     excludedOr('groq') ? skipData('groq') : getTodaysGroqFreeModels(),
     excludedOr('cerebras') ? skipData('cerebras') : getTodaysCerebrasFreeModels(),
     excludedOr('mistral') ? skipData('mistral') : getTodaysMistralFreeModels(),
-    excludedOr('cloudflare') ? skipData('cloudflare') : getTodaysCloudflareFreeModels()
+    excludedOr('cloudflare') ? skipData('cloudflare') : getTodaysCloudflareFreeModels(),
+    excludedOr('nvidia') ? skipData('nvidia') : getTodaysNvidiaFreeModels()
   ]);
 
   const ocData = (excludedOr('opencode') || excludedOr('oc'))
@@ -2358,7 +2398,8 @@ async function main() {
     groq: groqData,
     cerebras: cerebrasData,
     mistral: mistralData,
-    cloudflare: cloudflareData
+    cloudflare: cloudflareData,
+    nvidia: nvidiaData
   });
 }
 
@@ -2405,6 +2446,7 @@ module.exports = {
   getCerebrasCredentials,
   getMistralCredentials,
   getCloudflareCredentials,
+  getNvidiaCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
@@ -2417,6 +2459,7 @@ module.exports = {
   getTodaysCerebrasFreeModels,
   getTodaysMistralFreeModels,
   getTodaysCloudflareFreeModels,
+  getTodaysNvidiaFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels,

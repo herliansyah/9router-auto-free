@@ -25,6 +25,8 @@ const {
   getTodaysOllamaFreeModels,
   getTodaysAirforceFreeModels,
   getTodaysBazaarlinkFreeModels,
+  getNvidiaCredentials,
+  getTodaysNvidiaFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router
 } = require('./sync.js');
@@ -108,6 +110,23 @@ async function runTests() {
   const bzlData = await getTodaysBazaarlinkFreeModels();
   console.log(`    Found ${bzlData.models.length} Bazaarlink candidate free models`);
   assert.ok(bzlData.models.length > 0, 'Should find Bazaarlink free models');
+
+  // 9.1 NVIDIA NIM Credential & Discovery Test
+  console.log('[-] Testing NVIDIA NIM discovery...');
+  const nimCreds = getNvidiaCredentials();
+  assert.strictEqual(nimCreds.prefix, 'nvidia', 'NVIDIA NIM prefix must be nvidia');
+  assert.strictEqual(nimCreds.baseUrl, 'https://integrate.api.nvidia.com/v1', 'NVIDIA NIM baseUrl must be integrate.api.nvidia.com/v1');
+  const nimData = await getTodaysNvidiaFreeModels();
+  console.log(`    Found ${nimData.models.length} NVIDIA NIM candidate free models`);
+  assert.ok(Array.isArray(nimData.models), 'NVIDIA NIM models must be an array');
+  if (nimCreds.apiKey) {
+    assert.ok(nimData.models.length > 0, 'NVIDIA NIM discovery must find models when an API key exists');
+  }
+  // Skip patterns must remove non-LLM entries (embeddings, guardrails, TTS, vision)
+  for (const m of nimData.models) {
+    assert.ok(!/embed|guard|safety|tts|riva|vision|-vl|vlm|fuyu|kosmos|neva|vila|deplot|clip|diffusion|video|detector|reward|parse/i.test(m.id),
+      `NVIDIA NIM candidate must be a text LLM, got: ${m.id}`);
+  }
 
   // 10. OpenCode from 9router Discovery Test
   console.log('[-] Testing 9router OpenCode free extraction...');
