@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node sync.js",
     "sync": "node sync.js",
-    "sync:fast": "node sync.js --skip-test",
     "dry-run": "node sync.js --dry-run",
     "test": "node test.js",
     "update-benchmarks": "node update-benchmarks.js",

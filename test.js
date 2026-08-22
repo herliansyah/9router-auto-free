@@ -26,8 +26,7 @@ const {
   getTodaysAirforceFreeModels,
   getTodaysBazaarlinkFreeModels,
   getTodaysOpenCodeFreeModels,
-  testModelWith9router,
-  validateCandidateModels
+  testModelWith9router
 } = require('./sync.js');
 
 async function runTests() {
@@ -142,38 +141,27 @@ async function runTests() {
   assert.strictEqual(isModelExcluded('poolside/poolside/laguna-s-2.1', exclusions), false, 'laguna-s-2.1 must not be excluded');
   assert.strictEqual(isModelExcluded('bazaarlink/qwen/qwen3.7-flash:free', exclusions), false, 'qwen3.7-flash must not be excluded');
 
-  // 12. Pre-test Validation Engine Check
-  console.log('[-] Testing pre-test validation engine...');
-  const sampleModels = [
-    { id: 'stepfun/step-3.7-flash:free', name: 'Step 3.7 Flash' },
-    { id: 'bazaarlink/auto:free', name: 'Bazaarlink Auto Free (Excluded)' }
-  ];
-  // Test skip mode with exclusion (auto:free dropped, stepfun kept)
-  const filtered = await validateCandidateModels(sampleModels, 'kc', true);
-  assert.strictEqual(filtered.length, 1, 'Only non-excluded models should remain');
-  assert.strictEqual(filtered[0].id, 'stepfun/step-3.7-flash:free');
-
-  // 13. Custom Priorities Engine Check
+  // 12. Custom Priorities Engine Check
   console.log('[-] Testing custom priorities engine & latency ranking...');
   const priorities = getPrioritiesList();
   assert.ok(Array.isArray(priorities) && priorities.length > 0, 'Priorities list must not be empty');
 
-  // Test fuzzy / substring matching rank
-  assert.strictEqual(getModelPriorityRank('openagentic/claude-sonnet-4.5', priorities), 0, 'Sonnet 4.5 should be rank 0');
-  assert.strictEqual(getModelPriorityRank('gemini/gemini-3.7-flash', priorities), 1, 'Gemini 3.7 should be rank 1');
-  assert.strictEqual(getModelPriorityRank('kc/stepfun/step-3.7-flash:free', priorities), 3, 'Step 3.7 should be rank 3');
+  // Test fuzzy / substring matching rank (mirrors priorities.json)
+  assert.strictEqual(getModelPriorityRank('openagentic/0x-alpha-pro', priorities), 0, '0x-alpha should be rank 0');
+  assert.strictEqual(getModelPriorityRank('openagentic/ox-alpha', priorities), 1, 'ox-alpha should be rank 1');
+  assert.strictEqual(getModelPriorityRank('poolside/poolside/laguna-s-2.1', priorities), 3, 'Laguna should be rank 3');
   assert.strictEqual(getModelPriorityRank('ollama/minimax-m3', priorities), Infinity, 'Minimax M3 has no custom rank');
 
   // Test similar models matching same priority rule -> prioritized by lowest latency
   const similarCandidates = [
-    { id: 'openagentic/gemini-3.7-flash', latencyMs: 2200 },
-    { id: 'gemini/gemini-3.7-flash', latencyMs: 450 },
-    { id: 'openagentic/claude-sonnet-4.5', latencyMs: 1500 }
+    { id: 'openagentic/hy3-large', latencyMs: 2200 },
+    { id: 'ollama/hy3-small', latencyMs: 450 },
+    { id: 'openagentic/ox-alpha', latencyMs: 1500 }
   ];
   const sortedSimilar = sortModelsByCodingQuality(similarCandidates, null, priorities);
-  assert.strictEqual(sortedSimilar[0].id, 'openagentic/claude-sonnet-4.5', 'Rank 0 (Sonnet) must come first');
-  assert.strictEqual(sortedSimilar[1].id, 'gemini/gemini-3.7-flash', 'Between two Gemini 3.7 models, lower latency (450ms) must come first');
-  assert.strictEqual(sortedSimilar[2].id, 'openagentic/gemini-3.7-flash', 'Higher latency Gemini (2200ms) comes after');
+  assert.strictEqual(sortedSimilar[0].id, 'openagentic/ox-alpha', 'Higher rank (ox-alpha) must come first');
+  assert.strictEqual(sortedSimilar[1].id, 'ollama/hy3-small', 'Between two hy3 models, lower latency (450ms) must come first');
+  assert.strictEqual(sortedSimilar[2].id, 'openagentic/hy3-large', 'Higher latency hy3 (2200ms) comes after');
 
   // 14. Combined sorting test across all providers
   console.log('[-] Testing combined priority sorting across all providers...');

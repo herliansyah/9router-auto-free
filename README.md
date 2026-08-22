@@ -141,10 +141,6 @@ npm run sync
 # Jalankan simulasi (Dry Run) tanpa mengubah database
 npm run dry-run
 
-# Sinkronisasi cepat tanpa pre-test
-npm run sync:fast
-# atau: node sync.js --skip-test
-
 # Perbarui database benchmark coding secara live dari leaderboard (EvalPlus / SWE-bench)
 npm run update-benchmarks
 

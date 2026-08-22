@@ -47,7 +47,6 @@ const CLIENT_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', '9rout
 const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
 const isCronSetup = args.includes('--setup-cron');
-const isSkipTest = args.includes('--skip-test');
 const isLiveBenchmarks = args.includes('--live-benchmarks') || args.includes('--update-benchmarks');
 
 // ponytail: shared better-sqlite3 loader helper
@@ -1094,7 +1093,7 @@ async function testModelWith9router(fullModelId, token) {
 /**
  * Filter model candidate list using exclusions and concurrency pool testing
  */
-async function validateCandidateModels(models, prefix, skipTest = false) {
+async function validateCandidateModels(models, prefix) {
   const exclusions = getExclusionList();
   const nonExcludedModels = [];
 
@@ -1107,8 +1106,6 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
       nonExcludedModels.push(m);
     }
   }
-
-  if (skipTest) return nonExcludedModels;
 
   const token = get9routerCliToken();
   if (!token) {
@@ -1153,15 +1150,15 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
 // Inject free models into 9router combos
 async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData) {
   // Validate each source's free models against 9router live test (skip if provider is excluded)
-  const validOaModels = oaData?.excluded ? [] : await validateCandidateModels(oaData.models, oaData.prefix, isSkipTest);
-  const validKiloModels = kiloData?.excluded ? [] : await validateCandidateModels(kiloData.models, kiloData.prefix, isSkipTest);
-  const validOcModels = ocData?.excluded ? [] : await validateCandidateModels(ocData.models, ocData.prefix, isSkipTest);
-  const validOrModels = orData?.excluded ? [] : (orData ? await validateCandidateModels(orData.models, orData.prefix, isSkipTest) : []);
-  const validPoolsideModels = poolsideData?.excluded ? [] : (poolsideData ? await validateCandidateModels(poolsideData.models, poolsideData.prefix || 'poolside', isSkipTest) : []);
-  const validGeminiModels = geminiData?.excluded ? [] : (geminiData ? await validateCandidateModels(geminiData.models, geminiData.prefix || 'gemini', isSkipTest) : []);
-  const validOllamaModels = ollamaData?.excluded ? [] : (ollamaData ? await validateCandidateModels(ollamaData.models, ollamaData.prefix || 'ollama', isSkipTest) : []);
-  const validAirforceModels = airforceData?.excluded ? [] : (airforceData ? await validateCandidateModels(airforceData.models, airforceData.prefix || 'api-airforce', isSkipTest) : []);
-  const validBazaarlinkModels = bazaarlinkData?.excluded ? [] : (bazaarlinkData ? await validateCandidateModels(bazaarlinkData.models, bazaarlinkData.prefix || 'bazaarlink', isSkipTest) : []);
+  const validOaModels = oaData?.excluded ? [] : await validateCandidateModels(oaData.models, oaData.prefix);
+  const validKiloModels = kiloData?.excluded ? [] : await validateCandidateModels(kiloData.models, kiloData.prefix);
+  const validOcModels = ocData?.excluded ? [] : await validateCandidateModels(ocData.models, ocData.prefix);
+  const validOrModels = orData?.excluded ? [] : (orData ? await validateCandidateModels(orData.models, orData.prefix) : []);
+  const validPoolsideModels = poolsideData?.excluded ? [] : (poolsideData ? await validateCandidateModels(poolsideData.models, poolsideData.prefix || 'poolside') : []);
+  const validGeminiModels = geminiData?.excluded ? [] : (geminiData ? await validateCandidateModels(geminiData.models, geminiData.prefix || 'gemini') : []);
+  const validOllamaModels = ollamaData?.excluded ? [] : (ollamaData ? await validateCandidateModels(ollamaData.models, ollamaData.prefix || 'ollama') : []);
+  const validAirforceModels = airforceData?.excluded ? [] : (airforceData ? await validateCandidateModels(airforceData.models, airforceData.prefix || 'api-airforce') : []);
+  const validBazaarlinkModels = bazaarlinkData?.excluded ? [] : (bazaarlinkData ? await validateCandidateModels(bazaarlinkData.models, bazaarlinkData.prefix || 'bazaarlink') : []);
 
   const oaPrefixed = validOaModels.map(m => `${oaData.prefix}/${m.id}`);
   const kiloPrefixed = validKiloModels.map(m => `${kiloData.prefix}/${m.id}`);
