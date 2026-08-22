@@ -97,6 +97,13 @@
     "livecodebench": 70.2,
     "tier": "A+"
   },
+  "qwen3.7-flash": {
+    "name": "Qwen 3.7 Flash",
+    "score": 70,
+    "swe_bench": 64.5,
+    "livecodebench": 69.5,
+    "tier": "A+"
+  },
   "qwen3.6-plus": {
     "name": "Qwen 3.6 Plus",
     "score": 69,

@@ -26,6 +26,7 @@ const BASELINE = {
   "deepseek-v3": { name: "DeepSeek V3", score: 72.0, swe_bench: 65.0, livecodebench: 70.5, tier: "A+" },
   "glm-5": { name: "Zhipu GLM 5", score: 71.0, swe_bench: 65.0, livecodebench: 71.5, tier: "A+" },
   "step-3.7-flash": { name: "StepFun Step 3.7 Flash", score: 70.0, swe_bench: 64.5, livecodebench: 70.2, tier: "A+" },
+  "qwen3.7-flash": { name: "Qwen 3.7 Flash", score: 70.0, swe_bench: 64.5, livecodebench: 69.5, tier: "A+" },
   "qwen3.6-plus": { name: "Qwen 3.6 Plus", score: 69.0, swe_bench: 64.0, livecodebench: 68.0, tier: "A" },
   "qwen2.5-coder": { name: "Qwen 2.5 Coder 32B", score: 68.5, swe_bench: 63.0, livecodebench: 67.5, tier: "A" },
   "gpt-4o": { name: "GPT-4o", score: 66.0, swe_bench: 60.0, livecodebench: 65.0, tier: "A" },

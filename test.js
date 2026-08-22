@@ -1,5 +1,5 @@
 /**
- * Ponytail test check for 9router free sync (OpenAgentic + Kilo.ai + OpenRouter + 9router OpenCode)
+ * Ponytail test check for 9router free sync
  * Minimal assert-based self check.
  */
 
@@ -14,6 +14,7 @@ const {
   getGeminiCredentials,
   getOllamaCredentials,
   getAirforceCredentials,
+  getBazaarlinkCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
@@ -21,13 +22,14 @@ const {
   getTodaysGeminiFreeModels,
   getTodaysOllamaFreeModels,
   getTodaysAirforceFreeModels,
+  getTodaysBazaarlinkFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels
 } = require('./sync.js');
 
 async function runTests() {
-  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + 9router OpenCode)...');
+  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + 9router OpenCode)...');
 
   // 1. Coding score & Benchmark tests
   console.log('[-] Testing coding benchmark score & sorting...');
@@ -96,15 +98,23 @@ async function runTests() {
   assert.ok(airforceCreds.prefix.length > 0, 'Airforce prefix must not be empty');
   const airforceData = await getTodaysAirforceFreeModels();
   console.log(`    Found ${airforceData.models.length} API.airforce candidate free models`);
-  assert.ok(airforceData.models.length > 0, 'Should find API.airforce free models');
+  assert.ok(Array.isArray(airforceData.models), 'Airforce models must be an array');
 
-  // 9. OpenCode from 9router Discovery Test
+  // 9. Bazaarlink Credential & Discovery Test
+  console.log('[-] Testing Bazaarlink discovery...');
+  const bzlCreds = getBazaarlinkCredentials();
+  assert.ok(bzlCreds.prefix.length > 0, 'Bazaarlink prefix must not be empty');
+  const bzlData = await getTodaysBazaarlinkFreeModels();
+  console.log(`    Found ${bzlData.models.length} Bazaarlink candidate free models`);
+  assert.ok(bzlData.models.length > 0, 'Should find Bazaarlink free models');
+
+  // 10. OpenCode from 9router Discovery Test
   console.log('[-] Testing 9router OpenCode free extraction...');
   const ocData = getTodaysOpenCodeFreeModels();
   console.log(`    Found ${ocData.models.length} OpenCode candidate free models`);
   assert.ok(ocData.models.length > 0, 'Should find OpenCode free models');
 
-  // 10. Exclusion Rules Check (Models & Providers)
+  // 11. Exclusion Rules Check (Models & Providers)
   console.log('[-] Testing exclusions filter engine (models & providers)...');
   const { getExclusionList, getExcludedProviders, isProviderExcluded, isModelExcluded } = require('./sync.js');
   const exclusions = getExclusionList();
@@ -113,32 +123,35 @@ async function runTests() {
   assert.ok(Array.isArray(excludedProviders) && excludedProviders.includes('api-airforce'), 'api-airforce must be in excludedProviders');
   assert.strictEqual(isProviderExcluded('api-airforce'), true, 'api-airforce must be reported as excluded');
   assert.strictEqual(isProviderExcluded('gemini'), false, 'gemini must not be excluded');
+  assert.strictEqual(isProviderExcluded('bazaarlink'), false, 'bazaarlink must not be excluded');
   assert.ok(isModelExcluded('ollama/nemotron-3-nano:30b', exclusions), 'nano models must be excluded');
   assert.ok(isModelExcluded('openrouter/liquid/lfm-2.5-2.6b:free', exclusions), 'lfm small models must be excluded');
   assert.ok(isModelExcluded('poolside/poolside/laguna-xs-2.1', exclusions), 'laguna-xs models must be excluded');
   assert.ok(isModelExcluded('openrouter/cohere/north-mini-code:free', exclusions), 'north-mini models must be excluded');
   assert.ok(isModelExcluded('gemini/gemma-4-31b-it', exclusions), 'gemma models must be excluded');
   assert.ok(isModelExcluded('ollama/gpt-oss:120b', exclusions), 'gpt-oss models must be excluded');
-  assert.ok(isModelExcluded('openrouter/stealth/ox-alpha', exclusions), 'ox-alpha must be excluded');
+  assert.ok(isModelExcluded('bazaarlink/auto:free', exclusions), 'bazaarlink/auto:free must be excluded');
   assert.ok(isModelExcluded('openrouter/free', exclusions), 'openrouter/free must be excluded');
   assert.ok(isModelExcluded('kc/dots-studio/dots-3-note-preview:free', exclusions), 'dots-studio must be excluded');
+  assert.strictEqual(isModelExcluded('openrouter/stealth/ox-alpha', exclusions), false, 'ox-alpha must not be excluded');
   assert.strictEqual(isModelExcluded('kc/stepfun/step-3.7-flash:free', exclusions), false, 'step-3.7 must not be excluded');
   assert.strictEqual(isModelExcluded('ollama/minimax-m3', exclusions), false, 'minimax-m3 must not be excluded');
   assert.strictEqual(isModelExcluded('gemini/gemini-3.5-flash-lite', exclusions), false, 'gemini-3.5-flash-lite must not be excluded');
   assert.strictEqual(isModelExcluded('poolside/poolside/laguna-s-2.1', exclusions), false, 'laguna-s-2.1 must not be excluded');
+  assert.strictEqual(isModelExcluded('bazaarlink/qwen/qwen3.7-flash:free', exclusions), false, 'qwen3.7-flash must not be excluded');
 
-  // 11. Pre-test Validation Engine Check
+  // 12. Pre-test Validation Engine Check
   console.log('[-] Testing pre-test validation engine...');
   const sampleModels = [
     { id: 'stepfun/step-3.7-flash:free', name: 'Step 3.7 Flash' },
-    { id: 'stealth/ox-alpha', name: 'Ox Alpha (Jelek / Excluded)' }
+    { id: 'bazaarlink/auto:free', name: 'Bazaarlink Auto Free (Excluded)' }
   ];
-  // Test skip mode with exclusion (ox-alpha dropped, stepfun kept)
+  // Test skip mode with exclusion (auto:free dropped, stepfun kept)
   const filtered = await validateCandidateModels(sampleModels, 'kc', true);
   assert.strictEqual(filtered.length, 1, 'Only non-excluded models should remain');
   assert.strictEqual(filtered[0].id, 'stepfun/step-3.7-flash:free');
 
-  // 12. Combined sorting test
+  // 13. Combined sorting test
   console.log('[-] Testing combined priority sorting across all providers...');
   const allPrefixed = [
     ...oaData.models.map(m => `openagentic/${m.id}`),
@@ -148,6 +161,7 @@ async function runTests() {
     ...geminiData.models.map(m => `gemini/${m.id}`),
     ...ollamaData.models.map(m => `ollama/${m.id}`),
     ...airforceData.models.map(m => `api-airforce/${m.id}`),
+    ...bzlData.models.map(m => `bazaarlink/${m.id}`),
     ...ocData.models.map(m => m.fullId || `oc/${m.id}`)
   ];
   const sortedUnified = sortModelsByCodingQuality(allPrefixed);
@@ -159,7 +173,7 @@ async function runTests() {
     assert.ok(scoreA >= scoreB, `Model ${sortedUnified[i]} (${scoreA}) must score >= ${sortedUnified[i + 1]} (${scoreB})`);
   }
 
-  // 12. Latency Tie-Breaker Test
+  // 14. Latency Tie-Breaker Test
   console.log('[-] Testing latency tie-breaker sorting...');
   const tieCandidates = [
     { id: 'poolside/laguna-s-2.1:free', name: 'Laguna S Slow', latencyMs: 2500 },

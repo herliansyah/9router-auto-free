@@ -2,7 +2,7 @@
 
 /**
  * Free Models Sync for 9router
- * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + 9router OpenCode Free)
+ * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + 9router OpenCode Free)
  * 
  * Automatically synchronizes today's free models from:
  *   1. OpenAgentic.id (Web & API /v1/models)
@@ -12,7 +12,8 @@
  *   5. Google Gemini API (/v1beta/models)
  *   6. Ollama Cloud API (api.ollama.com/v1/models)
  *   7. API.airforce API (api.airforce/v1/models)
- *   8. 9router OpenCode (oc/* free models directly from 9router)
+ *   8. Bazaarlink API (bazaarlink.ai/api/v1/models)
+ *   9. 9router OpenCode (oc/* free models directly from 9router)
  * 
  * Pre-tests all candidates against 9router to drop expired/dead/paid models,
  * sorts them by coding capability specification (best to worst),
@@ -25,6 +26,7 @@
  *   - gemini-free     : Dedicated Gemini free combo
  *   - ollama-free     : Dedicated Ollama Cloud free combo
  *   - airforce-free   : Dedicated API.airforce free combo
+ *   - bazaarlink-free : Dedicated Bazaarlink free combo
  *   - opencode-free   : Dedicated OpenCode free combo
  */
 
@@ -127,7 +129,7 @@ function isProviderExcluded(providerName, excludedProviders = null) {
   const list = excludedProviders || getExcludedProviders();
   if (!list || list.length === 0) return false;
   const name = String(providerName).trim().toLowerCase();
-  return list.some(p => p === name || name.includes(p) || (p === 'airforce' && name === 'api-airforce'));
+  return list.some(p => p === name || name.includes(p) || (p === 'airforce' && name === 'api-airforce') || (p === 'bzl' && name === 'bazaarlink') || (p === 'bazaarlink' && name === 'bzl'));
 }
 
 // Check if a model matches any exclusion rule (exact or substring)
@@ -161,7 +163,7 @@ function getBenchmarksDatabase() {
 function findBenchmarkMatch(modelIdentifier, benchmarks) {
   if (!benchmarks || Object.keys(benchmarks).length === 0) return null;
   const str = String(modelIdentifier).toLowerCase()
-    .replace(/^(?:openrouter|kc|oc|openagentic|poolside|gemini|ollama|api-airforce|airforce)\//, '')
+    .replace(/^(?:openrouter|kc|oc|openagentic|poolside|gemini|ollama|api-airforce|airforce|bazaarlink|bzl)\//, '')
     .replace(/:(?:free|thinking)$/, '')
     .replace(/-free$/, '');
 
@@ -444,6 +446,29 @@ function getAirforceCredentials() {
   }
 
   return { apiKey: null, prefix: 'api-airforce', baseUrl: 'https://api.airforce/v1' };
+}
+
+// Extract Bazaarlink API Key and Provider Prefix from 9router Database
+function getBazaarlinkCredentials() {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'bazaarlink' AND isActive = 1").get();
+    db.close();
+
+    if (row && row.data) {
+      const parsed = JSON.parse(row.data);
+      return {
+        apiKey: parsed.apiKey || null,
+        prefix: parsed?.providerSpecificData?.prefix || 'bazaarlink',
+        baseUrl: parsed?.providerSpecificData?.baseUrl || 'https://bazaarlink.ai/api/v1'
+      };
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for Bazaarlink credentials: ${err.message}`);
+  }
+
+  return { apiKey: null, prefix: 'bazaarlink', baseUrl: 'https://bazaarlink.ai/api/v1' };
 }
 
 // Scrape free models from OpenAgentic HTML landing page
@@ -929,6 +954,59 @@ async function getTodaysAirforceFreeModels() {
   };
 }
 
+// Fetch free models from Bazaarlink API (/v1/models)
+async function fetchBazaarlinkFreeModels(apiKey, baseUrl = 'https://bazaarlink.ai/api/v1') {
+  const freeModels = [];
+  if (!apiKey) return freeModels;
+
+  try {
+    console.log('[-] Fetching free models from Bazaarlink API (/v1/models)...');
+    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
+    const res = await fetch(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'User-Agent': 'Mozilla/5.0'
+      },
+      signal: AbortSignal.timeout(20000)
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      const models = Array.isArray(json) ? json : (json.data || []);
+
+      for (const m of models) {
+        const id = m.id || '';
+        const name = m.name || id;
+        const promptPrice = m.pricing?.prompt;
+        const isZeroPrice = promptPrice === '0' || promptPrice === '0.000000000000' || parseFloat(promptPrice) === 0;
+        const isFree = m.isFree === true || m.is_free === true || isZeroPrice || id.endsWith(':free') || id.includes('/free');
+
+        if (isFree && !id.includes('content-safety') && !id.includes('lyria') && !id.includes('embed') && !id.includes('tts') && !id.includes('image') && !id.includes('diffusion')) {
+          freeModels.push({
+            id: id,
+            name: name,
+            source: 'bazaarlink-api-free'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[!] Bazaarlink fetch notice: ${err.message}`);
+  }
+  return freeModels;
+}
+
+// Merge and discover all free models from Bazaarlink
+async function getTodaysBazaarlinkFreeModels() {
+  const creds = getBazaarlinkCredentials();
+  const models = await fetchBazaarlinkFreeModels(creds.apiKey, creds.baseUrl);
+
+  return {
+    prefix: creds.prefix || 'bazaarlink',
+    models: sortModelsByCodingQuality(models)
+  };
+}
+
 /**
  * Pre-test a model via 9router internal test endpoint
  * Filters out dead/expired promotions (401), paid models (402), 404s, and timeouts.
@@ -946,7 +1024,7 @@ async function testModelWith9router(fullModelId, token) {
         'x-9r-cli-token': token
       },
       body: JSON.stringify({ model: fullModelId, kind: 'llm' }),
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(20000)
     });
 
     const latencyMs = Date.now() - startTime;
@@ -1024,7 +1102,7 @@ async function validateCandidateModels(models, prefix, skipTest = false) {
 }
 
 // Inject free models into 9router combos
-async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData) {
+async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData) {
   // Validate each source's free models against 9router live test (skip if provider is excluded)
   const validOaModels = oaData?.excluded ? [] : await validateCandidateModels(oaData.models, oaData.prefix, isSkipTest);
   const validKiloModels = kiloData?.excluded ? [] : await validateCandidateModels(kiloData.models, kiloData.prefix, isSkipTest);
@@ -1034,6 +1112,7 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
   const validGeminiModels = geminiData?.excluded ? [] : (geminiData ? await validateCandidateModels(geminiData.models, geminiData.prefix || 'gemini', isSkipTest) : []);
   const validOllamaModels = ollamaData?.excluded ? [] : (ollamaData ? await validateCandidateModels(ollamaData.models, ollamaData.prefix || 'ollama', isSkipTest) : []);
   const validAirforceModels = airforceData?.excluded ? [] : (airforceData ? await validateCandidateModels(airforceData.models, airforceData.prefix || 'api-airforce', isSkipTest) : []);
+  const validBazaarlinkModels = bazaarlinkData?.excluded ? [] : (bazaarlinkData ? await validateCandidateModels(bazaarlinkData.models, bazaarlinkData.prefix || 'bazaarlink', isSkipTest) : []);
 
   const oaPrefixed = validOaModels.map(m => `${oaData.prefix}/${m.id}`);
   const kiloPrefixed = validKiloModels.map(m => `${kiloData.prefix}/${m.id}`);
@@ -1043,10 +1122,11 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
   const geminiPrefixed = validGeminiModels.map(m => m.fullId || `${geminiData.prefix || 'gemini'}/${m.id}`);
   const ollamaPrefixed = validOllamaModels.map(m => m.fullId || `${ollamaData.prefix || 'ollama'}/${m.id}`);
   const airforcePrefixed = validAirforceModels.map(m => m.fullId || `${airforceData.prefix || 'api-airforce'}/${m.id}`);
+  const bzlPrefixed = validBazaarlinkModels.map(m => m.fullId || `${bazaarlinkData.prefix || 'bazaarlink'}/${m.id}`);
 
   // Build global latency lookup map for tie-breaking
   const latencyMap = new Map();
-  for (const m of [...validOaModels, ...validKiloModels, ...validOcModels, ...validOrModels, ...validPoolsideModels, ...validGeminiModels, ...validOllamaModels, ...validAirforceModels]) {
+  for (const m of [...validOaModels, ...validKiloModels, ...validOcModels, ...validOrModels, ...validPoolsideModels, ...validGeminiModels, ...validOllamaModels, ...validAirforceModels, ...validBazaarlinkModels]) {
     const key = m.fullId || (m.prefix ? `${m.prefix}/${m.id}` : m.id);
     if (m.latencyMs != null) latencyMap.set(key, m.latencyMs);
   }
@@ -1147,12 +1227,25 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
     }
   }
 
+  if (bazaarlinkData) {
+    if (!bazaarlinkData.excluded) {
+      console.log(`\n[+] Validated Bazaarlink: ${validBazaarlinkModels.length} models:`);
+      for (const m of validBazaarlinkModels) {
+        const rawId = m.fullId || `${bazaarlinkData.prefix || 'bazaarlink'}/${m.id}`;
+        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+      }
+    } else {
+      console.log(`\n[⊘] Bazaarlink: Skipped (provider excluded)`);
+    }
+  }
+
   if (isDryRun) {
     console.log('\n[*] Dry run mode enabled. No changes written.');
     return;
   }
 
-  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed, ...psPrefixed, ...geminiPrefixed, ...ollamaPrefixed, ...airforcePrefixed])), latencyMap);
+  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed, ...psPrefixed, ...geminiPrefixed, ...ollamaPrefixed, ...airforcePrefixed, ...bzlPrefixed])), latencyMap);
 
   // 1. Try updating via 9router API client if server is running
   let updatedViaApi = false;
@@ -1199,6 +1292,10 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
             await client.updateCombo(combo.id, { name: combo.name, models: airforcePrefixed });
             console.log(`[✓] Updated combo 'airforce-free' via 9router API (${airforcePrefixed.length} models)`);
             updatedViaApi = true;
+          } else if (combo.name === 'bazaarlink-free' && bazaarlinkData && !bazaarlinkData.excluded) {
+            await client.updateCombo(combo.id, { name: combo.name, models: bzlPrefixed });
+            console.log(`[✓] Updated combo 'bazaarlink-free' via 9router API (${bzlPrefixed.length} models)`);
+            updatedViaApi = true;
           }
         }
       }
@@ -1244,6 +1341,7 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
     if (geminiPrefixed.length > 0 && !geminiData?.excluded) upsertCombo('gemini-free', geminiPrefixed);
     if (ollamaPrefixed.length > 0 && !ollamaData?.excluded) upsertCombo('ollama-free', ollamaPrefixed);
     if (airforcePrefixed.length > 0 && !airforceData?.excluded) upsertCombo('airforce-free', airforcePrefixed);
+    if (bzlPrefixed.length > 0 && !bazaarlinkData?.excluded) upsertCombo('bazaarlink-free', bzlPrefixed);
 
     db.close();
   } catch (err) {
@@ -1291,7 +1389,7 @@ function setupDailyCron() {
 async function main() {
   console.log('====================================================');
   console.log('  Free Models Sync -> 9router Combos               ');
-  console.log('  Sources: OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama + Airforce + OC');
+  console.log('  Sources: OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama + Airforce + Bazaarlink + OC');
   console.log('  Account: herliansyah@gmail.com                   ');
   console.log('  Pre-testing: Auto-drop expired & non-free models ');
   console.log(`  Time: ${new Date().toISOString()}`);
@@ -1315,7 +1413,7 @@ async function main() {
     console.log(`[⊘] Excluded providers via config (${excludedProviders.length}): ${excludedProviders.join(', ')}\n`);
   }
 
-  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData] = await Promise.all([
+  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData] = await Promise.all([
     isProviderExcluded('openagentic', excludedProviders)
       ? Promise.resolve({ prefix: 'openagentic', models: [], excluded: true })
       : getTodaysOpenAgenticFreeModels(),
@@ -1336,14 +1434,17 @@ async function main() {
       : getTodaysOllamaFreeModels(),
     isProviderExcluded('api-airforce', excludedProviders) || isProviderExcluded('airforce', excludedProviders)
       ? Promise.resolve({ prefix: 'api-airforce', models: [], excluded: true })
-      : getTodaysAirforceFreeModels()
+      : getTodaysAirforceFreeModels(),
+    isProviderExcluded('bazaarlink', excludedProviders) || isProviderExcluded('bzl', excludedProviders)
+      ? Promise.resolve({ prefix: 'bazaarlink', models: [], excluded: true })
+      : getTodaysBazaarlinkFreeModels()
   ]);
 
   const ocData = isProviderExcluded('opencode', excludedProviders) || isProviderExcluded('oc', excludedProviders)
     ? { prefix: 'oc', models: [], excluded: true }
     : getTodaysOpenCodeFreeModels();
 
-  await injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData);
+  await injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData);
 }
 
 if (require.main === module) {
@@ -1370,6 +1471,7 @@ module.exports = {
   getGeminiCredentials,
   getOllamaCredentials,
   getAirforceCredentials,
+  getBazaarlinkCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
@@ -1377,6 +1479,7 @@ module.exports = {
   getTodaysGeminiFreeModels,
   getTodaysOllamaFreeModels,
   getTodaysAirforceFreeModels,
+  getTodaysBazaarlinkFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels,
@@ -1388,5 +1491,6 @@ module.exports = {
   fetchGeminiFreeModels,
   fetchOllamaFreeModels,
   fetchAirforceFreeModels,
+  fetchBazaarlinkFreeModels,
   injectInto9router
 };
