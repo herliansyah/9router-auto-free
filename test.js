@@ -7,6 +7,8 @@ const assert = require('node:assert');
 const {
   getCodingScore,
   sortModelsByCodingQuality,
+  getPrioritiesList,
+  getModelPriorityRank,
   getOpenAgenticCredentials,
   getKiloCredentials,
   getOpenRouterCredentials,
@@ -151,7 +153,29 @@ async function runTests() {
   assert.strictEqual(filtered.length, 1, 'Only non-excluded models should remain');
   assert.strictEqual(filtered[0].id, 'stepfun/step-3.7-flash:free');
 
-  // 13. Combined sorting test
+  // 13. Custom Priorities Engine Check
+  console.log('[-] Testing custom priorities engine & latency ranking...');
+  const priorities = getPrioritiesList();
+  assert.ok(Array.isArray(priorities) && priorities.length > 0, 'Priorities list must not be empty');
+
+  // Test fuzzy / substring matching rank
+  assert.strictEqual(getModelPriorityRank('openagentic/claude-sonnet-4.5', priorities), 0, 'Sonnet 4.5 should be rank 0');
+  assert.strictEqual(getModelPriorityRank('gemini/gemini-3.7-flash', priorities), 1, 'Gemini 3.7 should be rank 1');
+  assert.strictEqual(getModelPriorityRank('kc/stepfun/step-3.7-flash:free', priorities), 3, 'Step 3.7 should be rank 3');
+  assert.strictEqual(getModelPriorityRank('ollama/minimax-m3', priorities), Infinity, 'Minimax M3 has no custom rank');
+
+  // Test similar models matching same priority rule -> prioritized by lowest latency
+  const similarCandidates = [
+    { id: 'openagentic/gemini-3.7-flash', latencyMs: 2200 },
+    { id: 'gemini/gemini-3.7-flash', latencyMs: 450 },
+    { id: 'openagentic/claude-sonnet-4.5', latencyMs: 1500 }
+  ];
+  const sortedSimilar = sortModelsByCodingQuality(similarCandidates, null, priorities);
+  assert.strictEqual(sortedSimilar[0].id, 'openagentic/claude-sonnet-4.5', 'Rank 0 (Sonnet) must come first');
+  assert.strictEqual(sortedSimilar[1].id, 'gemini/gemini-3.7-flash', 'Between two Gemini 3.7 models, lower latency (450ms) must come first');
+  assert.strictEqual(sortedSimilar[2].id, 'openagentic/gemini-3.7-flash', 'Higher latency Gemini (2200ms) comes after');
+
+  // 14. Combined sorting test across all providers
   console.log('[-] Testing combined priority sorting across all providers...');
   const allPrefixed = [
     ...oaData.models.map(m => `openagentic/${m.id}`),
@@ -167,13 +191,7 @@ async function runTests() {
   const sortedUnified = sortModelsByCodingQuality(allPrefixed);
   assert.strictEqual(sortedUnified.length, allPrefixed.length, 'Unified list must retain all models');
 
-  for (let i = 0; i < sortedUnified.length - 1; i++) {
-    const scoreA = getCodingScore(sortedUnified[i]);
-    const scoreB = getCodingScore(sortedUnified[i + 1]);
-    assert.ok(scoreA >= scoreB, `Model ${sortedUnified[i]} (${scoreA}) must score >= ${sortedUnified[i + 1]} (${scoreB})`);
-  }
-
-  // 14. Latency Tie-Breaker Test
+  // 15. Latency Tie-Breaker Test for unpinned models
   console.log('[-] Testing latency tie-breaker sorting...');
   const tieCandidates = [
     { id: 'poolside/laguna-s-2.1:free', name: 'Laguna S Slow', latencyMs: 2500 },

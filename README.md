@@ -106,9 +106,29 @@ Skor kapabilitas model dihitung secara empiris dengan mengambil data langsung da
 
 ---
 
+## 🎯 Prioritas Model Kustom (`priorities.json`)
+
+Anda dapat menentukan sendiri urutan prioritas model favorit di [`priorities.json`](file:///home/ian/9router-auto-free/priorities.json). Nama tidak harus sama persis (cukup *keyword* / *substring* mirip):
+
+```json
+[
+  "sonnet-4.5",
+  "gemini-3.7",
+  "deepseek-r1",
+  "step-3.7",
+  "qwen3.7"
+]
+```
+
+- **Urutan Ranking**: Model yang cocok dengan item pertama (`"sonnet-4.5"`) akan ditempatkan di posisi paling atas (#1), item kedua di (#2), dst.
+- **Latency Prioritization untuk Model Mirip/Setara**: Jika ada beberapa model yang cocok dengan aturan yang sama (misal ada model `gemini-3.7` dari beberapa provider), sistem otomatis menaruh **model dengan latensi tercepat di urutan teratas**.
+- **Otomatis Fallback**: Model-model lain yang tidak disebutkan di `priorities.json` tetap diurutkan di bawahnya secara otomatis berdasarkan skor kapabilitas benchmark coding.
+
+---
+
 ## ⚡ Prioritas Kecepatan Koneksi (Latency Tie-Breaker)
 
-Ketika dua atau lebih model memiliki **skor benchmark yang sama**, sistem secara otomatis mengukur waktu respons riil (*round-trip latency* dalam milidetik) dan **memprioritaskan model dengan koneksi paling cepat di urutan teratas**.
+Ketika dua atau lebih model memiliki **skor benchmark atau prioritas yang sama**, sistem secara otomatis mengukur waktu respons riil (*round-trip latency* dalam milidetik) dan **memprioritaskan model dengan koneksi paling cepat di urutan teratas**.
 
 ---
 

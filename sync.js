@@ -255,25 +255,74 @@ function getCodingScore(modelIdentifier, customBenchmarks = null) {
   return score;
 }
 
-// Sort models array from best coding capability to lowest (with latency tie-breaker)
-function sortModelsByCodingQuality(models, latencyMap = null) {
+// Load user-defined custom model priorities list (priorities.json)
+const PRIORITIES_PATH = path.join(__dirname, 'priorities.json');
+function getPrioritiesList() {
+  try {
+    if (fs.existsSync(PRIORITIES_PATH)) {
+      const content = fs.readFileSync(PRIORITIES_PATH, 'utf8');
+      const data = JSON.parse(content);
+      if (Array.isArray(data)) {
+        return data.map(p => String(p).trim().toLowerCase()).filter(Boolean);
+      }
+      if (data && Array.isArray(data.priorities)) {
+        return data.priorities.map(p => String(p).trim().toLowerCase()).filter(Boolean);
+      }
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read priorities.json: ${err.message}`);
+  }
+  return [];
+}
+
+// Find user priority rank index for a model (0 = highest priority, Infinity = no custom priority)
+function getModelPriorityRank(modelIdentifier, priorities) {
+  if (!priorities || priorities.length === 0) return Infinity;
+  const str = String(modelIdentifier).toLowerCase();
+  for (let i = 0; i < priorities.length; i++) {
+    const p = priorities[i];
+    if (!p) continue;
+    if (str === p || str.includes(p)) {
+      return i;
+    }
+  }
+  return Infinity;
+}
+
+// Sort models array with User Custom Priorities -> Benchmark Capability -> Latency Tie-Breaker
+function sortModelsByCodingQuality(models, latencyMap = null, customPriorities = null) {
+  const priorities = customPriorities || getPrioritiesList();
   const benchmarks = getBenchmarksDatabase();
+
   return [...models].sort((a, b) => {
     const idA = typeof a === 'string' ? a : (a.fullId || a.id || a.name || '');
     const idB = typeof b === 'string' ? b : (b.fullId || b.id || b.name || '');
 
+    const latA = typeof a === 'object' && a.latencyMs != null ? a.latencyMs : (latencyMap ? latencyMap.get(idA) ?? 99999 : 99999);
+    const latB = typeof b === 'object' && b.latencyMs != null ? b.latencyMs : (latencyMap ? latencyMap.get(idB) ?? 99999 : 99999);
+
+    // 1. User defined priorities (e.g. priorities.json: rank 0 > rank 1 > rank 2...)
+    const rankA = getModelPriorityRank(idA, priorities);
+    const rankB = getModelPriorityRank(idB, priorities);
+
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+
+    // 2. If both matched the SAME priority rule, prioritize lowest latency first
+    if (rankA !== Infinity && rankB !== Infinity) {
+      if (latA !== latB) return latA - latB;
+    }
+
+    // 3. Empirical benchmark / capability score
     const scoreA = getCodingScore(idA, benchmarks);
     const scoreB = getCodingScore(idB, benchmarks);
 
-    // Primary: Higher benchmark/coding score wins
     if (scoreB !== scoreA) {
       return scoreB - scoreA;
     }
 
-    // Secondary / Tie-breaker: If benchmark/spec score is identical, prioritize fastest response latency
-    const latA = typeof a === 'object' && a.latencyMs != null ? a.latencyMs : (latencyMap ? latencyMap.get(idA) ?? 99999 : 99999);
-    const latB = typeof b === 'object' && b.latencyMs != null ? b.latencyMs : (latencyMap ? latencyMap.get(idB) ?? 99999 : 99999);
-
+    // 4. Secondary tie-breaker: fastest response latency
     return latA - latB;
   });
 }
@@ -1457,6 +1506,8 @@ if (require.main === module) {
 module.exports = {
   getCodingScore,
   sortModelsByCodingQuality,
+  getPrioritiesList,
+  getModelPriorityRank,
   getBenchmarksDatabase,
   findBenchmarkMatch,
   getExclusionConfig,
