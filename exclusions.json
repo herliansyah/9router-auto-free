@@ -5,7 +5,8 @@
     "mistral",
     "nvidia",
     "groq",
-    "bazaarlink"
+    "bazaarlink",
+    "cerebras"
   ],
   "excludedModels": [
     "nano",
