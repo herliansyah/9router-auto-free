@@ -97,23 +97,121 @@ async function fetchEvalPlusBenchmarks() {
   }
 }
 
+// Fetch SWE-bench Verified resolved-rate per model from the official leaderboard data file
+// https://raw.githubusercontent.com/SWE-bench/SWE-bench.github.io/master/data/leaderboards.json
+async function fetchSweBenchVerified() {
+  const url = "https://raw.githubusercontent.com/SWE-bench/SWE-bench.github.io/master/data/leaderboards.json";
+  try {
+    console.log("[*] Fetching SWE-bench Verified leaderboard...");
+    const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    const board = (data.leaderboards || []).find(b => b.name === "Verified");
+    if (!board || !Array.isArray(board.results)) throw new Error("Verified board not found");
+
+    const parsed = {};
+    for (const entry of board.results) {
+      const name = entry.name || entry.model_display;
+      const resolved = Number(entry.resolved);
+      if (!name || isNaN(resolved) || resolved <= 0) continue;
+      const key = normalizeKey(name);
+      if (!key) continue;
+      // Keep the best observed score per normalized model name
+      if (!parsed[key] || resolved > parsed[key].score) {
+        parsed[key] = {
+          name,
+          score: Math.round(resolved * 10) / 10,
+          swe_bench: Math.round(resolved * 10) / 10,
+          tier: determineTier(resolved),
+          source: "swebench-verified"
+        };
+      }
+    }
+    console.log(`[+] Parsed ${Object.keys(parsed).length} models from SWE-bench Verified.`);
+    return parsed;
+  } catch (err) {
+    console.warn(`[!] Note: Could not fetch SWE-bench data (${err.message}). Skipping.`);
+    return null;
+  }
+}
+
+// Fetch LiveCodeBench mean pass@1 per model from the official final dataset
+// (project frozen since 2025-04; still the authoritative historical benchmark)
+async function fetchLiveCodeBench() {
+  const url = "https://raw.githubusercontent.com/LiveCodeBench/LiveCodeBench.github.io/main/build/performances_generation.json";
+  try {
+    console.log("[*] Fetching LiveCodeBench dataset...");
+    const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    const performances = data.performances || [];
+    const reprByModel = {};
+    for (const m of (Array.isArray(data.models) ? data.models : [])) {
+      if (m && m.model_name) reprByModel[m.model_name] = m.model_repr || m.model_name;
+    }
+
+    // Mean pass@1 across all recorded questions per model
+    const sums = new Map();
+    for (const row of performances) {
+      const model = row.model;
+      const pass = Number(row["pass@1"]);
+      if (!model || isNaN(pass)) continue;
+      if (!sums.has(model)) sums.set(model, { total: 0, count: 0 });
+      const agg = sums.get(model);
+      agg.total += pass;
+      agg.count += 1;
+    }
+
+    const parsed = {};
+    for (const [model, { total, count }] of sums) {
+      if (count < 20) continue; // ignore models with barely any recorded questions
+      const score = Math.round((total / count) * 10) / 10;
+      if (score <= 0) continue;
+      const displayName = reprByModel[model] || model;
+      const key = normalizeKey(displayName);
+      if (!key) continue;
+      parsed[key] = {
+        name: displayName,
+        score,
+        livecodebench: score,
+        tier: determineTier(score),
+        source: "livecodebench"
+      };
+    }
+    console.log(`[+] Parsed ${Object.keys(parsed).length} models from LiveCodeBench.`);
+    return parsed;
+  } catch (err) {
+    console.warn(`[!] Note: Could not fetch LiveCodeBench data (${err.message}). Skipping.`);
+    return null;
+  }
+}
+
 async function updateBenchmarks() {
   console.log("[*] Checking latest empirical coding benchmarks...");
   
   // Start with calibrated baseline
   const merged = { ...BASELINE };
 
-  // Fetch live EvalPlus benchmarks from official repo
+  // Fetch live sources; the calibrated baseline always wins, later sources only fill gaps
   const liveEvalPlus = await fetchEvalPlusBenchmarks();
-  if (liveEvalPlus && Object.keys(liveEvalPlus).length > 0) {
-    console.log(`[+] Fetched ${Object.keys(liveEvalPlus).length} live models from EvalPlus leaderboard.`);
-    for (const [key, data] of Object.entries(liveEvalPlus)) {
-      // Don't overwrite higher-accuracy empirical baseline if already present
+  const liveSweBench = await fetchSweBenchVerified();
+  const liveLcb = await fetchLiveCodeBench();
+
+  let added = 0;
+  for (const dataset of [liveEvalPlus, liveSweBench, liveLcb]) {
+    if (!dataset || Object.keys(dataset).length === 0) continue;
+    console.log(`[+] Fetched ${Object.keys(dataset).length} models from ${Object.values(dataset)[0]?.source || "live"} source.`);
+    for (const [key, data] of Object.entries(dataset)) {
+      // Don't overwrite the calibrated baseline or an earlier (higher-priority) source
       if (!merged[key]) {
         merged[key] = data;
+        added += 1;
       }
     }
   }
+  console.log(`[+] Merged ${added} additional model scores from live sources.`);
 
   // Save merged benchmarks database
   fs.writeFileSync(BENCHMARKS_PATH, JSON.stringify(merged, null, 2) + "\n");
@@ -125,4 +223,4 @@ if (require.main === module) {
   updateBenchmarks().catch(console.error);
 }
 
-module.exports = { updateBenchmarks, determineTier, normalizeKey };
+module.exports = { updateBenchmarks, determineTier, normalizeKey, fetchSweBenchVerified, fetchLiveCodeBench };
