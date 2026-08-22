@@ -88,7 +88,7 @@ Threshold dapat diubah lewat konstanta `AGENTIC_MIN_CONTEXT` di `sync.js`.
 | 13 | Cloudflare Workers AI | Koneksi native `cloudflare-ai` di 9router (fallback koneksi *openai-compatible*) | Hanya model tanpa harga dan tanpa flag `require_workers_paid` | `cloudflare-ai/@cf/meta/llama-3.1-8b-instruct` |
 | 14 | API.airforce | API `api.airforce/v1/models` via koneksi `api-airforce` | Model berlabel `tier: "free"` | `api-airforce/llama-3.3-70b-instruct-fp8-fast` |
 
-Tiga provider dinonaktifkan secara default melalui [`exclusions.json`](exclusions.json): **API.airforce** (rate limit ketat 1 req/detik di plan gratis), **Cloudflare** (plan gratis hanya menyisakan sedikit model LoRA lama), dan **Mistral** (mayoritas katalog sudah berbayar). Hapus entri mereka di `excludedProviders` bila ingin mengaktifkan kembali.
+Enam provider dinonaktifkan secara default melalui [`exclusions.json`](exclusions.json): **API.airforce** (rate limit ketat 1 req/detik di plan gratis), **Cloudflare** (plan gratis hanya menyisakan sedikit model LoRA lama), **Mistral** (mayoritas katalog sudah berbayar), **NVIDIA NIM**, **Groq**, dan **Bazaarlink**. Hapus entri mereka di `excludedProviders` bila ingin mengaktifkan kembali.
 
 > Catatan: integrasi GitHub Models **tidak ditambahkan** karena layanan ini sudah di-retire GitHub per 30 Juli 2026 (endpoint `models.github.ai` mengembalikan HTTP 410 permanen).
 
@@ -111,13 +111,13 @@ Semua combo di bawah ditulis ulang setiap sync (dan di-refresh watchdog); combo 
 | `gemini-free` | Model gratis Google Gemini yang aktif |
 | `ollama-free` | Model gratis Ollama Cloud yang aktif |
 | `opencode-free` | Model gratis OpenCode (`oc/*`) yang aktif |
-| `groq-free` | Model gratis Groq yang aktif |
+| `groq-free` | Model gratis Groq yang aktif (jika tidak di-exclude) |
 | `cerebras-free` | Model gratis Cerebras yang aktif |
 | `mistral-free` | Model gratis Mistral yang aktif (jika tidak di-exclude) |
 | `airforce-free` | Model gratis API.airforce yang aktif (jika tidak di-exclude) |
-| `bazaarlink-free` | Model gratis Bazaarlink yang aktif |
+| `bazaarlink-free` | Model gratis Bazaarlink yang aktif (jika tidak di-exclude) |
 | `cloudflare-free` | Model gratis Cloudflare Workers AI yang aktif (jika tidak di-exclude) |
-| `nvidia-free` | Model gratis NVIDIA NIM yang aktif |
+| `nvidia-free` | Model gratis NVIDIA NIM yang aktif (jika tidak di-exclude) |
 
 Combo per-provider hanya memuat model yang **sedang hidup** — model kuota-habis dikeluarkan agar daftar di IDE selalu bisa dipakai, lalu masuk lagi otomatis begitu kuota reset dan lolos re-test watchdog.
 
@@ -134,7 +134,10 @@ Anda dapat mengecualikan provider tertentu, atau model-model dengan kualitas kur
   "excludedProviders": [
     "api-airforce",
     "cloudflare",
-    "mistral"
+    "mistral",
+    "nvidia",
+    "groq",
+    "bazaarlink"
   ],
   "excludedModels": [
     "nano",

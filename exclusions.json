@@ -2,7 +2,10 @@
   "excludedProviders": [
     "api-airforce",
     "cloudflare",
-    "mistral"
+    "mistral",
+    "nvidia",
+    "groq",
+    "bazaarlink"
   ],
   "excludedModels": [
     "nano",
