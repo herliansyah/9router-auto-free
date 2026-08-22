@@ -188,6 +188,153 @@ async function runTests() {
   const sortedTies = sortModelsByCodingQuality(tieCandidates);
   assert.strictEqual(sortedTies[0].latencyMs, 350, 'Fastest latency must be prioritized on identical score');
 
+  // 16. Watchdog / delta / agentic-gate helpers (offline unit checks)
+  console.log('[-] Testing watchdog refresh helpers...');
+  const {
+    computeComboDelta,
+    buildDeltaMessage,
+    readCurrentComboModels,
+    MANAGED_COMBOS,
+    isSmartTierModel,
+    isThinkingVariant,
+    passesAgenticGate,
+    AGENTIC_MIN_CONTEXT,
+    getUsagePenalty,
+    isQuotaExhaustedResult,
+    getModelFullId
+  } = require('./sync.js');
+
+  // Delta computation
+  const delta = computeComboDelta(['a', 'b', 'c'], ['b', 'c', 'd', 'e']);
+  assert.deepStrictEqual(delta.added.sort(), ['d', 'e'], 'Delta must detect additions');
+  assert.deepStrictEqual(delta.removed, ['a'], 'Delta must detect removals');
+  assert.deepStrictEqual(computeComboDelta([], []).added, [], 'Empty delta must stay empty');
+
+  // Delta message builder
+  const msg = buildDeltaMessage({ mode: 'unit-test', added: ['x/one'], removed: ['y/two'], total: 7 });
+  assert.ok(typeof msg === 'string' && msg.includes('unit-test') && msg.includes('x/one') && msg.includes('y/two'), 'Delta message must include mode and changes');
+  const msgNoChange = buildDeltaMessage({ mode: 'unit-test', added: [], removed: [], total: 3 });
+  assert.ok(msgNoChange.includes('No changes'), 'No-change run must say so');
+
+  // Managed combos registry includes every provider combo
+  for (const required of ['my9model-free', 'my9model-smart', 'my9model-fast', 'groq-free', 'cerebras-free', 'mistral-free', 'cloudflare-free']) {
+    assert.ok(MANAGED_COMBOS.includes(required), `MANAGED_COMBOS must contain ${required}`);
+  }
+
+  // Smart/fast split heuristics
+  assert.strictEqual(isThinkingVariant('oc/mimo-v2.5-free'), false, 'Plain model is not a thinking variant');
+  assert.strictEqual(isThinkingVariant('kc/qwen/qwen3.6-plus-thinking:free'), true, 'Thinking suffix must be detected');
+  assert.strictEqual(isSmartTierModel('openagentic/claude-sonnet-4.5'), true, 'High-benchmark model is smart tier');
+  assert.strictEqual(isSmartTierModel('poolside/poolside/laguna-s-2.1'), false, 'Low-benchmark model is not smart tier');
+  assert.strictEqual(isSmartTierModel('ollama/minimax-m3-thinking'), true, 'Thinking variant is always smart tier');
+
+  // Agentic readiness gate
+  assert.strictEqual(passesAgenticGate(null), true, 'Unknown metadata passes the gate');
+  assert.strictEqual(passesAgenticGate({ contextLength: 131072 }), true, '128k context passes the gate');
+  assert.strictEqual(passesAgenticGate({ contextLength: 32768 }), false, '32k context fails the gate');
+  assert.strictEqual(passesAgenticGate({ toolsUnsupported: true }), false, 'Explicit no-tools must fail the gate');
+  assert.strictEqual(AGENTIC_MIN_CONTEXT, 100000, 'Agentic floor constant sanity check');
+
+  // Usage penalty shape (real DB or empty fallback both valid)
+  const penalty = getUsagePenalty('gemini/gemini-3.5-flash');
+  assert.ok(typeof penalty === 'number' && penalty >= -800 && penalty <= 0, 'Usage penalty must be a bounded number');
+  assert.strictEqual(getUsagePenalty('no-slash-id'), 0, 'Ids without prefix carry no penalty');
+
+  // Quota classification
+  assert.strictEqual(isQuotaExhaustedResult({ quotaExhausted: true }), true, 'Quota flag must be honored');
+  assert.strictEqual(isQuotaExhaustedResult({ reason: 'HTTP 402' }), false, 'Paid model is not a quota case');
+  assert.strictEqual(isQuotaExhaustedResult(null), false, 'Null result is not a quota case');
+
+  // Combo snapshot reader
+  assert.ok(Array.isArray(readCurrentComboModels('my9model-free')), 'Combo reader must return an array');
+
+  // Canonical id extraction
+  assert.strictEqual(getModelFullId('plain/id'), 'plain/id');
+  assert.strictEqual(getModelFullId({ fullId: 'full/id' }), 'full/id');
+  assert.strictEqual(getModelFullId({ id: 'bare' }), 'bare');
+
+  // 17. New provider discovery (Groq / Cerebras / Mistral / Cloudflare)
+  console.log('[-] Testing new provider discovery (Groq / Cerebras / Mistral / Cloudflare)...');
+  const {
+    getTodaysGroqFreeModels,
+    getTodaysCerebrasFreeModels,
+    getTodaysMistralFreeModels,
+    getTodaysCloudflareFreeModels,
+    getGroqCredentials,
+    getCerebrasCredentials
+  } = require('./sync.js');
+
+  const groqData = await getTodaysGroqFreeModels();
+  console.log(`    Found ${groqData.models.length} Groq candidate models`);
+  assert.strictEqual(groqData.prefix, 'groq', 'Groq prefix must be groq');
+  assert.ok(Array.isArray(groqData.models), 'Groq models must be an array');
+  if (getGroqCredentials().apiKey) {
+    assert.ok(groqData.models.length > 0, 'Groq discovery must find models when an API key exists');
+  }
+
+  const cerebrasData = await getTodaysCerebrasFreeModels();
+  console.log(`    Found ${cerebrasData.models.length} Cerebras candidate models`);
+  assert.strictEqual(cerebrasData.prefix, 'cerebras', 'Cerebras prefix must be cerebras');
+  assert.ok(Array.isArray(cerebrasData.models), 'Cerebras models must be an array');
+  if (getCerebrasCredentials().apiKey) {
+    assert.ok(cerebrasData.models.length > 0, 'Cerebras discovery must find models when an API key exists');
+  }
+
+  const mistralData = await getTodaysMistralFreeModels();
+  console.log(`    Found ${mistralData.models.length} Mistral candidate models (0 expected without a connection)`);
+  assert.strictEqual(mistralData.prefix, 'mistral', 'Mistral prefix must be mistral');
+  assert.ok(Array.isArray(mistralData.models), 'Mistral models must be an array even without credentials');
+
+  const cloudflareData = await getTodaysCloudflareFreeModels();
+  console.log(`    Found ${cloudflareData.models.length} Cloudflare candidate models (0 expected without a connection)`);
+  assert.strictEqual(cloudflareData.prefix, 'cloudflare-ai', 'Cloudflare prefix must be cloudflare-ai');
+  assert.ok(Array.isArray(cloudflareData.models), 'Cloudflare models must be an array even without credentials');
+
+  // 18. Quota models always sink below user priorities (regression for 0x-alpha-free case)
+  const { sortModelsByCodingQuality: sortByQuality } = require('./sync.js');
+  const quotaCase = [
+    { id: 'acme/hero-model', latencyMs: 1200 },
+    { id: 'acme/priority-but-quota', latencyMs: 999998, quotaExhausted: true },
+    { id: 'acme/plain-slow', latencyMs: 7000 }
+  ];
+  const ranked = sortByQuality(quotaCase, null, ['priority-but-quota']);
+  assert.strictEqual(ranked[ranked.length - 1].id, 'acme/priority-but-quota', 'A prioritized quota-exhausted model must still rank last');
+  assert.strictEqual(ranked[0].id, 'acme/hero-model', 'Active prioritized model stays on top');
+
+  const sentinelRanked = sortByQuality([
+    { id: 'acme/a', latencyMs: 999998 },
+    { id: 'acme/b', latencyMs: 400 }
+  ], null, []);
+  assert.strictEqual(sentinelRanked[sentinelRanked.length - 1].id, 'acme/a', 'Latency sentinel alone forces bottom placement');
+
+  // String-id form with latencyMap must behave identically
+  const latMap = new Map([['acme/q', 999998], ['acme/ok', 300]]);
+  const strRanked = sortByQuality(['acme/q', 'acme/ok'], latMap, ['q']);
+  assert.strictEqual(strRanked[strRanked.length - 1], 'acme/q', 'String ids via latencyMap respect quota-bottom too');
+
+  // 19. Clean provider combos + recovery pool helpers
+  const { deriveTierLists: tiersOf, idMatchesPrefixes: matchesPrefix, PROVIDER_COMBO_PREFIXES: COMBO_PREFIXES } = require('./sync.js');
+
+  assert.strictEqual(matchesPrefix('openrouter/z/inkling:free', COMBO_PREFIXES['openrouter-free']), true, 'prefix routing for openrouter combo');
+  assert.strictEqual(matchesPrefix('kc/stepfun/x:free', COMBO_PREFIXES['openagentic-free']), false, 'kilo ids must not leak into openagentic combo');
+  assert.strictEqual(matchesPrefix('oa/whatever', COMBO_PREFIXES['openagentic-free']), true, 'oa alias maps to openagentic combo');
+
+  const tiers = tiersOf(['x/a-thinking', 'x/b', 'x/c', 'x/d', 'x/e-thinking']);
+  assert.ok(tiers.smartList.includes('x/a-thinking') && tiers.smartList.includes('x/e-thinking'), 'thinking ids land in smart tier');
+  assert.ok(!tiers.fastList.includes('x/a-thinking'), 'thinking ids stay out of fast tier');
+
+  const tinyTiers = tiersOf(['x/only-one']);
+  assert.strictEqual(tinyTiers.smartList.length, 1, 'tiny lists fall back to the ranked list itself');
+
+  // 20. Version heuristic must not mistake parameter counts (8b, 70b) for versions
+  const { getCodingScore: scoreOf } = require('./sync.js');
+  assert.ok(
+    scoreOf('mistral/ministral-8b-latest') < scoreOf('gemini/gemini-3.7-flash'),
+    'parameter-count "8b" must not out-rank benchmarked gemini-3.7-flash'
+  );
+  assert.ok(scoreOf('groq/llama-3.3-70b-versatile') > 3000 && scoreOf('groq/llama-3.3-70b-versatile') < 9000, '"70b" ignored, real version 3.3 scored');
+  assert.strictEqual(scoreOf('x/image'), -10000, 'non-coding models keep heavy penalty');
+
   console.log('[✓] All tests passed successfully!');
 }
 

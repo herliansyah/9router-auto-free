@@ -1,6 +1,8 @@
 {
   "excludedProviders": [
-    "api-airforce"
+    "api-airforce",
+    "cloudflare",
+    "mistral"
   ],
   "excludedModels": [
     "nano",

@@ -2,8 +2,8 @@
 
 /**
  * Free Models Sync for 9router
- * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + 9router OpenCode Free)
- * 
+ * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + Groq + Cerebras + Mistral + Cloudflare AI + 9router OpenCode Free)
+ *
  * Automatically synchronizes today's free models from:
  *   1. OpenAgentic.id (Web & API /v1/models)
  *   2. Kilo.ai (Gateway API /api/gateway/models)
@@ -14,6 +14,10 @@
  *   7. API.airforce API (api.airforce/v1/models)
  *   8. Bazaarlink API (bazaarlink.ai/api/v1/models)
  *   9. 9router OpenCode (oc/* free models directly from 9router)
+ *   10. Groq API (api.groq.com/openai/v1/models)
+ *   11. Cerebras API (api.cerebras.ai/v1/models)
+ *   12. Mistral La Plateforme free tier (api.mistral.ai/v1/models)
+ *   13. Cloudflare Workers AI free neurons (native "cloudflare-ai" connection in 9router)
  * 
  * Pre-tests all candidates against 9router to drop expired/dead/paid models,
  * sorts them by coding capability specification (best to worst),
@@ -28,6 +32,21 @@
  *   - airforce-free   : Dedicated API.airforce free combo
  *   - bazaarlink-free : Dedicated Bazaarlink free combo
  *   - opencode-free   : Dedicated OpenCode free combo
+ *   - groq-free       : Dedicated Groq free combo
+ *   - cerebras-free   : Dedicated Cerebras free combo
+ *   - mistral-free    : Dedicated Mistral free combo (requires Mistral connection)
+ *   - cloudflare-free : Dedicated Cloudflare Workers AI free combo ("cloudflare-ai" connection)
+ *   - my9model-smart  : Thinking / high-benchmark subset of the super-combo
+ *   - my9model-fast   : Low-latency non-thinking subset of the super-combo
+ *   - my9model-cooldown : Parking combo for temporarily quota-exhausted models;
+ *                       the watchdog moves them back to the main combos once they recover
+ *
+ * Modes:
+ *   node sync.js              -> Full daily sync (scrape + live-test + inject)
+ *   node sync.js --refresh    -> Intra-day watchdog: re-test existing combo models,
+ *                                park quota-exhausted (429) in my9model-cooldown, drop dead ones
+ *   node sync.js --dry-run    -> Simulate without writing
+ *   node sync.js --setup-cron -> Install scheduler (systemd timer w/ Persistent=true, cron fallback)
  */
 
 const fs = require('node:fs');
@@ -46,8 +65,16 @@ const CLIENT_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', '9rout
 // Options
 const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
-const isCronSetup = args.includes('--setup-cron');
+const isRefreshMode = args.includes('--refresh') || args.includes('--watchdog');
+const isCronSetup = args.includes('--setup-cron') || args.includes('--setup-scheduler');
 const isLiveBenchmarks = args.includes('--live-benchmarks') || args.includes('--update-benchmarks');
+
+// ponytail: single-user local tool, thresholds hardcoded; promote to config file when a second machine appears
+const AGENTIC_MIN_CONTEXT = 100000;      // super-combo agentic floor (supports 128k/256k/1M models)
+const QUOTA_RETRY_DELAY_MS = 1200;       // wait before re-testing a transient failure
+const QUOTA_LATENCY_SENTINEL = 999998;   // latency marker that forces quota-exhausted models to the bottom
+const CANDIDATES_STATE_PATH = path.join(__dirname, 'candidates-state.json'); // last full-sync candidate pool (watchdog recovery)
+const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 529]);
 
 // ponytail: shared better-sqlite3 loader helper
 function getDbClass() {
@@ -235,7 +262,8 @@ function getCodingScore(modelIdentifier, customBenchmarks = null) {
   }
 
   // 2. Version multiplier / bonus (e.g. 5.6 -> 5600, 4.5 -> 4500, 3.7 -> 3700)
-  const versionMatch = str.match(/(?:v|gpt-|claude-|gemini-|qwen|glm-|kimi-k|mimo-v|minimax-m|step-|lfm-)?(\d+(?:\.\d+)?)/);
+  //    Strip parameter-count tokens first (8b, 70b, 16x9b) so they are never mistaken for a version.
+  const versionMatch = str.replace(/\d+(?:\.\d+)?[xb]\b/g, '').match(/(?:v|gpt-|claude-|gemini-|qwen|glm-|kimi-k|mimo-v|minimax-m|step-|lfm-)?(\d+(?:\.\d+)?)/);
   if (versionMatch) {
     const ver = parseFloat(versionMatch[1]);
     if (!isNaN(ver) && ver > 0 && ver <= 10) {
@@ -288,17 +316,117 @@ function getModelPriorityRank(modelIdentifier, priorities) {
   return Infinity;
 }
 
-// Sort models array with User Custom Priorities -> Benchmark Capability -> Latency Tie-Breaker
+// ============================================================================
+// Usage Feedback Loop (real-world reliability signal from 9router usageHistory)
+// Models that error a lot in real traffic get a ranking penalty, so benchmark
+// score alone never keeps a broken free endpoint at the top of the combo.
+// ============================================================================
+const USAGE_PROVIDER_MAP = {
+  'oa': 'openagentic', 'openagentic': 'openagentic',
+  'kc': 'kilocode',
+  'oc': 'opencode',
+  'openrouter': 'openrouter',
+  'poolside': 'poolside',
+  'gemini': 'gemini',
+  'ollama': 'ollama',
+  'api-airforce': 'api-airforce', 'airforce': 'api-airforce',
+  'bazaarlink': 'bazaarlink', 'bzl': 'bazaarlink',
+  'groq': 'groq',
+  'cerebras': 'cerebras',
+  'mistral': 'mistral',
+  'cloudflare': 'cloudflare', 'cloudflare-ai': 'cloudflare', 'cf': 'cloudflare'
+};
+const USAGE_LOOKBACK_DAYS = 7;
+const USAGE_MIN_SAMPLES = 5;
+
+let usageFeedbackCache = null;
+let usageFeedbackLoadedAt = 0;
+
+function loadUsageFeedback(forceReload = false) {
+  // ponytail: 60s in-process cache; a long-lived daemon would want TTL invalidation
+  if (!forceReload && usageFeedbackCache && (Date.now() - usageFeedbackLoadedAt) < 60000) {
+    return usageFeedbackCache;
+  }
+  const stats = new Map();
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const since = new Date(Date.now() - USAGE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const rows = db.prepare(
+      "SELECT provider, model, status, COUNT(*) as cnt FROM usageHistory WHERE timestamp >= ? GROUP BY provider, model, status"
+    ).all(since);
+    db.close();
+
+    for (const row of rows) {
+      if (!row.provider || !row.model) continue;
+      const key = `${String(row.provider).toLowerCase()}|${String(row.model).toLowerCase()}`;
+      if (!stats.has(key)) stats.set(key, { ok: 0, err: 0 });
+      const entry = stats.get(key);
+      if (String(row.status).toLowerCase() === 'ok') entry.ok += row.cnt;
+      else entry.err += row.cnt;
+    }
+  } catch (err) {
+    console.warn(`[!] Usage feedback unavailable (${err.message}). Ranking without usage penalty.`);
+  }
+  usageFeedbackCache = stats;
+  usageFeedbackLoadedAt = Date.now();
+  return stats;
+}
+
+// Compute real-world reliability penalty for a combo model id (0 = no penalty)
+function getUsagePenalty(fullId) {
+  const stats = loadUsageFeedback();
+  if (!stats || stats.size === 0) return 0;
+
+  const slash = String(fullId).indexOf('/');
+  if (slash <= 0) return 0;
+  const provider = USAGE_PROVIDER_MAP[String(fullId).slice(0, slash).toLowerCase()];
+  if (!provider) return 0;
+  const model = String(fullId).slice(slash + 1).toLowerCase();
+
+  // Exact match first, then without a :free / -free suffix (usage rows may store either form)
+  const entry = stats.get(`${provider}|${model}`)
+    || stats.get(`${provider}|${model.replace(/:free$/, '')}`)
+    || stats.get(`${provider}|${model.replace(/-free$/, '')}`);
+  if (!entry) return 0;
+
+  const total = entry.ok + entry.err;
+  if (total < USAGE_MIN_SAMPLES) return 0;
+  const errorRate = entry.err / total;
+  if (errorRate >= 0.5) return -800;
+  if (errorRate >= 0.25) return -400;
+  return 0;
+}
+
+// Extract canonical full model id from a model entry (string or object)
+function getModelFullId(m) {
+  return typeof m === 'string' ? m : (m.fullId || m.id || m.name || '');
+}
+
+// Classify a failed pre-test: quota exhaustion (demote, keep) vs hard failure (drop)
+function isQuotaExhaustedResult(result) {
+  return Boolean(result && result.quotaExhausted);
+}
+
+// Sort models array with User Custom Priorities -> Benchmark Capability -> Usage Reliability -> Latency Tie-Breaker
 function sortModelsByCodingQuality(models, latencyMap = null, customPriorities = null) {
   const priorities = customPriorities || getPrioritiesList();
   const benchmarks = getBenchmarksDatabase();
 
   return [...models].sort((a, b) => {
-    const idA = typeof a === 'string' ? a : (a.fullId || a.id || a.name || '');
-    const idB = typeof b === 'string' ? b : (b.fullId || b.id || b.name || '');
+    const idA = getModelFullId(a);
+    const idB = getModelFullId(b);
 
     const latA = typeof a === 'object' && a.latencyMs != null ? a.latencyMs : (latencyMap ? latencyMap.get(idA) ?? 99999 : 99999);
     const latB = typeof b === 'object' && b.latencyMs != null ? b.latencyMs : (latencyMap ? latencyMap.get(idB) ?? 99999 : 99999);
+
+    // 0. Quota-exhausted models ALWAYS sink to the bottom, above every other rule
+    //    (user priorities included). Detected via object flag or the latency sentinel.
+    const quotaA = (typeof a === 'object' && (a.quotaExhausted === true || a.latencyMs >= QUOTA_LATENCY_SENTINEL)) || latA >= QUOTA_LATENCY_SENTINEL;
+    const quotaB = (typeof b === 'object' && (b.quotaExhausted === true || b.latencyMs >= QUOTA_LATENCY_SENTINEL)) || latB >= QUOTA_LATENCY_SENTINEL;
+    if (quotaA !== quotaB) {
+      return quotaA ? 1 : -1;
+    }
 
     // 1. User defined priorities (e.g. priorities.json: rank 0 > rank 1 > rank 2...)
     const rankA = getModelPriorityRank(idA, priorities);
@@ -313,9 +441,9 @@ function sortModelsByCodingQuality(models, latencyMap = null, customPriorities =
       if (latA !== latB) return latA - latB;
     }
 
-    // 3. Empirical benchmark / capability score
-    const scoreA = getCodingScore(idA, benchmarks);
-    const scoreB = getCodingScore(idB, benchmarks);
+    // 3. Empirical benchmark / capability score minus real-world usage penalty
+    const scoreA = getCodingScore(idA, benchmarks) + getUsagePenalty(idA);
+    const scoreB = getCodingScore(idB, benchmarks) + getUsagePenalty(idB);
 
     if (scoreB !== scoreA) {
       return scoreB - scoreA;
@@ -1055,12 +1183,312 @@ async function getTodaysBazaarlinkFreeModels() {
   };
 }
 
+// ============================================================================
+// Additional free providers: Groq, Cerebras, Mistral, Cloudflare Workers AI
+// Each is optional: without a matching 9router connection the source is
+// skipped gracefully, and every candidate still passes the live pre-test
+// before it can enter any combo.
+// ============================================================================
+
+// Shared helper: read one active provider connection from the 9router database
+function getProviderConnection(providerName) {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = ? AND isActive = 1").get(providerName);
+    db.close();
+    if (row && row.data) return JSON.parse(row.data);
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for ${providerName}: ${err.message}`);
+  }
+  return null;
+}
+
+// Extract Groq API Key from 9router Database
+function getGroqCredentials() {
+  const parsed = getProviderConnection('groq');
+  return {
+    apiKey: parsed?.apiKey || null,
+    prefix: parsed?.providerSpecificData?.prefix || 'groq',
+    baseUrl: 'https://api.groq.com/openai/v1'
+  };
+}
+
+// Extract Cerebras API Key from 9router Database
+function getCerebrasCredentials() {
+  const parsed = getProviderConnection('cerebras');
+  return {
+    apiKey: parsed?.apiKey || null,
+    prefix: parsed?.providerSpecificData?.prefix || 'cerebras',
+    baseUrl: 'https://api.cerebras.ai/v1'
+  };
+}
+
+// Extract Mistral API Key from 9router Database (native 9router provider type)
+function getMistralCredentials() {
+  const parsed = getProviderConnection('mistral');
+  return {
+    apiKey: parsed?.apiKey || null,
+    prefix: parsed?.providerSpecificData?.prefix || 'mistral',
+    baseUrl: 'https://api.mistral.ai/v1'
+  };
+}
+
+// Cloudflare Workers AI credentials. Preferred: the native "cloudflare-ai" provider
+// connection in 9router (apiKey + providerSpecificData.accountId). Fallback: a
+// user-added openai-compatible connection whose baseUrl points at api.cloudflare.com.
+function getCloudflareCredentials() {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const rows = db.prepare("SELECT * FROM providerConnections WHERE isActive = 1").all();
+    db.close();
+
+    for (const row of rows) {
+      const provider = String(row.provider || '').toLowerCase();
+      if (provider !== 'cloudflare-ai') continue;
+      let parsed = null;
+      try { parsed = JSON.parse(row.data || '{}'); } catch { continue; }
+      const accountId = parsed?.providerSpecificData?.accountId || null;
+      if (!parsed.apiKey || !accountId) continue;
+      return { apiKey: parsed.apiKey, accountId, prefix: 'cloudflare-ai', baseUrl: '' };
+    }
+
+    for (const row of rows) {
+      const provider = String(row.provider || '').toLowerCase();
+      if (!provider.startsWith('openai-compatible')) continue;
+      let parsed = null;
+      try { parsed = JSON.parse(row.data || '{}'); } catch { continue; }
+      const baseUrl = parsed?.providerSpecificData?.baseUrl || '';
+      if (!baseUrl.includes('api.cloudflare.com')) continue;
+      const accountMatch = baseUrl.match(/accounts\/([^/]+)/);
+      return {
+        apiKey: parsed.apiKey || null,
+        accountId: accountMatch ? accountMatch[1] : null,
+        prefix: parsed?.providerSpecificData?.prefix || 'cloudflare-ai',
+        baseUrl
+      };
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for Cloudflare: ${err.message}`);
+  }
+  return { apiKey: null, accountId: null, prefix: 'cloudflare-ai', baseUrl: '' };
+}
+
+// Generic OpenAI-compatible /models fetcher with per-provider free filtering
+async function fetchOpenAiCompatibleFreeModels({ label, apiKey, baseUrl, prefix, skipPatterns = [], requireApiKey = true }) {
+  const freeModels = [];
+  if (requireApiKey && !apiKey) {
+    console.log(`[⊘] ${label}: no API key/connection found in 9router, skipping (add the connection to enable).`);
+    return freeModels;
+  }
+
+  try {
+    console.log(`[-] Fetching free models from ${label} (/models)...`);
+    const headers = { 'User-Agent': 'Mozilla/5.0' };
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/models`, {
+      headers,
+      signal: AbortSignal.timeout(15000)
+    });
+    if (!res.ok) {
+      console.warn(`[!] ${label} fetch notice: HTTP ${res.status}`);
+      return freeModels;
+    }
+
+    const json = await res.json();
+    const models = Array.isArray(json) ? json : (json.data || json.models || []);
+
+    // Alias-aware dedupe: providers like Mistral list canonical ids, dated snapshots
+    // and marketing names as SEPARATE rows that reference each other through
+    // circular `aliases` arrays. Group ids connected via aliases (union-find) and
+    // keep exactly one representative per group, preferring the "-latest" id.
+    const parentMap = new Map();
+    const findRoot = x => {
+      // Iterative find with path halving; always advance x toward the root
+      while (parentMap.get(x) !== x) {
+        const next = parentMap.get(parentMap.get(x));
+        if (next == null || next === undefined) break;
+        parentMap.set(x, next);
+        x = next;
+      }
+      return parentMap.get(x) ?? x;
+    };
+    const unionIds = (a, b) => {
+      const ra = findRoot(a);
+      const rb = findRoot(b);
+      if (ra !== rb) parentMap.set(ra, rb);
+    };
+    const ensureId = x => { if (!parentMap.has(x)) parentMap.set(x, x); };
+
+    const modelById = new Map();
+    for (const m of models) {
+      const id = String(m.id || m.name || m.model || '').toLowerCase();
+      if (!id) continue;
+      ensureId(id);
+      modelById.set(id, m);
+      for (const alias of (Array.isArray(m?.aliases) ? m.aliases : [])) {
+        const key = String(alias).toLowerCase();
+        if (!key) continue;
+        ensureId(key);
+        unionIds(id, key);
+      }
+    }
+
+    const representativeOfRoot = new Map();
+    const preferCandidate = (candidate, incumbent) => {
+      if (!incumbent) return true;
+      const candidateLatest = candidate.endsWith('-latest');
+      const incumbentLatest = incumbent.endsWith('-latest');
+      if (candidateLatest !== incumbentLatest) return candidateLatest;
+      return candidate.length < incumbent.length;
+    };
+    for (const id of modelById.keys()) {
+      const root = findRoot(id);
+      if (preferCandidate(id, representativeOfRoot.get(root))) {
+        representativeOfRoot.set(root, id);
+      }
+    }
+    const keepIds = new Set(representativeOfRoot.values());
+
+    const seenIds = new Set();
+    for (const m of models) {
+      const id = m.id || m.name || m.model || '';
+      if (!id || seenIds.has(id)) continue;
+      const name = m.name || m.summary || id;
+      const lowerId = id.toLowerCase();
+
+      if (skipPatterns.some(pat => lowerId.includes(pat))) continue;
+      if (!keepIds.has(lowerId)) continue;
+      seenIds.add(id);
+
+      freeModels.push({
+        id,
+        name,
+        source: `${prefix}-api-free`,
+        contextLength: Number(m.context_window || m.context_length || m.max_context_length || 0) || undefined
+      });
+    }
+  } catch (err) {
+    console.warn(`[!] ${label} fetch notice: ${err.message}`);
+  }
+  return freeModels;
+}
+
+// Fetch zero-cost text-generation models from Cloudflare Workers AI (free daily neurons)
+async function fetchCloudflareFreeModels(creds) {
+  const freeModels = [];
+  if (!creds.apiKey || !creds.accountId) {
+    console.log('[⊘] Cloudflare Workers AI: no "cloudflare-ai" connection found in 9router, skipping.');
+    console.log('    Add one in 9router (provider "Cloudflare", API token + Account ID from dash.cloudflare.com).');
+    return freeModels;
+  }
+
+  try {
+    console.log('[-] Fetching free models from Cloudflare Workers AI (models/search)...');
+    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${creds.accountId}/ai/models/search`;
+    const perPage = 100;
+
+    for (let page = 1; page <= 5; page++) {
+      const res = await fetch(`${endpoint}?task=${encodeURIComponent('Text Generation')}&per_page=${perPage}&page=${page}`, {
+        headers: { 'Authorization': `Bearer ${creds.apiKey}`, 'User-Agent': 'Mozilla/5.0' },
+        signal: AbortSignal.timeout(15000)
+      });
+      if (!res.ok) {
+        console.warn(`[!] Cloudflare models/search notice: HTTP ${res.status}`);
+        break;
+      }
+
+      const json = await res.json();
+      const models = json.data || json.result || [];
+
+      for (const m of models) {
+        // The search API returns a UUID in `id`; the real model name (e.g.
+        // "@cf/zai-org/glm-5.2") lives in `name` and is what the API routes on.
+        const id = m.name || '';
+        if (!id) continue;
+        const lowerId = id.toLowerCase();
+
+        // Text-generation models only; drop embed/image/audio/tts/rerank/moderation
+        if (/embed|image|audio|speech|tts|whisper|flux|diffusion|rerank|guard|moderation/.test(lowerId)) continue;
+
+        // properties is an array of { property_id, value } pairs
+        const props = Object.fromEntries((Array.isArray(m.properties) ? m.properties : [])
+          .map(prop => [prop.property_id, prop.value]));
+
+        // Keep only models runnable on the free plan: no per-token price entry and
+        // no explicit "requires Workers paid plan" flag. Priced models answer 403
+        // on free accounts, so fetching them would only create combo churn.
+        const hasPrice = Array.isArray(props.price) && props.price.length > 0;
+        const needsPaid = String(props.require_workers_paid) === 'true';
+        if (hasPrice || needsPaid) continue;
+
+        freeModels.push({
+          id,
+          name: m.name || id,
+          source: 'cloudflare-workersai-free',
+          contextLength: Number(props.context_window || 0) || undefined
+        });
+      }
+
+      if (models.length < perPage) break;
+    }
+  } catch (err) {
+    console.warn(`[!] Cloudflare models/search notice: ${err.message}`);
+  }
+  return freeModels;
+}
+
+// Merge and discover all free models from Groq
+async function getTodaysGroqFreeModels() {
+  const creds = getGroqCredentials();
+  const models = await fetchOpenAiCompatibleFreeModels({
+    label: 'Groq', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
+    skipPatterns: ['whisper', 'tts', 'guard', 'embed', 'playai']
+  });
+  return { prefix: creds.prefix || 'groq', models: sortModelsByCodingQuality(models) };
+}
+
+// Merge and discover all free models from Cerebras
+async function getTodaysCerebrasFreeModels() {
+  const creds = getCerebrasCredentials();
+  const models = await fetchOpenAiCompatibleFreeModels({
+    label: 'Cerebras', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
+    skipPatterns: ['embed']
+  });
+  return { prefix: creds.prefix || 'cerebras', models: sortModelsByCodingQuality(models) };
+}
+
+// Merge and discover all free models from Mistral (free "Experiment" tier)
+async function getTodaysMistralFreeModels() {
+  const creds = getMistralCredentials();
+  const models = await fetchOpenAiCompatibleFreeModels({
+    label: 'Mistral', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
+    // Paid-only / non-coding entries; anything else that needs payment is dropped by the live pre-test (HTTP 402/403)
+    skipPatterns: ['embed', 'moderation', 'ocr', 'tts', 'voxtral', 'mistral-saba']
+  });
+  return { prefix: creds.prefix || 'mistral', models: sortModelsByCodingQuality(models) };
+}
+
+// Merge and discover all free models from Cloudflare Workers AI
+async function getTodaysCloudflareFreeModels() {
+  const creds = getCloudflareCredentials();
+  const models = await fetchCloudflareFreeModels(creds);
+  return { prefix: creds.prefix || 'cloudflare-ai', models: sortModelsByCodingQuality(models) };
+}
+
 /**
  * Pre-test a model via 9router internal test endpoint
- * Filters out dead/expired promotions (401), paid models (402), 404s, and timeouts.
+ * - Definitive failures (401 promo ended, 402 paid, 403 subscription, 404 missing): dropped immediately.
+ * - Transient failures (timeouts, network errors, 408/429/5xx): retried once before a verdict,
+ *   so a single hiccup or burst rate-limit never evicts a healthy model for the whole day.
+ * - Quota exhaustion (429 / "quota exceeded" after retry): flagged `quotaExhausted` so callers
+ *   can demote the model to the bottom of the combo instead of dropping it. It comes back
+ *   automatically once its upstream quota resets.
  * Measures response latency (ms) to prioritize faster connections.
  */
-async function testModelWith9router(fullModelId, token) {
+async function testModelWith9router(fullModelId, token, attempt = 1) {
   if (!token) return { valid: true, ok: true, latencyMs: 9999, note: '9router token unavailable' };
 
   const startTime = Date.now();
@@ -1081,12 +1509,34 @@ async function testModelWith9router(fullModelId, token) {
     // 200 OK -> Reachable & Active
     if (data.ok) return { valid: true, ok: true, latencyMs };
 
-    // Any non-200 (429 quota exceeded, 401 promo ended, 402 paid, 404, timeout) -> Dropped
-    const reason = (data.error || `HTTP ${data.status || res.status}`).replace(/\n/g, ' ').slice(0, 75);
-    return { valid: false, ok: false, latencyMs, status: data.status || res.status, reason };
+    const status = Number(data.status || res.status);
+    // Keep enough of the error body for reliable classification (some providers bury
+    // "Resource Exhausted" / quota markers deep in JSON), but display a short slice.
+    const fullReason = String(data.error || `HTTP ${data.status || res.status}`).replace(/\s+/g, ' ').trim();
+    const reason = fullReason.slice(0, 75);
+    const quotaish = status === 429 || /quota|rate.?limit|resource.?exhaust|capacity/i.test(fullReason.slice(0, 400));
+
+    // Transient status -> retry once before judging
+    if (TRANSIENT_HTTP_STATUSES.has(status) && attempt < 2) {
+      await new Promise(r => setTimeout(r, QUOTA_RETRY_DELAY_MS));
+      return { ...(await testModelWith9router(fullModelId, token, attempt + 1)), retried: true };
+    }
+
+    const result = { valid: false, ok: false, latencyMs, status, reason };
+    if (quotaish) {
+      result.quotaExhausted = true;
+    }
+    return result;
   } catch (err) {
     const latencyMs = Date.now() - startTime;
-    return { valid: false, ok: false, latencyMs, reason: err.message.slice(0, 75) };
+    // Network error / timeout -> transient, retry once before judging
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, QUOTA_RETRY_DELAY_MS));
+      return { ...(await testModelWith9router(fullModelId, token, attempt + 1)), retried: true };
+    }
+    const result = { valid: false, ok: false, latencyMs, reason: err.message.slice(0, 75) };
+    if (/timed?\s*out|abort/i.test(err.message)) result.timedOut = true;
+    return result;
   }
 }
 
@@ -1113,7 +1563,8 @@ async function validateCandidateModels(models, prefix) {
     return nonExcludedModels;
   }
 
-  const validModels = [];
+  const activeModels = [];
+  const quotaLimitedModels = [];
   const concurrency = (prefix === 'ollama' || prefix === 'api-airforce' || prefix === 'airforce') ? 1 : 5;
   const queue = [...nonExcludedModels];
 
@@ -1134,9 +1585,15 @@ async function validateCandidateModels(models, prefix) {
       if (result.valid) {
         const msText = `${result.latencyMs}ms`;
         console.log(`    [✓ Active] ${fullId} (${msText}) ${result.note ? '(' + result.note + ')' : ''}`);
-        validModels.push({ ...m, latencyMs: result.latencyMs });
+        activeModels.push({ ...m, latencyMs: result.latencyMs });
+      } else if (isQuotaExhaustedResult(result)) {
+        // Quota exhausted today: keep the model but park it at the very bottom of the
+        // combo so IDE fallback never wastes latency on it first. It returns to its
+        // natural rank on the next sync once the upstream quota resets.
+        console.log(`    [⏳ Quota] ${fullId} -> Kept at bottom (${result.reason})`);
+        quotaLimitedModels.push({ ...m, latencyMs: QUOTA_LATENCY_SENTINEL, quotaExhausted: true });
       } else {
-        console.log(`    [✗ Dropped] ${fullId} -> ${result.reason}`);
+        console.log(`    [✗ Dropped] ${fullId} -> ${result.reason}${result.retried ? ' (after retry)' : ''}`);
       }
     }
   }
@@ -1144,154 +1601,172 @@ async function validateCandidateModels(models, prefix) {
   const workers = Array.from({ length: Math.min(concurrency, nonExcludedModels.length) }, () => worker());
   await Promise.all(workers);
 
-  return sortModelsByCodingQuality(validModels);
+  return [
+    ...sortModelsByCodingQuality(activeModels),
+    ...sortModelsByCodingQuality(quotaLimitedModels)
+  ];
 }
 
-// Inject free models into 9router combos
-async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData) {
-  // Validate each source's free models against 9router live test (skip if provider is excluded)
-  const validOaModels = oaData?.excluded ? [] : await validateCandidateModels(oaData.models, oaData.prefix);
-  const validKiloModels = kiloData?.excluded ? [] : await validateCandidateModels(kiloData.models, kiloData.prefix);
-  const validOcModels = ocData?.excluded ? [] : await validateCandidateModels(ocData.models, ocData.prefix);
-  const validOrModels = orData?.excluded ? [] : (orData ? await validateCandidateModels(orData.models, orData.prefix) : []);
-  const validPoolsideModels = poolsideData?.excluded ? [] : (poolsideData ? await validateCandidateModels(poolsideData.models, poolsideData.prefix || 'poolside') : []);
-  const validGeminiModels = geminiData?.excluded ? [] : (geminiData ? await validateCandidateModels(geminiData.models, geminiData.prefix || 'gemini') : []);
-  const validOllamaModels = ollamaData?.excluded ? [] : (ollamaData ? await validateCandidateModels(ollamaData.models, ollamaData.prefix || 'ollama') : []);
-  const validAirforceModels = airforceData?.excluded ? [] : (airforceData ? await validateCandidateModels(airforceData.models, airforceData.prefix || 'api-airforce') : []);
-  const validBazaarlinkModels = bazaarlinkData?.excluded ? [] : (bazaarlinkData ? await validateCandidateModels(bazaarlinkData.models, bazaarlinkData.prefix || 'bazaarlink') : []);
+// ============================================================================
+// Delta notifications (optional): Telegram bot or Discord webhook via env vars
+//   TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID   and/or   DISCORD_WEBHOOK_URL
+// Unset -> silently skipped, sync keeps working without any notification.
+// ============================================================================
 
-  const oaPrefixed = validOaModels.map(m => `${oaData.prefix}/${m.id}`);
-  const kiloPrefixed = validKiloModels.map(m => `${kiloData.prefix}/${m.id}`);
-  const ocPrefixed = validOcModels.map(m => m.fullId || `${ocData.prefix}/${m.id}`);
-  const orPrefixed = validOrModels.map(m => m.fullId || `${orData.prefix}/${m.id}`);
-  const psPrefixed = validPoolsideModels.map(m => m.fullId || `${poolsideData.prefix || 'poolside'}/${m.id}`);
-  const geminiPrefixed = validGeminiModels.map(m => m.fullId || `${geminiData.prefix || 'gemini'}/${m.id}`);
-  const ollamaPrefixed = validOllamaModels.map(m => m.fullId || `${ollamaData.prefix || 'ollama'}/${m.id}`);
-  const airforcePrefixed = validAirforceModels.map(m => m.fullId || `${airforceData.prefix || 'api-airforce'}/${m.id}`);
-  const bzlPrefixed = validBazaarlinkModels.map(m => m.fullId || `${bazaarlinkData.prefix || 'bazaarlink'}/${m.id}`);
+async function sendTextNotification(text) {
+  const results = [];
+  const tgToken = process.env.TELEGRAM_BOT_TOKEN;
+  const tgChat = process.env.TELEGRAM_CHAT_ID;
+  const discordUrl = process.env.DISCORD_WEBHOOK_URL;
 
-  // Build global latency lookup map for tie-breaking
-  const latencyMap = new Map();
-  for (const m of [...validOaModels, ...validKiloModels, ...validOcModels, ...validOrModels, ...validPoolsideModels, ...validGeminiModels, ...validOllamaModels, ...validAirforceModels, ...validBazaarlinkModels]) {
-    const key = m.fullId || (m.prefix ? `${m.prefix}/${m.id}` : m.id);
-    if (m.latencyMs != null) latencyMap.set(key, m.latencyMs);
-  }
-
-  if (!oaData?.excluded) {
-    console.log(`\n[+] Validated OpenAgentic: ${validOaModels.length} models:`);
-    for (const m of validOaModels) {
-      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-      console.log(`    - ${oaData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+  const post = async (label, url, body) => {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(8000)
+      });
+      results.push(`${label}: HTTP ${res.status}`);
+    } catch (err) {
+      results.push(`${label}: ${err.message.slice(0, 60)}`);
     }
+  };
+
+  const jobs = [];
+  if (tgToken && tgChat) {
+    jobs.push(post('telegram', `https://api.telegram.org/bot${tgToken}/sendMessage`, {
+      chat_id: tgChat,
+      text
+    }));
+  }
+  if (discordUrl) {
+    jobs.push(post('discord', discordUrl, { content: text }));
+  }
+  if (jobs.length > 0) {
+    await Promise.all(jobs);
+    console.log(`[*] Notification results: ${results.join(', ')}`);
+  }
+}
+
+function buildDeltaMessage({ mode, added, removed, total }) {
+  const lines = [`9router free sync (${mode}) done.`];
+  lines.push(`Total active models: ${total}`);
+  if (added.length === 0 && removed.length === 0) {
+    lines.push('No changes since last run.');
   } else {
-    console.log(`\n[⊘] OpenAgentic: Skipped (provider excluded)`);
+    if (added.length > 0) lines.push(`+ Added (${added.length}): ${added.slice(0, 10).join(', ')}${added.length > 10 ? ', ...' : ''}`);
+    if (removed.length > 0) lines.push(`- Removed (${removed.length}): ${removed.slice(0, 10).join(', ')}${removed.length > 10 ? ', ...' : ''}`);
   }
+  return lines.join('\n');
+}
 
-  if (!kiloData?.excluded) {
-    console.log(`\n[+] Validated Kilo.ai: ${validKiloModels.length} models:`);
-    for (const m of validKiloModels) {
-      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-      console.log(`    - ${kiloData.prefix}/${m.id} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+// Compute set difference between two model id lists
+function computeComboDelta(oldList, newList) {
+  const oldSet = new Set((oldList || []).map(String));
+  const newSet = new Set((newList || []).map(String));
+  return {
+    added: [...newSet].filter(id => !oldSet.has(id)),
+    removed: [...oldSet].filter(id => !newSet.has(id))
+  };
+}
+
+// Read a combo's current model list straight from SQLite (pre-write snapshot)
+function readCurrentComboModels(comboName) {
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const row = db.prepare("SELECT models FROM combos WHERE name = ?").get(comboName);
+    db.close();
+    if (row && row.models) {
+      const parsed = JSON.parse(row.models);
+      if (Array.isArray(parsed)) return parsed.map(String);
     }
-  } else {
-    console.log(`\n[⊘] Kilo.ai: Skipped (provider excluded)`);
-  }
+  } catch {}
+  return [];
+}
 
-  if (!ocData?.excluded) {
-    console.log(`\n[+] Validated 9router OpenCode: ${validOcModels.length} models:`);
-    for (const m of validOcModels) {
-      const rawId = m.fullId || `${ocData.prefix}/${m.id}`;
-      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
+// All free combos managed by this tool
+const MANAGED_COMBOS = [
+  'my9model-free', 'my9model-smart', 'my9model-fast',
+  'openagentic-free', 'kilo-free', 'opencode-free', 'openrouter-free',
+  'poolside-free', 'gemini-free', 'ollama-free', 'airforce-free',
+  'bazaarlink-free', 'groq-free', 'cerebras-free', 'mistral-free', 'cloudflare-free'
+];
+
+// Combo name -> model-id prefixes belonging to it (first segment of fullId)
+const PROVIDER_COMBO_PREFIXES = {
+  'openagentic-free': ['openagentic', 'oa'],
+  'kilo-free': ['kilocode', 'kc'],
+  'opencode-free': ['opencode', 'oc'],
+  'openrouter-free': ['openrouter'],
+  'poolside-free': ['poolside'],
+  'gemini-free': ['gemini'],
+  'ollama-free': ['ollama'],
+  'airforce-free': ['api-airforce', 'airforce'],
+  'bazaarlink-free': ['bazaarlink', 'bzl'],
+  'groq-free': ['groq'],
+  'cerebras-free': ['cerebras'],
+  'mistral-free': ['mistral'],
+  'cloudflare-free': ['cloudflare-ai', 'cloudflare', 'cf']
+};
+
+function idMatchesPrefixes(fullId, prefixes) {
+  const head = String(fullId).split('/')[0].toLowerCase();
+  return prefixes.includes(head);
+}
+
+// Persist the full validated candidate pool after a successful full sync so the
+// watchdog can re-admit models that recover from quota exhaustion later in the day.
+function saveCandidateState(defs, prefixedByProvider) {
+  try {
+    const providers = {};
+    for (const [key, data] of defs) {
+      const ids = prefixedByProvider[key];
+      if (!Array.isArray(ids) || ids.length === 0) continue;
+      providers[key] = { prefix: data.prefix, ids };
     }
-  } else {
-    console.log(`\n[⊘] 9router OpenCode: Skipped (provider excluded)`);
+    fs.writeFileSync(CANDIDATES_STATE_PATH, JSON.stringify({ updatedAt: new Date().toISOString(), providers }, null, 2));
+  } catch (err) {
+    console.warn(`[!] Warning: Could not save candidates-state.json: ${err.message}`);
   }
+}
 
-  if (orData) {
-    if (!orData.excluded) {
-      console.log(`\n[+] Validated OpenRouter: ${validOrModels.length} models:`);
-      for (const m of validOrModels) {
-        const rawId = m.fullId || `${orData.prefix}/${m.id}`;
-        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
-      }
-    } else {
-      console.log(`\n[⊘] OpenRouter: Skipped (provider excluded)`);
+// Load the candidate pool as prefix -> Set(fullId). Returns an empty Map when absent.
+function loadCandidatePool() {
+  try {
+    if (!fs.existsSync(CANDIDATES_STATE_PATH)) return new Map();
+    const data = JSON.parse(fs.readFileSync(CANDIDATES_STATE_PATH, 'utf8'));
+    const pool = new Map();
+    for (const entry of Object.values(data.providers || {})) {
+      if (!entry || !entry.prefix) continue;
+      const set = pool.get(entry.prefix) || new Set();
+      for (const id of entry.ids || []) set.add(String(id));
+      pool.set(entry.prefix, set);
     }
+    return pool;
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read candidates-state.json: ${err.message}`);
+    return new Map();
   }
+}
 
-  if (poolsideData) {
-    if (!poolsideData.excluded) {
-      console.log(`\n[+] Validated Poolside: ${validPoolsideModels.length} models:`);
-      for (const m of validPoolsideModels) {
-        const rawId = m.fullId || `${poolsideData.prefix || 'poolside'}/${m.id}`;
-        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
-      }
-    } else {
-      console.log(`\n[⊘] Poolside: Skipped (provider excluded)`);
-    }
-  }
+// Derive the smart/fast tier sub-lists from an already-ranked super-combo list.
+function deriveTierLists(rankedAll) {
+  let smartList = rankedAll.filter(id => isSmartTierModel(id));
+  let fastList = rankedAll.filter(id => !isSmartTierModel(id) && !isThinkingVariant(id));
+  if (smartList.length < 3) smartList = rankedAll.slice(0, 5);
+  if (fastList.length < 3) fastList = rankedAll.slice(0, 5);
+  return { smartList, fastList };
+}
 
-  if (geminiData) {
-    if (!geminiData.excluded) {
-      console.log(`\n[+] Validated Gemini: ${validGeminiModels.length} models:`);
-      for (const m of validGeminiModels) {
-        const rawId = m.fullId || `${geminiData.prefix || 'gemini'}/${m.id}`;
-        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
-      }
-    } else {
-      console.log(`\n[⊘] Gemini: Skipped (provider excluded)`);
-    }
-  }
-
-  if (ollamaData) {
-    if (!ollamaData.excluded) {
-      console.log(`\n[+] Validated Ollama Cloud: ${validOllamaModels.length} models:`);
-      for (const m of validOllamaModels) {
-        const rawId = m.fullId || `${ollamaData.prefix || 'ollama'}/${m.id}`;
-        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
-      }
-    } else {
-      console.log(`\n[⊘] Ollama Cloud: Skipped (provider excluded)`);
-    }
-  }
-
-  if (airforceData) {
-    if (!airforceData.excluded) {
-      console.log(`\n[+] Validated API.airforce: ${validAirforceModels.length} models:`);
-      for (const m of validAirforceModels) {
-        const rawId = m.fullId || `${airforceData.prefix || 'api-airforce'}/${m.id}`;
-        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
-      }
-    } else {
-      console.log(`\n[⊘] API.airforce: Skipped (provider excluded)`);
-    }
-  }
-
-  if (bazaarlinkData) {
-    if (!bazaarlinkData.excluded) {
-      console.log(`\n[+] Validated Bazaarlink: ${validBazaarlinkModels.length} models:`);
-      for (const m of validBazaarlinkModels) {
-        const rawId = m.fullId || `${bazaarlinkData.prefix || 'bazaarlink'}/${m.id}`;
-        const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
-        console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr} (${m.name})`);
-      }
-    } else {
-      console.log(`\n[⊘] Bazaarlink: Skipped (provider excluded)`);
-    }
-  }
-
-  if (isDryRun) {
-    console.log('\n[*] Dry run mode enabled. No changes written.');
-    return;
-  }
-
-  const unifiedList = sortModelsByCodingQuality(Array.from(new Set([...oaPrefixed, ...kiloPrefixed, ...ocPrefixed, ...orPrefixed, ...psPrefixed, ...geminiPrefixed, ...ollamaPrefixed, ...airforcePrefixed, ...bzlPrefixed])), latencyMap);
+/**
+ * Write combo updates: 9router API first (live server), SQLite as fallback.
+ * Also snapshots the pre-write my9model-free list and notifies the delta.
+ */
+async function persistCombos(comboMap, mode = 'daily-sync') {
+  const previousUnified = readCurrentComboModels('my9model-free');
+  const delta = computeComboDelta(previousUnified, comboMap.get('my9model-free') || []);
 
   // 1. Try updating via 9router API client if server is running
   let updatedViaApi = false;
@@ -1300,62 +1775,26 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
     if (client && typeof client.getCombos === 'function') {
       const res = await client.getCombos();
       if (res.success && res.data && res.data.combos) {
-        const combos = res.data.combos;
-        for (const combo of combos) {
-          if (combo.name === 'my9model-free') {
-            await client.updateCombo(combo.id, { name: combo.name, models: unifiedList });
-            console.log(`[✓] Updated combo '${combo.name}' via 9router API (${unifiedList.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'openagentic-free' && !oaData?.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: oaPrefixed });
-            console.log(`[✓] Updated combo 'openagentic-free' via 9router API (${oaPrefixed.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'kilo-free' && !kiloData?.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: kiloPrefixed });
-            console.log(`[✓] Updated combo 'kilo-free' via 9router API (${kiloPrefixed.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'opencode-free' && !ocData?.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: ocPrefixed });
-            console.log(`[✓] Updated combo 'opencode-free' via 9router API (${ocPrefixed.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'openrouter-free' && orData && !orData.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: orPrefixed });
-            console.log(`[✓] Updated combo 'openrouter-free' via 9router API (${orPrefixed.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'poolside-free' && poolsideData && !poolsideData.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: psPrefixed });
-            console.log(`[✓] Updated combo 'poolside-free' via 9router API (${psPrefixed.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'gemini-free' && geminiData && !geminiData.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: geminiPrefixed });
-            console.log(`[✓] Updated combo 'gemini-free' via 9router API (${geminiPrefixed.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'ollama-free' && ollamaData && !ollamaData.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: ollamaPrefixed });
-            console.log(`[✓] Updated combo 'ollama-free' via 9router API (${ollamaPrefixed.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'airforce-free' && airforceData && !airforceData.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: airforcePrefixed });
-            console.log(`[✓] Updated combo 'airforce-free' via 9router API (${airforcePrefixed.length} models)`);
-            updatedViaApi = true;
-          } else if (combo.name === 'bazaarlink-free' && bazaarlinkData && !bazaarlinkData.excluded) {
-            await client.updateCombo(combo.id, { name: combo.name, models: bzlPrefixed });
-            console.log(`[✓] Updated combo 'bazaarlink-free' via 9router API (${bzlPrefixed.length} models)`);
-            updatedViaApi = true;
-          }
+        for (const combo of res.data.combos) {
+          const newList = comboMap.get(combo.name);
+          if (!Array.isArray(newList)) continue;
+          await client.updateCombo(combo.id, { name: combo.name, models: newList });
+          console.log(`[✓] Updated combo '${combo.name}' via 9router API (${newList.length} models)`);
+          updatedViaApi = true;
         }
       }
     }
   } catch {}
 
-  // 2. Direct SQLite update
+  // 2. Direct SQLite update (also creates brand-new combos on first run)
   try {
     const Database = getDbClass();
     const db = new Database(DB_PATH);
     const existingCombos = db.prepare("SELECT * FROM combos").all();
     const now = new Date().toISOString();
 
-    function upsertCombo(comboName, modelList) {
+    for (const [comboName, modelList] of comboMap) {
+      if (!Array.isArray(modelList)) continue;
       const found = existingCombos.find(c => c.name === comboName);
       if (found) {
         db.prepare("UPDATE combos SET models = ?, updatedAt = ? WHERE id = ?").run(
@@ -1378,17 +1817,6 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
       }
     }
 
-    upsertCombo('my9model-free', unifiedList);
-    if (!oaData?.excluded) upsertCombo('openagentic-free', oaPrefixed);
-    if (kiloPrefixed.length > 0 && !kiloData?.excluded) upsertCombo('kilo-free', kiloPrefixed);
-    if (ocPrefixed.length > 0 && !ocData?.excluded) upsertCombo('opencode-free', ocPrefixed);
-    if (orPrefixed.length > 0 && !orData?.excluded) upsertCombo('openrouter-free', orPrefixed);
-    if (psPrefixed.length > 0 && !poolsideData?.excluded) upsertCombo('poolside-free', psPrefixed);
-    if (geminiPrefixed.length > 0 && !geminiData?.excluded) upsertCombo('gemini-free', geminiPrefixed);
-    if (ollamaPrefixed.length > 0 && !ollamaData?.excluded) upsertCombo('ollama-free', ollamaPrefixed);
-    if (airforcePrefixed.length > 0 && !airforceData?.excluded) upsertCombo('airforce-free', airforcePrefixed);
-    if (bzlPrefixed.length > 0 && !bazaarlinkData?.excluded) upsertCombo('bazaarlink-free', bzlPrefixed);
-
     db.close();
   } catch (err) {
     if (!updatedViaApi) {
@@ -1397,52 +1825,483 @@ async function injectInto9router(oaData, kiloData, ocData, orData, poolsideData,
     }
   }
 
+  // 3. Notify the delta (silent no-op when no webhook/token configured)
+  try {
+    await sendTextNotification(buildDeltaMessage({
+      mode,
+      added: delta.added,
+      removed: delta.removed,
+      total: (comboMap.get('my9model-free') || []).length
+    }));
+  } catch {}
+}
+
+/**
+ * Watchdog refresh (--refresh): intra-day health pass over existing combo members.
+ * - Never discovers/adds new models (that is the daily sync's job).
+ * - Re-tests every member: healthy keep their rank (fresh latency),
+ *   quota-exhausted are demoted to the bottom instead of dropped,
+ *   hard-dead models (401 promo ended / 402 paid / 404 gone) are removed.
+ */
+async function refreshCombos() {
+  console.log('[*] Watchdog refresh: re-testing existing combo members (no discovery)...');
+  const token = get9routerCliToken();
+  if (!token) {
+    console.error('[X] 9router CLI auth token unavailable; live re-test impossible. Aborting without changes.');
+    process.exit(1);
+  }
+
+  // Load current managed combos
+  const current = new Map(); // name -> [ids]
+  for (const name of MANAGED_COMBOS) {
+    const models = readCurrentComboModels(name);
+    if (models.length > 0) current.set(name, models);
+  }
+  const previousMembers = new Set(MANAGED_COMBOS.flatMap(n => current.get(n) || []));
+
+  // Candidate pool saved by the last full sync: lets models that recover from
+  // quota exhaustion rejoin their provider combo within the hour.
+  const candidatePool = loadCandidatePool();
+  const poolIds = Array.from(new Set([...candidatePool.values()].flatMap(s => [...s])));
+  if (poolIds.length > 0) {
+    console.log(`[*] Candidate pool: ${poolIds.length} ids from last full sync (recovered models can rejoin).`);
+  } else {
+    console.log('[*] No candidates-state.json yet — run a full sync once to enable recovery.');
+  }
+
+  const superIds = current.get('my9model-free') || [];
+  const extraSuper = new Set([
+    ...(current.get('my9model-smart') || []),
+    ...(current.get('my9model-fast') || []),
+    ...(current.get('my9model-cooldown') || []) // parked models must keep being re-tested for recovery
+  ]);
+  const allIds = Array.from(new Set([
+    ...superIds,
+    ...extraSuper,
+    ...MANAGED_COMBOS.filter(n => !n.startsWith('my9model')).flatMap(n => current.get(n) || []),
+    ...poolIds
+  ]));
+
+  if (allIds.length === 0) {
+    console.log('[!] No managed combos found to refresh. Run a full sync first.');
+    return;
+  }
+
+  // Live re-test with a bounded worker pool (staggered for rate-limited providers)
+  const activeSet = new Set();
+  const quotaSet = new Set();
+  const latencyRefresh = new Map();
+  const queue = [...allIds];
+  const CONCURRENCY = 8;
+
+  console.log(`[*] Re-testing ${queue.length} unique combo members...`);
+
+  async function worker() {
+    while (queue.length > 0) {
+      const fullId = queue.shift();
+      const providerPrefix = String(fullId).split('/')[0].toLowerCase();
+      if (providerPrefix === 'api-airforce') await new Promise(r => setTimeout(r, 1200));
+
+      const result = await testModelWith9router(fullId, token);
+      if (result.valid) {
+        latencyRefresh.set(fullId, result.latencyMs);
+        activeSet.add(fullId);
+      } else if (isQuotaExhaustedResult(result)) {
+        console.log(`    [⏳ Quota] ${fullId} demoted to bottom (${result.reason})`);
+        quotaSet.add(fullId);
+      } else {
+        console.log(`    [✗ Removed] ${fullId} -> ${result.reason}${result.retried ? ' (after retry)' : ''}`);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, allIds.length) }, () => worker()));
+
+  // Rank helpers for rebuilds
+  const rankedActive = sortModelsByCodingQuality(Array.from(activeSet), latencyRefresh);
+  const rankedQuota = sortModelsByCodingQuality(Array.from(quotaSet), latencyRefresh);
+
+  let recoveredCount = 0;
+  for (const id of activeSet) {
+    if (!previousMembers.has(id)) recoveredCount++;
+  }
+
+  const comboMap = new Map();
+  // Main super-combo is active-only; quota-exhausted models park in my9model-cooldown
+  // and are moved back automatically once they pass a live test again.
+  comboMap.set('my9model-free', rankedActive);
+  const tiers = deriveTierLists(rankedActive);
+  if (tiers.smartList.length > 0) comboMap.set('my9model-smart', tiers.smartList);
+  if (tiers.fastList.length > 0) comboMap.set('my9model-fast', tiers.fastList);
+  comboMap.set('my9model-cooldown', rankedQuota);
+
+  // Provider combos are CLEAN lists: only currently-active models qualify.
+  // Quota-exhausted models sit them out until they pass a live test again.
+  for (const name of MANAGED_COMBOS) {
+    if (name === 'my9model-free' || name === 'my9model-smart' || name === 'my9model-fast') continue;
+    const prefixes = PROVIDER_COMBO_PREFIXES[name];
+    if (!prefixes) continue;
+    const eligible = new Set([
+      ...(current.get(name) || []),
+      ...poolIds.filter(id => idMatchesPrefixes(id, prefixes))
+    ]);
+    if (eligible.size === 0) continue;
+    // Fresh test evidence backs this write: an empty list means every member was
+    // re-tested this run and none passed — an honest empty state beats a stale list.
+    comboMap.set(name, rankedActive.filter(id => eligible.has(id)));
+  }
+
+  console.log(`\n[Σ] Refresh result: ${activeSet.size} active, ${quotaSet.size} parked in cooldown, ${allIds.length - activeSet.size - quotaSet.size} removed permanently, ${recoveredCount} recovered into provider combos.`);
+
+  if (isDryRun) {
+    console.log('\n[*] Dry run mode enabled. No changes written.');
+    return;
+  }
+
+  await persistCombos(comboMap, 'watchdog-refresh');
+  console.log('\n[🎉] Watchdog refresh completed successfully.');
+}
+
+// ============================================================================
+// Agentic readiness helpers (super-combo quality gate)
+// ============================================================================
+
+// A model is "smart tier" when it has an empirical benchmark >= 60 or is a thinking/reasoning variant
+function isSmartTierModel(modelIdentifier) {
+  const str = String(modelIdentifier).toLowerCase();
+  if (/thinking|reasoning|reasoner|r1\b/.test(str)) return true;
+  const match = findBenchmarkMatch(str, getBenchmarksDatabase());
+  return Boolean(match && typeof match.score === 'number' && match.score >= 60);
+}
+
+// Thinking variants always belong to the smart combo, never the fast one
+function isThinkingVariant(modelIdentifier) {
+  return /thinking|reasoning|reasoner/.test(String(modelIdentifier).toLowerCase());
+}
+
+// Super-combo agentic gate: drop models whose provider metadata explicitly says
+// tool-calling is unsupported, and require a usable context window when known.
+function passesAgenticGate(meta) {
+  if (!meta) return true; // unknown metadata -> let it in (live pre-test already passed)
+  if (meta.toolsUnsupported === true) return false;
+  if (meta.contextLength != null && meta.contextLength > 0 && meta.contextLength < AGENTIC_MIN_CONTEXT) return false;
+  return true;
+}
+
+/**
+ * Inject free models into 9router combos.
+ * Accepts a single providers object:
+ *   { oa, kilo, oc, openrouter, poolside, gemini, ollama, airforce, bazaarlink,
+ *     groq, cerebras, mistral, cloudflare }
+ * Each entry: { prefix, models: [...] , excluded?: true }
+ */
+async function injectInto9router(providers) {
+  const p = providers || {};
+  const defs = [
+    ['oa', p.oa, 'openagentic'],
+    ['kilo', p.kilo, 'kilo'],
+    ['oc', p.oc, 'opencode'],
+    ['openrouter', p.openrouter, 'openrouter'],
+    ['poolside', p.poolside, 'poolside'],
+    ['gemini', p.gemini, 'gemini'],
+    ['ollama', p.ollama, 'ollama'],
+    ['airforce', p.airforce, 'api-airforce'],
+    ['bazaarlink', p.bazaarlink, 'bazaarlink'],
+    ['groq', p.groq, 'groq'],
+    ['cerebras', p.cerebras, 'cerebras'],
+    ['mistral', p.mistral, 'mistral'],
+    ['cloudflare', p.cloudflare, 'cloudflare']
+  ];
+
+  // Live-test each source (skipped when the whole provider is excluded)
+  for (const [key, data] of defs) {
+    if (data && !data.excluded && Array.isArray(data.models)) {
+      data.validated = await validateCandidateModels(data.models, data.prefix);
+    } else {
+      data.validated = [];
+    }
+  }
+
+  // Prefixed id list + metadata map per provider
+  const prefixedByProvider = {};
+  const activeByProvider = {}; // CLEAN lists: quota-exhausted models excluded
+  const metaMap = new Map(); // fullId -> { contextLength?, toolsUnsupported? }
+  const latencyMap = new Map();
+
+  for (const [key, data] of defs) {
+    const prefix = data.prefix;
+    prefixedByProvider[key] = (data.validated || []).map(m => m.fullId || `${prefix}/${m.id}`);
+    activeByProvider[key] = (data.validated || [])
+      .filter(m => !(m.quotaExhausted === true || m.latencyMs >= QUOTA_LATENCY_SENTINEL))
+      .map(m => m.fullId || `${prefix}/${m.id}`);
+    for (const m of (data.validated || [])) {
+      const fullId = m.fullId || `${prefix}/${m.id}`;
+      const meta = {};
+      if (m.contextLength != null) meta.contextLength = m.contextLength;
+      if (m.toolsUnsupported != null) meta.toolsUnsupported = m.toolsUnsupported;
+      if (Object.keys(meta).length > 0) metaMap.set(fullId, meta);
+      if (m.latencyMs != null) latencyMap.set(fullId, m.latencyMs);
+    }
+  }
+
+  // Per-provider validation report
+  for (const [key, data, label] of defs) {
+    if (data.excluded) {
+      console.log(`\n[⊘] ${label}: Skipped (provider excluded)`);
+      continue;
+    }
+    console.log(`\n[+] Validated ${label}: ${(data.validated || []).length} models:`);
+    for (const m of (data.validated || [])) {
+      const rawId = m.fullId || `${data.prefix}/${m.id}`;
+      const latStr = m.latencyMs ? ` [${m.latencyMs}ms]` : '';
+      const quotaStr = m.quotaExhausted ? ' [QUOTA-BOTTOM]' : '';
+      console.log(`    - ${rawId} [Score: ${getCodingScore(m.id)}]${latStr}${quotaStr} (${m.name})`);
+    }
+  }
+
+  // Super-combo candidates: union of every provider, deduplicated
+  const allIds = Array.from(new Set(defs.flatMap(([key]) => prefixedByProvider[key])));
+
+  // Agentic gate only applies to the super-combos (per-provider combos stay untouched)
+  const gatedIds = allIds.filter(id => passesAgenticGate(metaMap.get(id)));
+  const gatedOut = allIds.length - gatedIds.length;
+  if (gatedOut > 0) {
+    console.log(`\n[⚙] Agentic gate: ${gatedOut} model(s) left out of super-combo (no tools support or context < ${AGENTIC_MIN_CONTEXT}). Still kept in their dedicated provider combo.`);
+  }
+
+  // Active-only main list; quota-exhausted models park in my9model-cooldown
+  const gatedActiveIds = gatedIds.filter(id => (latencyMap.get(id) ?? 0) < QUOTA_LATENCY_SENTINEL);
+  const gatedQuotaIds = gatedIds.filter(id => !gatedActiveIds.includes(id));
+  const unifiedList = sortModelsByCodingQuality(gatedActiveIds, latencyMap);
+  const cooldownList = sortModelsByCodingQuality(gatedQuotaIds, latencyMap);
+
+  // Fast / smart split (both fall back to the unified top-5 so they are never empty)
+  const tiers = deriveTierLists(unifiedList);
+  const smartList = tiers.smartList;
+  const fastList = tiers.fastList;
+
+  console.log(`\n[+] Super-combo my9model-free: ${unifiedList.length} models (all active)`);
+  console.log(`[+] my9model-smart: ${smartList.length} models | my9model-fast: ${fastList.length} models`);
+  console.log(`[+] my9model-cooldown: ${cooldownList.length} model(s) parked (quota-exhausted)`);
+
+  // Notice when a whole provider is temporarily quota-exhausted
+  for (const [key, data, label] of defs) {
+    if (!data.excluded && (data.validated || []).length > 0 && activeByProvider[key].length === 0) {
+      console.log(`[i] ${label}: all ${(data.validated || []).length} models currently quota-exhausted — ${label}-free cleared until they recover.`);
+    }
+  }
+
+  if (isDryRun) {
+    console.log('\n[*] Dry run mode enabled. No changes written.');
+    return;
+  }
+
+  const comboMap = new Map([
+    ['my9model-free', unifiedList],
+    ['my9model-smart', smartList],
+    ['my9model-fast', fastList],
+    ['my9model-cooldown', cooldownList],
+    ['openagentic-free', (!p.oa?.excluded && (p.oa?.validated?.length || 0) > 0) ? activeByProvider.oa : null],
+    ['kilo-free', (!p.kilo?.excluded && (p.kilo?.validated?.length || 0) > 0) ? activeByProvider.kilo : null],
+    ['opencode-free', (!p.oc?.excluded && (p.oc?.validated?.length || 0) > 0) ? activeByProvider.oc : null],
+    ['openrouter-free', (!p.openrouter?.excluded && (p.openrouter?.validated?.length || 0) > 0) ? activeByProvider.openrouter : null],
+    ['poolside-free', (!p.poolside?.excluded && (p.poolside?.validated?.length || 0) > 0) ? activeByProvider.poolside : null],
+    ['gemini-free', (!p.gemini?.excluded && (p.gemini?.validated?.length || 0) > 0) ? activeByProvider.gemini : null],
+    ['ollama-free', (!p.ollama?.excluded && (p.ollama?.validated?.length || 0) > 0) ? activeByProvider.ollama : null],
+    ['airforce-free', (!p.airforce?.excluded && (p.airforce?.validated?.length || 0) > 0) ? activeByProvider.airforce : null],
+    ['bazaarlink-free', (!p.bazaarlink?.excluded && (p.bazaarlink?.validated?.length || 0) > 0) ? activeByProvider.bazaarlink : null],
+    ['groq-free', (!p.groq?.excluded && (p.groq?.validated?.length || 0) > 0) ? activeByProvider.groq : null],
+    ['cerebras-free', (!p.cerebras?.excluded && (p.cerebras?.validated?.length || 0) > 0) ? activeByProvider.cerebras : null],
+    ['mistral-free', (!p.mistral?.excluded && (p.mistral?.validated?.length || 0) > 0) ? activeByProvider.mistral : null],
+    ['cloudflare-free', (!p.cloudflare?.excluded && (p.cloudflare?.validated?.length || 0) > 0) ? activeByProvider.cloudflare : null]
+  ]);
+  for (const [name, list] of Array.from(comboMap)) {
+    if (!Array.isArray(list)) comboMap.delete(name);
+  }
+
+  await persistCombos(comboMap);
+  saveCandidateState(defs, prefixedByProvider);
+
   console.log('\n[🎉] Synchronization completed successfully.');
 }
 
-// Setup daily cron job
-function setupDailyCron() {
-  console.log('[*] Setting up daily cron job...');
-  const scriptPath = path.resolve(__filename);
-  const logPath = path.join(path.dirname(scriptPath), 'sync.log');
-  const cronSchedule = `5 0 * * * /usr/bin/node ${scriptPath} >> ${logPath} 2>&1`;
+// ============================================================================
+// Scheduler installation: systemd user timers first (Persistent=true gives
+// catch-up after the machine was off), crontab as fallback. Installs three jobs:
+//   - daily full sync      00:05
+//   - hourly watchdog      hh:35 (--refresh)
+//   - weekly benchmarks    Monday 04:17
+// ============================================================================
+function writeSystemdUnit(unitsDir, name, content) {
+  fs.mkdirSync(unitsDir, { recursive: true });
+  fs.writeFileSync(path.join(unitsDir, name), content);
+}
 
-  try {
-    let currentCrontab = '';
+function installScheduler() {
+  console.log('[*] Installing scheduler (systemd timers preferred, cron fallback)...');
+  const scriptPath = path.resolve(__filename);
+  const benchPath = path.join(path.dirname(scriptPath), 'update-benchmarks.js');
+  const logPath = path.join(path.dirname(scriptPath), 'sync.log');
+  const unitsDir = path.join(HOME, '.config', 'systemd', 'user');
+
+  const serviceUnit = `[Unit]
+Description=9router free models daily full sync
+
+[Service]
+Type=oneshot
+WorkingDirectory=${path.dirname(scriptPath)}
+ExecStart=/usr/bin/node ${scriptPath}
+`;
+
+  const serviceTimer = `[Unit]
+Description=Daily 00:05 full sync of free models into 9router
+
+[Timer]
+OnCalendar=*-*-* 00:05:00
+Persistent=true
+Unit=9router-auto-free.service
+
+[Install]
+WantedBy=timers.target
+`;
+
+  const watchdogService = `[Unit]
+Description=9router free combo watchdog (intra-day quota re-check)
+
+[Service]
+Type=oneshot
+WorkingDirectory=${path.dirname(scriptPath)}
+ExecStart=/usr/bin/node ${scriptPath} --refresh
+`;
+
+  const watchdogTimer = `[Unit]
+Description=Hourly watchdog re-test of free combos (quota demotion)
+
+[Timer]
+OnCalendar=*-*-* *:35:00
+Persistent=true
+Unit=9router-free-watchdog.service
+
+[Install]
+WantedBy=timers.target
+`;
+
+  const benchService = `[Unit]
+Description=Weekly live coding-benchmark database update
+
+[Service]
+Type=oneshot
+WorkingDirectory=${path.dirname(scriptPath)}
+ExecStart=/usr/bin/node ${benchPath}
+`;
+
+  const benchTimer = `[Unit]
+Description=Weekly benchmark update (Monday 04:17)
+
+[Timer]
+OnCalendar=Mon *-*-* 04:17:00
+Persistent=true
+Unit=9router-bench-update.service
+
+[Install]
+WantedBy=timers.target
+`;
+
+  // 1) Try systemd user timers
+  if (fs.existsSync('/run/systemd/system') || fs.existsSync('/usr/bin/systemctl')) {
     try {
-      currentCrontab = execSync('crontab -l 2>/dev/null', { encoding: 'utf8' });
-    } catch {}
+      writeSystemdUnit(unitsDir, '9router-auto-free.service', serviceUnit);
+      writeSystemdUnit(unitsDir, '9router-auto-free.timer', serviceTimer);
+      writeSystemdUnit(unitsDir, '9router-free-watchdog.service', watchdogService);
+      writeSystemdUnit(unitsDir, '9router-free-watchdog.timer', watchdogTimer);
+      writeSystemdUnit(unitsDir, '9router-bench-update.service', benchService);
+      writeSystemdUnit(unitsDir, '9router-bench-update.timer', benchTimer);
+
+      // Avoid double-runs: strip any legacy cron lines installed by older versions
+      removeLegacyCronLines(scriptPath);
+
+      execSync('systemctl --user daemon-reload');
+      execSync('systemctl --user enable --now 9router-auto-free.timer 9router-free-watchdog.timer 9router-bench-update.timer');
+
+      let lingerNote = '';
+      try {
+        execSync(`loginctl enable-linger ${os.userInfo().username}`, { stdio: 'ignore' });
+      } catch {
+        lingerNote = '\n    Note: could not enable linger; timers run while you are logged in.\n    Run `sudo loginctl enable-linger ' + os.userInfo().username + '` for boot-level persistence.';
+      }
+
+      console.log('[✓] systemd user timers installed:');
+      console.log('    - 9router-auto-free.timer     daily 00:05 (full sync, Persistent=true)');
+      console.log('    - 9router-free-watchdog.timer hourly :35   (--refresh quota watchdog)');
+      console.log('    - 9router-bench-update.timer  Mon 04:17    (benchmark update)');
+      console.log(`    Log file: ${logPath}${lingerNote}`);
+      return;
+    } catch (err) {
+      console.warn(`[!] systemd installation failed (${String(err.message).split('\n')[0]}); falling back to crontab.`);
+    }
+  }
+
+  // 2) Crontab fallback
+  try {
+    const lines = [
+      '# Free Models Sync for 9router (installed by sync.js)',
+      `5 0 * * * /usr/bin/node ${scriptPath} >> ${logPath} 2>&1`,
+      `35 * * * * /usr/bin/node ${scriptPath} --refresh >> ${logPath} 2>&1`,
+      `17 4 * * 1 /usr/bin/node ${benchPath} >> ${logPath} 2>&1`
+    ];
+
+    let currentCrontab = '';
+    try { currentCrontab = execSync('crontab -l 2>/dev/null', { encoding: 'utf8' }); } catch {}
 
     const filtered = currentCrontab.split('\n')
       .filter(line => !line.includes('9router-auto-free') && !line.includes(scriptPath))
       .filter(line => line.trim().length > 0);
 
-    filtered.push(`# Daily Free Models Sync for 9router (herliansyah@gmail.com)`);
-    filtered.push(cronSchedule);
-
+    filtered.push(...lines);
     const newCrontab = filtered.join('\n') + '\n';
-    execSync(`echo "${newCrontab.replace(/"/g, '\\"')}" | crontab -`);
-    console.log(`[✓] Daily cron installed! Will run every day at 00:05 AM.`);
-    console.log(`    Schedule: ${cronSchedule}`);
+    execSync(`echo "${newCrontab.replace(/"/g, '\"')}" | crontab -`);
+
+    console.log('[✓] Cron fallback installed:');
+    console.log('    - daily 00:05 full sync');
+    console.log('    - hourly :35 watchdog refresh (--refresh)');
+    console.log('    - Monday 04:17 benchmark update');
     console.log(`    Log file: ${logPath}`);
   } catch (err) {
-    console.error(`[X] Failed to install crontab: ${err.message}`);
-    console.log(`    You can manually add this to 'crontab -e':\n    ${cronSchedule}`);
+    console.error(`[X] Failed to install any scheduler: ${err.message}`);
+    console.log("    You can manually add the schedules shown above to 'crontab -e'.");
   }
+}
+
+// Remove legacy per-version cron entries for this script (prevents double-runs)
+function removeLegacyCronLines(scriptPath) {
+  try {
+    const currentCrontab = execSync('crontab -l 2>/dev/null', { encoding: 'utf8' });
+    const filtered = currentCrontab.split('\n')
+      .filter(line => line.trim().length > 0)
+      .filter(line => !(line.includes('9router-auto-free') || line.includes(scriptPath)));
+
+    if (filtered.length === 0) {
+      execSync('crontab -r 2>/dev/null');
+      return;
+    }
+    execSync(`echo "${filtered.join('\n').replace(/"/g, '\"')}" | crontab -`);
+  } catch {}
 }
 
 // Main execution
 async function main() {
+  const mode = isRefreshMode ? 'WATCHDOG REFRESH' : (isCronSetup ? 'SETUP SCHEDULER' : 'DAILY FULL SYNC');
   console.log('====================================================');
   console.log('  Free Models Sync -> 9router Combos               ');
-  console.log('  Sources: OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama + Airforce + Bazaarlink + OC');
-  console.log('  Account: herliansyah@gmail.com                   ');
-  console.log('  Pre-testing: Auto-drop expired & non-free models ');
+  console.log('  Sources: OpenAgentic + Kilo + OpenRouter + Poolside + Gemini + Ollama + Airforce + Bazaarlink');
+  console.log('           + Groq + Cerebras + Mistral + Cloudflare AI + OC');
+  console.log(`  Mode: ${mode}  `);
   console.log(`  Time: ${new Date().toISOString()}`);
   console.log('====================================================\n');
 
   if (isCronSetup) {
-    setupDailyCron();
+    installScheduler();
+    console.log('\n[*] Scheduler installed. Exiting (run `npm run sync` manually anytime).');
+    return;
   }
 
   if (isLiveBenchmarks) {
@@ -1454,48 +2313,58 @@ async function main() {
     }
   }
 
+  if (isRefreshMode) {
+    await refreshCombos();
+    return;
+  }
+
   const excludedProviders = getExcludedProviders();
   if (excludedProviders.length > 0) {
     console.log(`[⊘] Excluded providers via config (${excludedProviders.length}): ${excludedProviders.join(', ')}\n`);
   }
 
-  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData] = await Promise.all([
-    isProviderExcluded('openagentic', excludedProviders)
-      ? Promise.resolve({ prefix: 'openagentic', models: [], excluded: true })
-      : getTodaysOpenAgenticFreeModels(),
-    isProviderExcluded('kilocode', excludedProviders) || isProviderExcluded('kilo', excludedProviders)
-      ? Promise.resolve({ prefix: 'kc', models: [], excluded: true })
-      : getTodaysKiloFreeModels(),
-    isProviderExcluded('openrouter', excludedProviders)
-      ? Promise.resolve({ prefix: 'openrouter', models: [], excluded: true })
-      : getTodaysOpenRouterFreeModels(),
-    isProviderExcluded('poolside', excludedProviders)
-      ? Promise.resolve({ prefix: 'poolside', models: [], excluded: true })
-      : getTodaysPoolsideFreeModels(),
-    isProviderExcluded('gemini', excludedProviders)
-      ? Promise.resolve({ prefix: 'gemini', models: [], excluded: true })
-      : getTodaysGeminiFreeModels(),
-    isProviderExcluded('ollama', excludedProviders)
-      ? Promise.resolve({ prefix: 'ollama', models: [], excluded: true })
-      : getTodaysOllamaFreeModels(),
-    isProviderExcluded('api-airforce', excludedProviders) || isProviderExcluded('airforce', excludedProviders)
-      ? Promise.resolve({ prefix: 'api-airforce', models: [], excluded: true })
-      : getTodaysAirforceFreeModels(),
-    isProviderExcluded('bazaarlink', excludedProviders) || isProviderExcluded('bzl', excludedProviders)
-      ? Promise.resolve({ prefix: 'bazaarlink', models: [], excluded: true })
-      : getTodaysBazaarlinkFreeModels()
+  const excludedOr = (name) => isProviderExcluded(name, excludedProviders);
+  const skipData = (prefix) => Promise.resolve({ prefix, models: [], excluded: true });
+
+  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData, groqData, cerebrasData, mistralData, cloudflareData] = await Promise.all([
+    excludedOr('openagentic') ? skipData('openagentic') : getTodaysOpenAgenticFreeModels(),
+    (excludedOr('kilocode') || excludedOr('kilo')) ? skipData('kc') : getTodaysKiloFreeModels(),
+    excludedOr('openrouter') ? skipData('openrouter') : getTodaysOpenRouterFreeModels(),
+    excludedOr('poolside') ? skipData('poolside') : getTodaysPoolsideFreeModels(),
+    excludedOr('gemini') ? skipData('gemini') : getTodaysGeminiFreeModels(),
+    excludedOr('ollama') ? skipData('ollama') : getTodaysOllamaFreeModels(),
+    (excludedOr('api-airforce') || excludedOr('airforce')) ? skipData('api-airforce') : getTodaysAirforceFreeModels(),
+    (excludedOr('bazaarlink') || excludedOr('bzl')) ? skipData('bazaarlink') : getTodaysBazaarlinkFreeModels(),
+    excludedOr('groq') ? skipData('groq') : getTodaysGroqFreeModels(),
+    excludedOr('cerebras') ? skipData('cerebras') : getTodaysCerebrasFreeModels(),
+    excludedOr('mistral') ? skipData('mistral') : getTodaysMistralFreeModels(),
+    excludedOr('cloudflare') ? skipData('cloudflare') : getTodaysCloudflareFreeModels()
   ]);
 
-  const ocData = isProviderExcluded('opencode', excludedProviders) || isProviderExcluded('oc', excludedProviders)
+  const ocData = (excludedOr('opencode') || excludedOr('oc'))
     ? { prefix: 'oc', models: [], excluded: true }
     : getTodaysOpenCodeFreeModels();
 
-  await injectInto9router(oaData, kiloData, ocData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData);
+  await injectInto9router({
+    oa: oaData,
+    kilo: kiloData,
+    oc: ocData,
+    openrouter: orData,
+    poolside: poolsideData,
+    gemini: geminiData,
+    ollama: ollamaData,
+    airforce: airforceData,
+    bazaarlink: bazaarlinkData,
+    groq: groqData,
+    cerebras: cerebrasData,
+    mistral: mistralData,
+    cloudflare: cloudflareData
+  });
 }
 
 if (require.main === module) {
   main().catch(err => {
-    console.error(`[!] Unhandled error:`, err);
+    console.error('[!] Unhandled error:', err);
     process.exit(1);
   });
 }
@@ -1505,8 +2374,20 @@ module.exports = {
   sortModelsByCodingQuality,
   getPrioritiesList,
   getModelPriorityRank,
+  getModelFullId,
   getBenchmarksDatabase,
   findBenchmarkMatch,
+  getUsagePenalty,
+  loadUsageFeedback,
+  isQuotaExhaustedResult,
+  isSmartTierModel,
+  isThinkingVariant,
+  passesAgenticGate,
+  AGENTIC_MIN_CONTEXT,
+  computeComboDelta,
+  buildDeltaMessage,
+  readCurrentComboModels,
+  MANAGED_COMBOS,
   getExclusionConfig,
   getExclusionList,
   getExcludedProviders,
@@ -1520,6 +2401,10 @@ module.exports = {
   getOllamaCredentials,
   getAirforceCredentials,
   getBazaarlinkCredentials,
+  getGroqCredentials,
+  getCerebrasCredentials,
+  getMistralCredentials,
+  getCloudflareCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
@@ -1528,6 +2413,10 @@ module.exports = {
   getTodaysOllamaFreeModels,
   getTodaysAirforceFreeModels,
   getTodaysBazaarlinkFreeModels,
+  getTodaysGroqFreeModels,
+  getTodaysCerebrasFreeModels,
+  getTodaysMistralFreeModels,
+  getTodaysCloudflareFreeModels,
   getTodaysOpenCodeFreeModels,
   testModelWith9router,
   validateCandidateModels,
@@ -1540,5 +2429,14 @@ module.exports = {
   fetchOllamaFreeModels,
   fetchAirforceFreeModels,
   fetchBazaarlinkFreeModels,
-  injectInto9router
+  fetchOpenAiCompatibleFreeModels,
+  fetchCloudflareFreeModels,
+  refreshCombos,
+  injectInto9router,
+  saveCandidateState,
+  loadCandidatePool,
+  deriveTierLists,
+  PROVIDER_COMBO_PREFIXES,
+  idMatchesPrefixes,
+  getCodingScore
 };
