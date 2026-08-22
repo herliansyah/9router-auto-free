@@ -4,14 +4,14 @@
     "score": 85,
     "swe_bench": 81,
     "livecodebench": 84.5,
-    "tier": "S+"
+    "tier": "S"
   },
   "assistant-sonnet-4.5-thinking": {
     "name": "Claude Sonnet 4.5 Thinking",
     "score": 84,
     "swe_bench": 80,
     "livecodebench": 83.5,
-    "tier": "S+"
+    "tier": "S"
   },
   "gemini-3.7-flash": {
     "name": "Gemini 3.7 Flash",
@@ -39,28 +39,28 @@
     "score": 79,
     "swe_bench": 74,
     "livecodebench": 78,
-    "tier": "S"
+    "tier": "A+"
   },
   "claude-3.5-sonnet": {
     "name": "Claude 3.5 Sonnet",
     "score": 79,
     "swe_bench": 74,
     "livecodebench": 78,
-    "tier": "S"
+    "tier": "A+"
   },
   "deepseek-r1": {
     "name": "DeepSeek R1",
     "score": 76.5,
     "swe_bench": 71,
     "livecodebench": 75.8,
-    "tier": "S"
+    "tier": "A+"
   },
   "gemini-3.5-flash-lite": {
     "name": "Gemini 3.5 Flash Lite",
     "score": 76,
     "swe_bench": 70,
     "livecodebench": 75,
-    "tier": "S"
+    "tier": "A+"
   },
   "gemini-3.1-flash-lite": {
     "name": "Gemini 3.1 Flash Lite",
@@ -137,14 +137,14 @@
     "score": 62.5,
     "swe_bench": 55,
     "livecodebench": 61,
-    "tier": "B+"
+    "tier": "A"
   },
   "minimax-m2.5": {
     "name": "MiniMax M2.5",
     "score": 61,
     "swe_bench": 53,
     "livecodebench": 59.5,
-    "tier": "B+"
+    "tier": "A"
   },
   "nemotron-3-ultra": {
     "name": "NVIDIA Nemotron 3 Ultra",
@@ -165,70 +165,70 @@
     "score": 56,
     "swe_bench": 48,
     "livecodebench": 55,
-    "tier": "B"
+    "tier": "B+"
   },
   "hy3": {
     "name": "Tencent HY3",
     "score": 54,
     "swe_bench": 46,
     "livecodebench": 52.5,
-    "tier": "B"
+    "tier": "B+"
   },
   "mimo-v2.5": {
     "name": "Xiaomi MiMo V2.5",
     "score": 52,
     "swe_bench": 44,
     "livecodebench": 50.5,
-    "tier": "B"
+    "tier": "B+"
   },
   "nemotron-3-nano": {
     "name": "NVIDIA Nemotron 3 Nano",
     "score": 50,
     "swe_bench": 42,
     "livecodebench": 49,
-    "tier": "B"
+    "tier": "B+"
   },
   "laguna-s-2.1": {
     "name": "Poolside Laguna S 2.1",
     "score": 48,
     "swe_bench": 40,
     "livecodebench": 46,
-    "tier": "C+"
+    "tier": "B"
   },
   "ling-3.0-flash": {
     "name": "Ling 3.0 Flash",
     "score": 47,
     "swe_bench": 39,
     "livecodebench": 45,
-    "tier": "C+"
+    "tier": "B"
   },
   "laguna-xs-2.1": {
     "name": "Poolside Laguna XS 2.1",
     "score": 46,
     "swe_bench": 38,
     "livecodebench": 44,
-    "tier": "C+"
+    "tier": "B"
   },
   "gpt-oss-20b": {
     "name": "OpenAI GPT OSS 20B",
     "score": 45,
     "swe_bench": 36,
     "livecodebench": 43,
-    "tier": "C+"
+    "tier": "B"
   },
   "lfm-2.5-2.6b": {
     "name": "LiquidAI LFM 2.5 2.6B",
     "score": 44,
     "swe_bench": 35,
     "livecodebench": 42,
-    "tier": "C"
+    "tier": "C+"
   },
   "north-mini-code": {
     "name": "Cohere North Mini Code",
     "score": 43,
     "swe_bench": 34,
     "livecodebench": 41,
-    "tier": "C"
+    "tier": "C+"
   },
   "opencoder-8b-instruct": {
     "name": "OpenCoder-8B-Instruct",
