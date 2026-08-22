@@ -199,7 +199,7 @@ Perintah `update-benchmarks.js` menggabungkan tiga sumber resmi ke satu cache te
 | [SWE-bench Verified](https://www.swebench.com/) | Resolved rate per model dari leaderboard resmi |
 | [LiveCodeBench](https://livecodebench.github.io/) | Rata-rata pass@1 (model dengan >= 20 soal terekam) |
 
-Hasil gabungan ditulis ke [`benchmarks.json`](benchmarks.json). *Calibrated baseline* untuk model frontier/proprietary (Gemini, Claude Sonnet, DeepSeek, GLM, Step, dll.) **selalu menang**; sumber live hanya mengisi model yang belum tercakup.
+Hasil gabungan ditulis ke [`benchmarks.json`](benchmarks.json). *Calibrated baseline* untuk model frontier/proprietary (Gemini, Claude Sonnet, DeepSeek, GLM, Step, dll.) **selalu menang** pada nilai skor; sumber live hanya mengisi model yang belum tercakup. Label tier sendiri **tidak pernah diketik manual** — setiap kali database ditulis, semua tier dihitung ulang dari skornya lewat `determineTier()`, sehingga label selalu konsisten dengan skala di atas.
 
 ### Formula Skor
 
