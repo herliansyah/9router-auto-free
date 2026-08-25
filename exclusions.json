@@ -6,7 +6,8 @@
     "nvidia",
     "groq",
     "bazaarlink",
-    "cerebras"
+    "cerebras",
+    "b.ai"
   ],
   "excludedModels": [
     "nano",
