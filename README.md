@@ -1,6 +1,6 @@
 # 9router-auto-free
 
-Otomasi harian untuk mengumpulkan **model AI gratis** dari 14 sumber provider, memvalidasinya dengan **live pre-test** langsung melalui 9router, mengurutkannya berdasarkan kapabilitas coding, lalu menyuntikkannya ke dalam combo 9router (`my9model-free`, `openagentic-free`, `kilo-free`, dll.) — sehingga IDE atau tool AI Anda selalu mendapat daftar model gratis yang benar-benar aktif, berkualitas, dan tercepat.
+Otomasi harian untuk mengumpulkan **model AI gratis** dari 15 sumber provider, memvalidasinya dengan **live pre-test** langsung melalui 9router, mengurutkannya berdasarkan kapabilitas coding, lalu menyuntikkannya ke dalam combo 9router (`my9model-free`, `openagentic-free`, `kilo-free`, dll.) — sehingga IDE atau tool AI Anda selalu mendapat daftar model gratis yang benar-benar aktif, berkualitas, dan tercepat.
 
 > Script ini membaca kredensial provider dari **koneksi yang sudah dikonfigurasi di 9router**. Tidak ada API key yang disimpan di repositori ini.
 
@@ -10,7 +10,7 @@ Otomasi harian untuk mengumpulkan **model AI gratis** dari 14 sumber provider, m
 
 Setiap siklus sinkronisasi menjalankan enam tahap:
 
-1. **Kumpul kandidat** — scrape/fetch daftar model gratis dari 14 sumber (lihat [Sumber Model Gratis](#sumber-model-gratis)).
+1. **Kumpul kandidat** — scrape/fetch daftar model gratis dari 15 sumber (lihat [Sumber Model Gratis](#sumber-model-gratis)).
 2. **Filter blacklist** — kandidat dicek terhadap `exclusions.json` dan flag `--exclude-provider`.
 3. **Live pre-test paralel** — setiap kandidat dites langsung melalui endpoint internal 9router (`POST /api/models/test`) dengan pengukuran latensi riil.
 4. **Vonis** — model valid diterima; model kuota-habis (429) diparkirkan; model mati/berbayar/promo-habis dibuang; kegagalan transient di-retest sekali.
@@ -87,6 +87,7 @@ Threshold dapat diubah lewat konstanta `AGENTIC_MIN_CONTEXT` di `sync.js`.
 | 12 | Mistral La Plateforme | API `api.mistral.ai/v1/models` via koneksi `mistral` | Mode free; deduplikasi alias otomatis ke id kanonik `-latest`; model berbayar dibuang oleh live pre-test | `mistral/devstral-latest` |
 | 13 | Cloudflare Workers AI | Koneksi native `cloudflare-ai` di 9router (fallback koneksi *openai-compatible*) | Hanya model tanpa harga dan tanpa flag `require_workers_paid` | `cloudflare-ai/@cf/meta/llama-3.1-8b-instruct` |
 | 14 | API.airforce | API `api.airforce/v1/models` via koneksi `api-airforce` | Model berlabel `tier: "free"` | `api-airforce/llama-3.3-70b-instruct-fp8-fast` |
+| 15 | B.ai | API `api.b.ai/v1/models` — koneksi *openai-compatible* di 9router dengan baseUrl `https://api.b.ai/v1` (fallback koneksi native `b.ai`) | Free-tier (filter live pre-test); non-coding di-skip | `b-ai/hy3` |
 
 Tujuh provider dinonaktifkan secara default melalui [`exclusions.json`](exclusions.json): **API.airforce** (rate limit ketat 1 req/detik di plan gratis), **Cloudflare** (plan gratis hanya menyisakan sedikit model LoRA lama), **Mistral** (mayoritas katalog sudah berbayar), **NVIDIA NIM**, **Groq**, **Bazaarlink**, dan **Cerebras**. Hapus entri mereka di `excludedProviders` bila ingin mengaktifkan kembali.
 
@@ -116,6 +117,7 @@ Semua combo di bawah ditulis ulang setiap sync (dan di-refresh watchdog); combo 
 | `mistral-free` | Model gratis Mistral yang aktif (jika tidak di-exclude) |
 | `airforce-free` | Model gratis API.airforce yang aktif (jika tidak di-exclude) |
 | `bazaarlink-free` | Model gratis Bazaarlink yang aktif (jika tidak di-exclude) |
+| `b.ai-free` | Model gratis B.ai yang aktif (jika tidak di-exclude) |
 | `cloudflare-free` | Model gratis Cloudflare Workers AI yang aktif (jika tidak di-exclude) |
 | `nvidia-free` | Model gratis NVIDIA NIM yang aktif (jika tidak di-exclude) |
 

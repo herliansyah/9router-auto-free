@@ -17,6 +17,7 @@ const {
   getOllamaCredentials,
   getAirforceCredentials,
   getBazaarlinkCredentials,
+  getBAiCredentials,
   getTodaysOpenAgenticFreeModels,
   getTodaysKiloFreeModels,
   getTodaysOpenRouterFreeModels,
@@ -25,6 +26,7 @@ const {
   getTodaysOllamaFreeModels,
   getTodaysAirforceFreeModels,
   getTodaysBazaarlinkFreeModels,
+  getTodaysBAiFreeModels,
   getNvidiaCredentials,
   getTodaysNvidiaFreeModels,
   getTodaysOpenCodeFreeModels,
@@ -32,7 +34,7 @@ const {
 } = require('./sync.js');
 
 async function runTests() {
-  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + 9router OpenCode)...');
+  console.log('[*] Running tests for Free Sync (OpenAgentic + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + B.ai + 9router OpenCode)...');
 
   // 1. Coding score & Benchmark tests
   console.log('[-] Testing coding benchmark score & sorting...');
@@ -110,6 +112,14 @@ async function runTests() {
   const bzlData = await getTodaysBazaarlinkFreeModels();
   console.log(`    Found ${bzlData.models.length} Bazaarlink candidate free models`);
   assert.ok(bzlData.models.length > 0, 'Should find Bazaarlink free models');
+
+  // 9.1 B.ai Credential & Discovery Test
+  console.log('[-] Testing B.ai discovery...');
+  const baiCreds = getBAiCredentials();
+  assert.ok(baiCreds.prefix.length > 0, 'B.ai prefix must not be empty');
+  const baiData = await getTodaysBAiFreeModels();
+  console.log(`    Found ${baiData.models.length} B.ai candidate free models`);
+  assert.ok(Array.isArray(baiData.models), 'B.ai models must be an array');
 
   // 9.1 NVIDIA NIM Credential & Discovery Test
   console.log('[-] Testing NVIDIA NIM discovery...');

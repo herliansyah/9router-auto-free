@@ -19,6 +19,7 @@
  *   12. Mistral La Plateforme free tier (api.mistral.ai/v1/models)
  *   13. Cloudflare Workers AI free neurons (native "cloudflare-ai" connection in 9router)
  *   14. NVIDIA NIM free tier (integrate.api.nvidia.com/v1/models, native "nvidia" connection)
+ *   15. B.ai OpenAI-compatible free tier (api.b.ai/v1/models, native "b.ai" connection)
  * 
  * Pre-tests all candidates against 9router to drop expired/dead/paid models,
  * sorts them by coding capability specification (best to worst),
@@ -30,6 +31,7 @@
  *   - poolside-free   : Dedicated Poolside free combo
  *   - gemini-free     : Dedicated Gemini free combo
  *   - ollama-free     : Dedicated Ollama Cloud free combo
+ *   - b.ai-free       : Dedicated B.ai free combo
  *   - airforce-free   : Dedicated API.airforce free combo
  *   - bazaarlink-free : Dedicated Bazaarlink free combo
  *   - opencode-free   : Dedicated OpenCode free combo
@@ -650,6 +652,43 @@ function getBazaarlinkCredentials() {
   return { apiKey: null, prefix: 'bazaarlink', baseUrl: 'https://bazaarlink.ai/api/v1' };
 }
 
+// Extract B.ai API Key from 9router Database. Preferred: a native "b.ai" provider
+// connection. Fallback: an openai-compatible connection whose baseUrl points at api.b.ai.
+function getBAiCredentials() {
+  const native = getProviderConnection('b.ai');
+  if (native && native.apiKey) {
+    return {
+      apiKey: native.apiKey,
+      prefix: native?.providerSpecificData?.prefix || 'b.ai',
+      baseUrl: native?.providerSpecificData?.baseUrl || 'https://api.b.ai/v1'
+    };
+  }
+  try {
+    const Database = getDbClass();
+    const db = new Database(DB_PATH, { readonly: true });
+    const rows = db.prepare("SELECT * FROM providerConnections WHERE isActive = 1").all();
+    db.close();
+
+    for (const row of rows) {
+      const provider = String(row.provider || '').toLowerCase();
+      if (!provider.startsWith('openai-compatible')) continue;
+      let parsed = null;
+      try { parsed = JSON.parse(row.data || '{}'); } catch { continue; }
+      const baseUrl = parsed?.providerSpecificData?.baseUrl || '';
+      if (!baseUrl.includes('api.b.ai')) continue;
+      return {
+        apiKey: parsed.apiKey || null,
+        prefix: parsed?.providerSpecificData?.prefix || 'b-ai',
+        baseUrl
+      };
+    }
+  } catch (err) {
+    console.warn(`[!] Warning: Could not read 9router DB for B.ai credentials: ${err.message}`);
+  }
+
+  return { apiKey: null, prefix: 'b-ai', baseUrl: 'https://api.b.ai/v1' };
+}
+
 // Scrape free models from OpenAgentic HTML landing page
 async function scrapeFreeModelsFromWeb() {
   const freeModels = new Set();
@@ -1184,6 +1223,17 @@ async function getTodaysBazaarlinkFreeModels() {
     prefix: creds.prefix || 'bazaarlink',
     models: sortModelsByCodingQuality(models)
   };
+}
+
+// Merge and discover all free models from B.ai (OpenAI-compatible /v1/models)
+
+async function getTodaysBAiFreeModels() {
+  const creds = getBAiCredentials();
+  const models = await fetchOpenAiCompatibleFreeModels({
+    label: 'B.ai', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
+    skipPatterns: ['tts', 'embed', 'image', 'whisper', 'diffusion', 'rerank', 'guard', 'audio', 'speech']
+  });
+  return { prefix: creds.prefix || 'b.ai', models: sortModelsByCodingQuality(models) };
 }
 
 // ============================================================================
@@ -1726,7 +1776,7 @@ const MANAGED_COMBOS = [
   'my9model-free', 'my9model-smart', 'my9model-fast',
   'openagentic-free', 'kilo-free', 'opencode-free', 'openrouter-free',
   'poolside-free', 'gemini-free', 'ollama-free', 'airforce-free',
-  'bazaarlink-free', 'groq-free', 'cerebras-free', 'mistral-free', 'cloudflare-free',
+  'bazaarlink-free', 'b.ai-free', 'groq-free', 'cerebras-free', 'mistral-free', 'cloudflare-free',
   'nvidia-free'
 ];
 
@@ -1741,6 +1791,7 @@ const PROVIDER_COMBO_PREFIXES = {
   'ollama-free': ['ollama'],
   'airforce-free': ['api-airforce', 'airforce'],
   'bazaarlink-free': ['bazaarlink', 'bzl'],
+  'b.ai-free': ['b-ai', 'b.ai', 'bai'],
   'groq-free': ['groq'],
   'cerebras-free': ['cerebras'],
   'mistral-free': ['mistral'],
@@ -2043,6 +2094,7 @@ async function injectInto9router(providers) {
     ['ollama', p.ollama, 'ollama'],
     ['airforce', p.airforce, 'api-airforce'],
     ['bazaarlink', p.bazaarlink, 'bazaarlink'],
+    ['bai', p.bai, 'b.ai'],
     ['groq', p.groq, 'groq'],
     ['cerebras', p.cerebras, 'cerebras'],
     ['mistral', p.mistral, 'mistral'],
@@ -2147,6 +2199,7 @@ async function injectInto9router(providers) {
     ['ollama-free', (!p.ollama?.excluded && (p.ollama?.validated?.length || 0) > 0) ? activeByProvider.ollama : null],
     ['airforce-free', (!p.airforce?.excluded && (p.airforce?.validated?.length || 0) > 0) ? activeByProvider.airforce : null],
     ['bazaarlink-free', (!p.bazaarlink?.excluded && (p.bazaarlink?.validated?.length || 0) > 0) ? activeByProvider.bazaarlink : null],
+    ['b.ai-free', (!p.bai?.excluded && (p.bai?.validated?.length || 0) > 0) ? activeByProvider.bai : null],
     ['groq-free', (!p.groq?.excluded && (p.groq?.validated?.length || 0) > 0) ? activeByProvider.groq : null],
     ['cerebras-free', (!p.cerebras?.excluded && (p.cerebras?.validated?.length || 0) > 0) ? activeByProvider.cerebras : null],
     ['mistral-free', (!p.mistral?.excluded && (p.mistral?.validated?.length || 0) > 0) ? activeByProvider.mistral : null],
@@ -2331,7 +2384,7 @@ async function main() {
   const mode = isRefreshMode ? 'WATCHDOG REFRESH' : (isCronSetup ? 'SETUP SCHEDULER' : 'DAILY FULL SYNC');
   console.log('====================================================');
   console.log('  Free Models Sync -> 9router Combos               ');
-  console.log('  Sources: OpenAgentic + Kilo + OpenRouter + Poolside + Gemini + Ollama + Airforce + Bazaarlink');
+  console.log('  Sources: OpenAgentic + Kilo + OpenRouter + Poolside + Gemini + Ollama + Airforce + Bazaarlink + B.ai');
   console.log('           + Groq + Cerebras + Mistral + Cloudflare AI + NVIDIA NIM + OC');
   console.log(`  Mode: ${mode}  `);
   console.log(`  Time: ${new Date().toISOString()}`);
@@ -2365,7 +2418,7 @@ async function main() {
   const excludedOr = (name) => isProviderExcluded(name, excludedProviders);
   const skipData = (prefix) => Promise.resolve({ prefix, models: [], excluded: true });
 
-  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData, groqData, cerebrasData, mistralData, cloudflareData, nvidiaData] = await Promise.all([
+  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData, baiData, groqData, cerebrasData, mistralData, cloudflareData, nvidiaData] = await Promise.all([
     excludedOr('openagentic') ? skipData('openagentic') : getTodaysOpenAgenticFreeModels(),
     (excludedOr('kilocode') || excludedOr('kilo')) ? skipData('kc') : getTodaysKiloFreeModels(),
     excludedOr('openrouter') ? skipData('openrouter') : getTodaysOpenRouterFreeModels(),
@@ -2374,6 +2427,7 @@ async function main() {
     excludedOr('ollama') ? skipData('ollama') : getTodaysOllamaFreeModels(),
     (excludedOr('api-airforce') || excludedOr('airforce')) ? skipData('api-airforce') : getTodaysAirforceFreeModels(),
     (excludedOr('bazaarlink') || excludedOr('bzl')) ? skipData('bazaarlink') : getTodaysBazaarlinkFreeModels(),
+    (excludedOr('b.ai') || excludedOr('bai')) ? skipData('b.ai') : getTodaysBAiFreeModels(),
     excludedOr('groq') ? skipData('groq') : getTodaysGroqFreeModels(),
     excludedOr('cerebras') ? skipData('cerebras') : getTodaysCerebrasFreeModels(),
     excludedOr('mistral') ? skipData('mistral') : getTodaysMistralFreeModels(),
@@ -2395,6 +2449,7 @@ async function main() {
     ollama: ollamaData,
     airforce: airforceData,
     bazaarlink: bazaarlinkData,
+    bai: baiData,
     groq: groqData,
     cerebras: cerebrasData,
     mistral: mistralData,
@@ -2442,6 +2497,7 @@ module.exports = {
   getOllamaCredentials,
   getAirforceCredentials,
   getBazaarlinkCredentials,
+  getBAiCredentials,
   getGroqCredentials,
   getCerebrasCredentials,
   getMistralCredentials,
@@ -2455,6 +2511,7 @@ module.exports = {
   getTodaysOllamaFreeModels,
   getTodaysAirforceFreeModels,
   getTodaysBazaarlinkFreeModels,
+  getTodaysBAiFreeModels,
   getTodaysGroqFreeModels,
   getTodaysCerebrasFreeModels,
   getTodaysMistralFreeModels,
