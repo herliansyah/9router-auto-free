@@ -80,6 +80,15 @@ const QUOTA_LATENCY_SENTINEL = 999998;   // latency marker that forces quota-exh
 const CANDIDATES_STATE_PATH = path.join(__dirname, 'candidates-state.json'); // last full-sync candidate pool (watchdog recovery)
 const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 529]);
 
+// Provider registry (providers.js): single source of truth for every source.
+// Managed combos, the combo-prefix map, the usage-feedback provider map and
+// benchmark-match prefix stripping are all DERIVED from its records below.
+const { PROVIDERS, PROVIDER_BY_KEY, providerByPrefix } = require('./providers.js');
+const escapeRegExp = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const PROVIDER_PREFIX_RE = new RegExp(
+  `^(?:${PROVIDERS.flatMap(p => p.prefixes).sort((a, b) => b.length - a.length).map(escapeRegExp).join('|')})/`
+);
+
 // ponytail: shared better-sqlite3 loader helper
 function getDbClass() {
   try {
@@ -193,7 +202,7 @@ function getBenchmarksDatabase() {
 function findBenchmarkMatch(modelIdentifier, benchmarks) {
   if (!benchmarks || Object.keys(benchmarks).length === 0) return null;
   const str = String(modelIdentifier).toLowerCase()
-    .replace(/^(?:openrouter|kc|oc|openagentic|poolside|gemini|ollama|api-airforce|airforce|bazaarlink|bzl)\//, '')
+    .replace(PROVIDER_PREFIX_RE, '')
     .replace(/:(?:free|thinking)$/, '')
     .replace(/-free$/, '');
 
@@ -325,22 +334,10 @@ function getModelPriorityRank(modelIdentifier, priorities) {
 // Models that error a lot in real traffic get a ranking penalty, so benchmark
 // score alone never keeps a broken free endpoint at the top of the combo.
 // ============================================================================
-const USAGE_PROVIDER_MAP = {
-  'oa': 'openagentic', 'openagentic': 'openagentic',
-  'kc': 'kilocode',
-  'oc': 'opencode',
-  'openrouter': 'openrouter',
-  'poolside': 'poolside',
-  'gemini': 'gemini',
-  'ollama': 'ollama',
-  'api-airforce': 'api-airforce', 'airforce': 'api-airforce',
-  'bazaarlink': 'bazaarlink', 'bzl': 'bazaarlink',
-  'groq': 'groq',
-  'cerebras': 'cerebras',
-  'mistral': 'mistral',
-  'cloudflare': 'cloudflare', 'cloudflare-ai': 'cloudflare', 'cf': 'cloudflare',
-  'nvidia': 'nvidia', 'nim': 'nvidia'
-};
+// prefix spelling -> usageHistory provider name, derived from the registry
+const USAGE_PROVIDER_MAP = Object.fromEntries(
+  PROVIDERS.filter(p => p.usageName).flatMap(p => p.prefixes.map(prefix => [prefix, p.usageName]))
+);
 const USAGE_LOOKBACK_DAYS = 7;
 const USAGE_MIN_SAMPLES = 5;
 
@@ -459,8 +456,30 @@ function sortModelsByCodingQuality(models, latencyMap = null, customPriorities =
   });
 }
 
-// Extract OpenAgentic API Key and Provider Prefix from 9router Database
-function getOpenAgenticCredentials() {
+// ============================================================================
+// Credential readers - one generic shaper driven by the provider registry,
+// plus the bespoke branches it dispatches to. The legacy per-provider
+// getXxxCredentials() functions below are thin delegations kept for callers.
+// ============================================================================
+
+function getProviderCredentials(record) {
+  if (!record) return { apiKey: null };
+  if (record.credentialKind === 'scan') return scanConnectionCredentials(record);
+  if (record.credentialKind === 'kilo') return kiloConnectionCredentials(record);
+  if (record.credentialKind === 'bai') return baiConnectionCredentials(record);
+  if (record.credentialKind === 'cloudflare') return getCloudflareCredentials();
+  // default: native connection row -> { apiKey, prefix, baseUrl }
+  const parsed = record.connection ? getProviderConnection(record.connection) : null;
+  return {
+    apiKey: parsed?.apiKey || null,
+    prefix: parsed?.providerSpecificData?.prefix || record.prefixes[0],
+    baseUrl: (record.readBaseUrlFromConnection && parsed?.providerSpecificData?.baseUrl) || record.baseUrl
+  };
+}
+
+// ponytail: only OpenAgentic needs a full-table host/name scan; add more
+// matchers here when a second provider grows the same shape.
+function scanConnectionCredentials(record) {
   try {
     const Database = getDbClass();
     const db = new Database(DB_PATH, { readonly: true });
@@ -468,199 +487,54 @@ function getOpenAgenticCredentials() {
     db.close();
 
     for (const row of rows) {
-      if (row.data) {
-        try {
-          const parsed = JSON.parse(row.data);
-          const baseUrl = parsed?.providerSpecificData?.baseUrl || '';
-          if (baseUrl.includes('openagentic.id') || baseUrl.includes('aimurah.my.id') || row.name?.toLowerCase().includes('openagentic')) {
-            return {
-              apiKey: parsed.apiKey,
-              prefix: parsed?.providerSpecificData?.prefix || 'openagentic',
-              baseUrl: baseUrl || 'https://openagentic.id/api/v1'
-            };
-          }
-        } catch {}
-      }
+      if (!row.data) continue;
+      try {
+        const parsed = JSON.parse(row.data);
+        const baseUrl = parsed?.providerSpecificData?.baseUrl || '';
+        const matchesHost = (record.matchHosts || []).some(host => baseUrl.includes(host));
+        if (matchesHost || (record.nameMatch && row.name?.toLowerCase().includes(record.nameMatch))) {
+          return {
+            apiKey: parsed.apiKey,
+            prefix: parsed?.providerSpecificData?.prefix || record.prefixes[0],
+            baseUrl: baseUrl || record.baseUrl
+          };
+        }
+      } catch {}
     }
   } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for OpenAgentic credentials: ${err.message}`);
+    console.warn(`[!] Warning: Could not read 9router DB for ${record.label}: ${err.message}`);
   }
-
-  return { apiKey: null, prefix: 'openagentic', baseUrl: 'https://openagentic.id/api/v1' };
+  return { apiKey: null, prefix: record.prefixes[0], baseUrl: record.baseUrl };
 }
 
-// Extract Kilo.ai (KiloCode) Access Token from 9router Database
-function getKiloCredentials() {
+function kiloConnectionCredentials(record) {
   try {
     const Database = getDbClass();
     const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'kilocode' AND isActive = 1").get();
+    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = ? AND isActive = 1").get(record.connection);
     db.close();
 
     if (row && row.data) {
       const parsed = JSON.parse(row.data);
       if (parsed.accessToken) {
-        return {
-          accessToken: parsed.accessToken,
-          prefix: 'kc',
-          gatewayUrl: 'https://api.kilo.ai/api/gateway'
-        };
+        return { accessToken: parsed.accessToken, prefix: 'kc', gatewayUrl: record.baseUrl };
       }
     }
   } catch (err) {
     console.warn(`[!] Warning: Could not read 9router DB for Kilo credentials: ${err.message}`);
   }
-
-  return { accessToken: null, prefix: 'kc', gatewayUrl: 'https://api.kilo.ai/api/gateway' };
+  return { accessToken: null, prefix: 'kc', gatewayUrl: record.baseUrl };
 }
 
-// Extract OpenRouter API Key and Provider Prefix from 9router Database
-function getOpenRouterCredentials() {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'openrouter' AND isActive = 1").get();
-    db.close();
-
-    if (row && row.data) {
-      const parsed = JSON.parse(row.data);
-      return {
-        apiKey: parsed.apiKey || null,
-        prefix: parsed?.providerSpecificData?.prefix || 'openrouter',
-        baseUrl: 'https://openrouter.ai/api/v1'
-      };
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for OpenRouter credentials: ${err.message}`);
-  }
-
-  return { apiKey: null, prefix: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1' };
-}
-
-// Extract Poolside API Key and Provider Prefix from 9router Database
-function getPoolsideCredentials() {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'poolside' AND isActive = 1").get();
-    db.close();
-
-    if (row && row.data) {
-      const parsed = JSON.parse(row.data);
-      return {
-        apiKey: parsed.apiKey || null,
-        prefix: parsed?.providerSpecificData?.prefix || 'poolside',
-        baseUrl: parsed?.providerSpecificData?.baseUrl || 'https://inference.poolside.ai/v1'
-      };
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for Poolside credentials: ${err.message}`);
-  }
-
-  return { apiKey: null, prefix: 'poolside', baseUrl: 'https://inference.poolside.ai/v1' };
-}
-
-// Extract Gemini API Key and Provider Prefix from 9router Database
-function getGeminiCredentials() {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'gemini' AND isActive = 1").get();
-    db.close();
-
-    if (row && row.data) {
-      const parsed = JSON.parse(row.data);
-      return {
-        apiKey: parsed.apiKey || null,
-        prefix: parsed?.providerSpecificData?.prefix || 'gemini',
-        baseUrl: 'https://generativelanguage.googleapis.com/v1beta'
-      };
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for Gemini credentials: ${err.message}`);
-  }
-
-  return { apiKey: null, prefix: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' };
-}
-
-// Extract Ollama Cloud API Key and Provider Prefix from 9router Database
-function getOllamaCredentials() {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'ollama' AND isActive = 1").get();
-    db.close();
-
-    if (row && row.data) {
-      const parsed = JSON.parse(row.data);
-      return {
-        apiKey: parsed.apiKey || null,
-        prefix: parsed?.providerSpecificData?.prefix || 'ollama',
-        baseUrl: parsed?.providerSpecificData?.baseUrl || 'https://api.ollama.com/v1'
-      };
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for Ollama credentials: ${err.message}`);
-  }
-
-  return { apiKey: null, prefix: 'ollama', baseUrl: 'https://api.ollama.com/v1' };
-}
-
-// Extract API.airforce API Key and Provider Prefix from 9router Database
-function getAirforceCredentials() {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'api-airforce' AND isActive = 1").get();
-    db.close();
-
-    if (row && row.data) {
-      const parsed = JSON.parse(row.data);
-      return {
-        apiKey: parsed.apiKey || null,
-        prefix: parsed?.providerSpecificData?.prefix || 'api-airforce',
-        baseUrl: parsed?.providerSpecificData?.baseUrl || 'https://api.airforce/v1'
-      };
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for API.airforce credentials: ${err.message}`);
-  }
-
-  return { apiKey: null, prefix: 'api-airforce', baseUrl: 'https://api.airforce/v1' };
-}
-
-// Extract Bazaarlink API Key and Provider Prefix from 9router Database
-function getBazaarlinkCredentials() {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = 'bazaarlink' AND isActive = 1").get();
-    db.close();
-
-    if (row && row.data) {
-      const parsed = JSON.parse(row.data);
-      return {
-        apiKey: parsed.apiKey || null,
-        prefix: parsed?.providerSpecificData?.prefix || 'bazaarlink',
-        baseUrl: parsed?.providerSpecificData?.baseUrl || 'https://bazaarlink.ai/api/v1'
-      };
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for Bazaarlink credentials: ${err.message}`);
-  }
-
-  return { apiKey: null, prefix: 'bazaarlink', baseUrl: 'https://bazaarlink.ai/api/v1' };
-}
-
-// Extract B.ai API Key from 9router Database. Preferred: a native "b.ai" provider
-// connection. Fallback: an openai-compatible connection whose baseUrl points at api.b.ai.
-function getBAiCredentials() {
-  const native = getProviderConnection('b.ai');
+// B.ai: preferred native "b.ai" connection; fallback to an openai-compatible
+// row whose baseUrl points at api.b.ai.
+function baiConnectionCredentials(record) {
+  const native = getProviderConnection(record.connection);
   if (native && native.apiKey) {
     return {
       apiKey: native.apiKey,
       prefix: native?.providerSpecificData?.prefix || 'b.ai',
-      baseUrl: native?.providerSpecificData?.baseUrl || 'https://api.b.ai/v1'
+      baseUrl: native?.providerSpecificData?.baseUrl || record.baseUrl
     };
   }
   try {
@@ -685,8 +559,70 @@ function getBAiCredentials() {
   } catch (err) {
     console.warn(`[!] Warning: Could not read 9router DB for B.ai credentials: ${err.message}`);
   }
+  return { apiKey: null, prefix: 'b-ai', baseUrl: record.baseUrl };
+}
 
-  return { apiKey: null, prefix: 'b-ai', baseUrl: 'https://api.b.ai/v1' };
+// Extract OpenAgentic API Key and Provider Prefix from 9router Database
+// Extract OpenAgentic API Key and Provider Prefix from 9router Database
+function getOpenAgenticCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.oa);
+}
+
+// Extract Kilo.ai (KiloCode) Access Token from 9router Database
+
+// Extract Kilo.ai (KiloCode) Access Token from 9router Database
+function getKiloCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.kilo);
+}
+
+// Extract OpenRouter API Key and Provider Prefix from 9router Database
+
+// Extract OpenRouter API Key and Provider Prefix from 9router Database
+function getOpenRouterCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.openrouter);
+}
+
+// Extract Poolside API Key and Provider Prefix from 9router Database
+
+// Extract Poolside API Key and Provider Prefix from 9router Database
+function getPoolsideCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.poolside);
+}
+
+// Extract Gemini API Key and Provider Prefix from 9router Database
+
+// Extract Gemini API Key and Provider Prefix from 9router Database
+function getGeminiCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.gemini);
+}
+
+// Extract Ollama Cloud API Key and Provider Prefix from 9router Database
+
+// Extract Ollama Cloud API Key and Provider Prefix from 9router Database
+function getOllamaCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.ollama);
+}
+
+// Extract API.airforce API Key and Provider Prefix from 9router Database
+
+// Extract API.airforce API Key and Provider Prefix from 9router Database
+function getAirforceCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.airforce);
+}
+
+// Extract Bazaarlink API Key and Provider Prefix from 9router Database
+
+// Extract Bazaarlink API Key and Provider Prefix from 9router Database
+function getBazaarlinkCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.bazaarlink);
+}
+
+// Extract B.ai API Key from 9router Database. Preferred: a native "b.ai" provider
+// connection. Fallback: an openai-compatible connection whose baseUrl points at api.b.ai.
+
+// Extract B.ai API Key from 9router Database (native or openai-compatible fallback)
+function getBAiCredentials() {
+  return getProviderCredentials(PROVIDER_BY_KEY.bai);
 }
 
 // Scrape free models from OpenAgentic HTML landing page
@@ -1258,43 +1194,31 @@ function getProviderConnection(providerName) {
 }
 
 // Extract Groq API Key from 9router Database
+
+// Extract Groq API Key from 9router Database
 function getGroqCredentials() {
-  const parsed = getProviderConnection('groq');
-  return {
-    apiKey: parsed?.apiKey || null,
-    prefix: parsed?.providerSpecificData?.prefix || 'groq',
-    baseUrl: 'https://api.groq.com/openai/v1'
-  };
+  return getProviderCredentials(PROVIDER_BY_KEY.groq);
 }
 
 // Extract Cerebras API Key from 9router Database
+
+// Extract Cerebras API Key from 9router Database
 function getCerebrasCredentials() {
-  const parsed = getProviderConnection('cerebras');
-  return {
-    apiKey: parsed?.apiKey || null,
-    prefix: parsed?.providerSpecificData?.prefix || 'cerebras',
-    baseUrl: 'https://api.cerebras.ai/v1'
-  };
+  return getProviderCredentials(PROVIDER_BY_KEY.cerebras);
 }
 
 // Extract Mistral API Key from 9router Database (native 9router provider type)
+
+// Extract Mistral API Key from 9router Database (native 9router provider type)
 function getMistralCredentials() {
-  const parsed = getProviderConnection('mistral');
-  return {
-    apiKey: parsed?.apiKey || null,
-    prefix: parsed?.providerSpecificData?.prefix || 'mistral',
-    baseUrl: 'https://api.mistral.ai/v1'
-  };
+  return getProviderCredentials(PROVIDER_BY_KEY.mistral);
 }
 
 // Extract NVIDIA NIM API Key from 9router Database (native 9router provider type)
+
+// Extract NVIDIA NIM API Key from 9router Database (native 9router provider type)
 function getNvidiaCredentials() {
-  const parsed = getProviderConnection('nvidia');
-  return {
-    apiKey: parsed?.apiKey || null,
-    prefix: parsed?.providerSpecificData?.prefix || 'nvidia',
-    baseUrl: 'https://integrate.api.nvidia.com/v1'
-  };
+  return getProviderCredentials(PROVIDER_BY_KEY.nvidia);
 }
 
 // Cloudflare Workers AI credentials. Preferred: the native "cloudflare-ai" provider
@@ -1505,33 +1429,17 @@ async function fetchCloudflareFreeModels(creds) {
 
 // Merge and discover all free models from Groq
 async function getTodaysGroqFreeModels() {
-  const creds = getGroqCredentials();
-  const models = await fetchOpenAiCompatibleFreeModels({
-    label: 'Groq', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
-    skipPatterns: ['whisper', 'tts', 'guard', 'embed', 'playai']
-  });
-  return { prefix: creds.prefix || 'groq', models: sortModelsByCodingQuality(models) };
+  return discoverProvider(PROVIDER_BY_KEY.groq);
 }
 
 // Merge and discover all free models from Cerebras
 async function getTodaysCerebrasFreeModels() {
-  const creds = getCerebrasCredentials();
-  const models = await fetchOpenAiCompatibleFreeModels({
-    label: 'Cerebras', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
-    skipPatterns: ['embed']
-  });
-  return { prefix: creds.prefix || 'cerebras', models: sortModelsByCodingQuality(models) };
+  return discoverProvider(PROVIDER_BY_KEY.cerebras);
 }
 
 // Merge and discover all free models from Mistral (free "Experiment" tier)
 async function getTodaysMistralFreeModels() {
-  const creds = getMistralCredentials();
-  const models = await fetchOpenAiCompatibleFreeModels({
-    label: 'Mistral', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
-    // Paid-only / non-coding entries; anything else that needs payment is dropped by the live pre-test (HTTP 402/403)
-    skipPatterns: ['embed', 'moderation', 'ocr', 'tts', 'voxtral', 'mistral-saba']
-  });
-  return { prefix: creds.prefix || 'mistral', models: sortModelsByCodingQuality(models) };
+  return discoverProvider(PROVIDER_BY_KEY.mistral);
 }
 
 // Merge and discover all free models from NVIDIA NIM (build.nvidia.com free credits)
@@ -1539,21 +1447,7 @@ async function getTodaysMistralFreeModels() {
 // runs on the account's free developer credits, so usability is decided by the live
 // pre-test. Skip patterns only remove non-LLM entries (embed/rerank/audio/vision/guard).
 async function getTodaysNvidiaFreeModels() {
-  const creds = getNvidiaCredentials();
-  const models = await fetchOpenAiCompatibleFreeModels({
-    label: 'NVIDIA NIM', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
-    skipPatterns: [
-      // embeddings / retrieval / document parsing
-      'embed', 'bge-m3', 'arctic', 'rerank', 'retriever', 'parse',
-      // audio / speech / translation
-      'tts', 'speech', 'audio', 'asr', 'riva', 'parakeet', 'whisper',
-      // vision / image / video
-      'vision', '-vl', 'vlm', 'fuyu', 'kosmos', 'neva', 'vila', 'deplot', 'clip', 'diffusion', 'image', 'video', 'detector',
-      // guardrails / reward models
-      'guard', 'safety', 'topic-control', 'reward', 'moderation'
-    ]
-  });
-  return { prefix: creds.prefix || 'nvidia', models: sortModelsByCodingQuality(models) };
+  return discoverProvider(PROVIDER_BY_KEY.nvidia);
 }
 
 // Merge and discover all free models from Cloudflare Workers AI
@@ -1561,6 +1455,42 @@ async function getTodaysCloudflareFreeModels() {
   const creds = getCloudflareCredentials();
   const models = await fetchCloudflareFreeModels(creds);
   return { prefix: creds.prefix || 'cloudflare-ai', models: sortModelsByCodingQuality(models) };
+}
+
+// ============================================================================
+// Provider discovery - driven by the registry in providers.js. Each entry
+// receives the provider record and returns { prefix, models }.
+// Adding a provider with a bespoke API means adding ONE entry here plus its
+// implementation; everything else (combos, wiring, exclusions) follows the
+// registry automatically.
+// ============================================================================
+const PROVIDER_DISCOVERY = {
+  openagentic: () => getTodaysOpenAgenticFreeModels(),
+  kilo: () => getTodaysKiloFreeModels(),
+  opencode: () => getTodaysOpenCodeFreeModels(),
+  openrouter: () => getTodaysOpenRouterFreeModels(),
+  poolside: () => getTodaysPoolsideFreeModels(),
+  gemini: () => getTodaysGeminiFreeModels(),
+  ollama: () => getTodaysOllamaFreeModels(),
+  airforce: () => getTodaysAirforceFreeModels(),
+  bazaarlink: () => getTodaysBazaarlinkFreeModels(),
+  bai: () => getTodaysBAiFreeModels(),
+  cloudflare: () => getTodaysCloudflareFreeModels(),
+  'openai-compatible': async record => {
+    const creds = getProviderCredentials(record);
+    const models = await fetchOpenAiCompatibleFreeModels({
+      label: record.label, apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
+      skipPatterns: record.skipPatterns || [], requireApiKey: record.requireApiKey !== false
+    });
+    return { prefix: creds.prefix || record.prefixes[0], models: sortModelsByCodingQuality(models) };
+  }
+};
+
+// Discover free-model candidates for one provider record from the registry
+function discoverProvider(record) {
+  const impl = PROVIDER_DISCOVERY[record.kind];
+  if (!impl) throw new Error(`No discovery implementation for provider kind "${record.kind}"`);
+  return impl(record);
 }
 
 /**
@@ -1650,7 +1580,8 @@ async function validateCandidateModels(models, prefix) {
 
   const activeModels = [];
   const quotaLimitedModels = [];
-  const concurrency = (prefix === 'ollama' || prefix === 'api-airforce' || prefix === 'airforce') ? 1 : 5;
+  const providerRecord = providerByPrefix(prefix);
+  const concurrency = providerRecord?.solo ? 1 : 5;
   const queue = [...nonExcludedModels];
 
   console.log(`[*] Pre-testing ${nonExcludedModels.length} candidate models for [${prefix}]...`);
@@ -1660,10 +1591,8 @@ async function validateCandidateModels(models, prefix) {
       const m = queue.shift();
       const fullId = m.fullId || `${prefix}/${m.id}`;
 
-      // API.airforce has a 1-req/sec global rate limit on free tier
-      if (prefix === 'api-airforce' || prefix === 'airforce') {
-        await new Promise(r => setTimeout(r, 1200));
-      }
+      // Rate-limited providers (e.g. API.airforce's global 1-req/sec free tier)
+      if (providerRecord?.throttleMs) await new Promise(r => setTimeout(r, providerRecord.throttleMs));
 
       const result = await testModelWith9router(fullId, token);
 
@@ -1771,33 +1700,16 @@ function readCurrentComboModels(comboName) {
   return [];
 }
 
-// All free combos managed by this tool
+// All free combos managed by this tool: the super-combos plus one derived from
+// every provider record in the registry
 const MANAGED_COMBOS = [
   'my9model-free', 'my9model-smart', 'my9model-fast',
-  'openagentic-free', 'kilo-free', 'opencode-free', 'openrouter-free',
-  'poolside-free', 'gemini-free', 'ollama-free', 'airforce-free',
-  'bazaarlink-free', 'b.ai-free', 'groq-free', 'cerebras-free', 'mistral-free', 'cloudflare-free',
-  'nvidia-free'
+  ...PROVIDERS.map(p => p.combo)
 ];
 
-// Combo name -> model-id prefixes belonging to it (first segment of fullId)
-const PROVIDER_COMBO_PREFIXES = {
-  'openagentic-free': ['openagentic', 'oa'],
-  'kilo-free': ['kilocode', 'kc'],
-  'opencode-free': ['opencode', 'oc'],
-  'openrouter-free': ['openrouter'],
-  'poolside-free': ['poolside'],
-  'gemini-free': ['gemini'],
-  'ollama-free': ['ollama'],
-  'airforce-free': ['api-airforce', 'airforce'],
-  'bazaarlink-free': ['bazaarlink', 'bzl'],
-  'b.ai-free': ['b-ai', 'b.ai', 'bai'],
-  'groq-free': ['groq'],
-  'cerebras-free': ['cerebras'],
-  'mistral-free': ['mistral'],
-  'cloudflare-free': ['cloudflare-ai', 'cloudflare', 'cf'],
-  'nvidia-free': ['nvidia']
-};
+// Combo name -> model-id prefixes belonging to it (first segment of fullId),
+// derived from the provider registry
+const PROVIDER_COMBO_PREFIXES = Object.fromEntries(PROVIDERS.map(p => [p.combo, p.prefixes]));
 
 function idMatchesPrefixes(fullId, prefixes) {
   const head = String(fullId).split('/')[0].toLowerCase();
@@ -1988,7 +1900,8 @@ async function refreshCombos() {
     while (queue.length > 0) {
       const fullId = queue.shift();
       const providerPrefix = String(fullId).split('/')[0].toLowerCase();
-      if (providerPrefix === 'api-airforce') await new Promise(r => setTimeout(r, 1200));
+      const throttled = providerByPrefix(providerPrefix);
+      if (throttled?.throttleMs) await new Promise(r => setTimeout(r, throttled.throttleMs));
 
       const result = await testModelWith9router(fullId, token);
       if (result.valid) {
@@ -2084,23 +1997,11 @@ function passesAgenticGate(meta) {
  */
 async function injectInto9router(providers) {
   const p = providers || {};
-  const defs = [
-    ['oa', p.oa, 'openagentic'],
-    ['kilo', p.kilo, 'kilo'],
-    ['oc', p.oc, 'opencode'],
-    ['openrouter', p.openrouter, 'openrouter'],
-    ['poolside', p.poolside, 'poolside'],
-    ['gemini', p.gemini, 'gemini'],
-    ['ollama', p.ollama, 'ollama'],
-    ['airforce', p.airforce, 'api-airforce'],
-    ['bazaarlink', p.bazaarlink, 'bazaarlink'],
-    ['bai', p.bai, 'b.ai'],
-    ['groq', p.groq, 'groq'],
-    ['cerebras', p.cerebras, 'cerebras'],
-    ['mistral', p.mistral, 'mistral'],
-    ['cloudflare', p.cloudflare, 'cloudflare'],
-    ['nvidia', p.nvidia, 'nvidia']
-  ];
+  // One def per registry record; missing entries count as excluded
+  const defs = PROVIDERS.map(rec => {
+    const data = p[rec.key] || { prefix: rec.prefixes[0], models: [], excluded: true };
+    return [rec.key, data, rec.label];
+  });
 
   // Live-test each source (skipped when the whole provider is excluded)
   for (const [key, data] of defs) {
@@ -2190,21 +2091,10 @@ async function injectInto9router(providers) {
     ['my9model-smart', smartList],
     ['my9model-fast', fastList],
     ['my9model-cooldown', cooldownList],
-    ['openagentic-free', (!p.oa?.excluded && (p.oa?.validated?.length || 0) > 0) ? activeByProvider.oa : null],
-    ['kilo-free', (!p.kilo?.excluded && (p.kilo?.validated?.length || 0) > 0) ? activeByProvider.kilo : null],
-    ['opencode-free', (!p.oc?.excluded && (p.oc?.validated?.length || 0) > 0) ? activeByProvider.oc : null],
-    ['openrouter-free', (!p.openrouter?.excluded && (p.openrouter?.validated?.length || 0) > 0) ? activeByProvider.openrouter : null],
-    ['poolside-free', (!p.poolside?.excluded && (p.poolside?.validated?.length || 0) > 0) ? activeByProvider.poolside : null],
-    ['gemini-free', (!p.gemini?.excluded && (p.gemini?.validated?.length || 0) > 0) ? activeByProvider.gemini : null],
-    ['ollama-free', (!p.ollama?.excluded && (p.ollama?.validated?.length || 0) > 0) ? activeByProvider.ollama : null],
-    ['airforce-free', (!p.airforce?.excluded && (p.airforce?.validated?.length || 0) > 0) ? activeByProvider.airforce : null],
-    ['bazaarlink-free', (!p.bazaarlink?.excluded && (p.bazaarlink?.validated?.length || 0) > 0) ? activeByProvider.bazaarlink : null],
-    ['b.ai-free', (!p.bai?.excluded && (p.bai?.validated?.length || 0) > 0) ? activeByProvider.bai : null],
-    ['groq-free', (!p.groq?.excluded && (p.groq?.validated?.length || 0) > 0) ? activeByProvider.groq : null],
-    ['cerebras-free', (!p.cerebras?.excluded && (p.cerebras?.validated?.length || 0) > 0) ? activeByProvider.cerebras : null],
-    ['mistral-free', (!p.mistral?.excluded && (p.mistral?.validated?.length || 0) > 0) ? activeByProvider.mistral : null],
-    ['cloudflare-free', (!p.cloudflare?.excluded && (p.cloudflare?.validated?.length || 0) > 0) ? activeByProvider.cloudflare : null],
-    ['nvidia-free', (!p.nvidia?.excluded && (p.nvidia?.validated?.length || 0) > 0) ? activeByProvider.nvidia : null]
+    ...PROVIDERS.map(rec => {
+      const d = p[rec.key];
+      return [rec.combo, (!d?.excluded && (d?.validated?.length || 0) > 0) ? activeByProvider[rec.key] : null];
+    })
   ]);
   for (const [name, list] of Array.from(comboMap)) {
     if (!Array.isArray(list)) comboMap.delete(name);
@@ -2415,47 +2305,17 @@ async function main() {
     console.log(`[⊘] Excluded providers via config (${excludedProviders.length}): ${excludedProviders.join(', ')}\n`);
   }
 
-  const excludedOr = (name) => isProviderExcluded(name, excludedProviders);
-  const skipData = (prefix) => Promise.resolve({ prefix, models: [], excluded: true });
+  // Discover every registry provider in parallel; a provider is skipped when
+  // ANY of its alias spellings is excluded.
+  const results = {};
+  await Promise.all(PROVIDERS.map(async rec => {
+    const excluded = rec.prefixes.some(name => isProviderExcluded(name, excludedProviders));
+    results[rec.key] = excluded
+      ? { prefix: rec.prefixes[0], models: [], excluded: true }
+      : await discoverProvider(rec);
+  }));
 
-  const [oaData, kiloData, orData, poolsideData, geminiData, ollamaData, airforceData, bazaarlinkData, baiData, groqData, cerebrasData, mistralData, cloudflareData, nvidiaData] = await Promise.all([
-    excludedOr('openagentic') ? skipData('openagentic') : getTodaysOpenAgenticFreeModels(),
-    (excludedOr('kilocode') || excludedOr('kilo')) ? skipData('kc') : getTodaysKiloFreeModels(),
-    excludedOr('openrouter') ? skipData('openrouter') : getTodaysOpenRouterFreeModels(),
-    excludedOr('poolside') ? skipData('poolside') : getTodaysPoolsideFreeModels(),
-    excludedOr('gemini') ? skipData('gemini') : getTodaysGeminiFreeModels(),
-    excludedOr('ollama') ? skipData('ollama') : getTodaysOllamaFreeModels(),
-    (excludedOr('api-airforce') || excludedOr('airforce')) ? skipData('api-airforce') : getTodaysAirforceFreeModels(),
-    (excludedOr('bazaarlink') || excludedOr('bzl')) ? skipData('bazaarlink') : getTodaysBazaarlinkFreeModels(),
-    (excludedOr('b.ai') || excludedOr('bai')) ? skipData('b.ai') : getTodaysBAiFreeModels(),
-    excludedOr('groq') ? skipData('groq') : getTodaysGroqFreeModels(),
-    excludedOr('cerebras') ? skipData('cerebras') : getTodaysCerebrasFreeModels(),
-    excludedOr('mistral') ? skipData('mistral') : getTodaysMistralFreeModels(),
-    excludedOr('cloudflare') ? skipData('cloudflare') : getTodaysCloudflareFreeModels(),
-    excludedOr('nvidia') ? skipData('nvidia') : getTodaysNvidiaFreeModels()
-  ]);
-
-  const ocData = (excludedOr('opencode') || excludedOr('oc'))
-    ? { prefix: 'oc', models: [], excluded: true }
-    : getTodaysOpenCodeFreeModels();
-
-  await injectInto9router({
-    oa: oaData,
-    kilo: kiloData,
-    oc: ocData,
-    openrouter: orData,
-    poolside: poolsideData,
-    gemini: geminiData,
-    ollama: ollamaData,
-    airforce: airforceData,
-    bazaarlink: bazaarlinkData,
-    bai: baiData,
-    groq: groqData,
-    cerebras: cerebrasData,
-    mistral: mistralData,
-    cloudflare: cloudflareData,
-    nvidia: nvidiaData
-  });
+  await injectInto9router(results);
 }
 
 if (require.main === module) {
@@ -2538,5 +2398,10 @@ module.exports = {
   deriveTierLists,
   PROVIDER_COMBO_PREFIXES,
   idMatchesPrefixes,
-  getCodingScore
+  getCodingScore,
+  PROVIDERS,
+  PROVIDER_BY_KEY,
+  providerByPrefix,
+  discoverProvider,
+  getProviderCredentials
 };
