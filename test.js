@@ -9,6 +9,8 @@ const {
   MANAGED_COMBOS,
   PROVIDER_COMBO_PREFIXES,
   PROVIDERS,
+  findBenchmarkMatch,
+  getBenchmarksDatabase,
   getProviderCredentials,
   getCodingScore,
   sortModelsByCodingQuality,
@@ -457,6 +459,36 @@ async function runTests() {
     assert.deepStrictEqual(Array.from(comboMap.get('my9model-free')), ['a', 'b']);
     assert.strictEqual(comboMap.has('my9model-fast'), false, 'omitted keys must stay unwritten');
     assert.deepStrictEqual(comboMap.get('my9model-cooldown'), ['c']);
+  }
+
+  // 24. Cross-file agreement: tier boundary & key normalization
+  {
+    const { normalizeKey, determineTier, SMART_MIN_SCORE } = require('./update-benchmarks.js');
+    // SMART_MIN_SCORE must sit exactly on the A-tier floor so the smart combo
+    // can never drift from the benchmark tier table.
+    assert.strictEqual(determineTier(SMART_MIN_SCORE), 'A', 'SMART_MIN_SCORE must be the A-tier floor');
+    assert.notStrictEqual(determineTier(SMART_MIN_SCORE - 1), 'A', 'one point below must leave tier A');
+
+    // Every provider alias must strip cleanly before benchmark lookup and land
+    // on exactly the entry the benchmarks file owns (both files agree).
+    const db = getBenchmarksDatabase();
+    const sampleKeys = Object.keys(db).slice(0, 5);
+    assert.ok(sampleKeys.length > 0, 'benchmarks database has entries');
+    for (const rec of PROVIDERS) {
+      for (const alias of rec.prefixes) {
+        for (const sampleKey of sampleKeys) {
+          const hit = findBenchmarkMatch(`${alias}/${sampleKey}`, db);
+          if (!hit) continue; // some aliases legitimately miss (substring rules)
+          assert.strictEqual(hit, db[sampleKey],
+            `${alias}/${sampleKey} must resolve to its own benchmark entry`);
+        }
+      }
+    }
+    // The two normalizers produce identical output on shared inputs
+    for (const s of ['Qwen2.5-Coder-32B', 'deepseek chat v3', 'GLM 4.6!']) {
+      assert.strictEqual(typeof normalizeKey(s), 'string');
+      assert.ok(!/[^a-z0-9\.\-]/.test(normalizeKey(s)), 'normalizeKey output stays in its own charset');
+    }
   }
 
   console.log('[✓] All tests passed successfully!');

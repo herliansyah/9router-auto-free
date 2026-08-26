@@ -310,6 +310,7 @@ lalu pilih nama combo sebagai model (mis. `my9model-free`). Lihat daftar lengkap
 ```
 9router-auto-free/
 ├── sync.js                 # Script utama: scrape, live test, ranking, injeksi, watchdog, scheduler
+├── providers.js            # Registry provider: satu record per source free-model (tabel lain diturunkan dari sini)
 ├── update-benchmarks.js    # Penggabung benchmark live (EvalPlus + SWE-bench + LiveCodeBench)
 ├── test.js                 # Self-check integrasi (butuh 9router berjalan + akses jaringan)
 ├── benchmarks.json         # Cache database benchmark (di-generate, di-commit)
