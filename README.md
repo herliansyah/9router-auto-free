@@ -63,9 +63,9 @@ Threshold dapat diubah lewat konstanta `AGENTIC_MIN_CONTEXT` di `sync.js`.
 
 ### Combo Turunan `smart` / `fast`
 
-- **`my9model-smart`**: model thinking/reasoning, atau benchmark >= 60 (untuk tugas berat).
+- **`my9model-smart`**: model thinking/reasoning, atau benchmark >= `SMART_MIN_SCORE` — 60, diekspor `update-benchmarks.js` (untuk tugas berat).
 - **`my9model-fast`**: model non-thinking di luar tier smart (untuk respons cepat).
-- Keduanya fallback ke top-5 super-combo supaya tidak pernah kosong.
+- Jika salah satunya beranggota kurang dari 3 model, daftar itu diisi top-5 super-combo supaya tidak pernah kosong.
 
 ---
 
@@ -89,7 +89,7 @@ Threshold dapat diubah lewat konstanta `AGENTIC_MIN_CONTEXT` di `sync.js`.
 | 14 | API.airforce | API `api.airforce/v1/models` via koneksi `api-airforce` | Model berlabel `tier: "free"` | `api-airforce/llama-3.3-70b-instruct-fp8-fast` |
 | 15 | B.ai | API `api.b.ai/v1/models` — koneksi *openai-compatible* di 9router dengan baseUrl `https://api.b.ai/v1` (fallback koneksi native `b.ai`) | Free-tier (filter live pre-test); non-coding di-skip | `b-ai/hy3` |
 
-Tujuh provider dinonaktifkan secara default melalui [`exclusions.json`](exclusions.json): **API.airforce** (rate limit ketat 1 req/detik di plan gratis), **Cloudflare** (plan gratis hanya menyisakan sedikit model LoRA lama), **Mistral** (mayoritas katalog sudah berbayar), **NVIDIA NIM**, **Groq**, **Bazaarlink**, dan **Cerebras**. Hapus entri mereka di `excludedProviders` bila ingin mengaktifkan kembali.
+Delapan provider dinonaktifkan secara default melalui [`exclusions.json`](exclusions.json): **API.airforce** (rate limit ketat 1 req/detik di plan gratis), **Cloudflare** (plan gratis hanya menyisakan sedikit model LoRA lama), **Mistral** (mayoritas katalog sudah berbayar), **NVIDIA NIM**, **Groq**, **Bazaarlink**, **Cerebras**, dan **B.ai**. Hapus entri mereka di `excludedProviders` bila ingin mengaktifkan kembali.
 
 > Catatan: integrasi GitHub Models **tidak ditambahkan** karena layanan ini sudah di-retire GitHub per 30 Juli 2026 (endpoint `models.github.ai` mengembalikan HTTP 410 permanen).
 
@@ -97,7 +97,7 @@ Tujuh provider dinonaktifkan secara default melalui [`exclusions.json`](exclusio
 
 ## Combo yang Dikelola
 
-Semua combo di bawah ditulis ulang setiap sync (dan di-refresh watchdog); combo lain milik pengguna tidak disentuh.
+Sync harian menulis ulang semua combo di bawah; watchdog menyegarkan combo yang anggotanya lolos re-test (tier kosong dibiarkan). Combo lain milik pengguna tidak disentuh.
 
 | Combo | Isi |
 |---|---|
@@ -140,7 +140,8 @@ Anda dapat mengecualikan provider tertentu, atau model-model dengan kualitas kur
     "nvidia",
     "groq",
     "bazaarlink",
-    "cerebras"
+    "cerebras",
+    "b.ai"
   ],
   "excludedModels": [
     "nano",
@@ -311,6 +312,7 @@ lalu pilih nama combo sebagai model (mis. `my9model-free`). Lihat daftar lengkap
 9router-auto-free/
 ├── sync.js                 # Script utama: scrape, live test, ranking, injeksi, watchdog, scheduler
 ├── providers.js            # Registry provider: satu record per source free-model (tabel lain diturunkan dari sini)
+├── CONTEXT.md              # Glosarium istilah domain (combo, verdict, signals, dst.)
 ├── update-benchmarks.js    # Penggabung benchmark live (EvalPlus + SWE-bench + LiveCodeBench)
 ├── test.js                 # Self-check integrasi (butuh 9router berjalan + akses jaringan)
 ├── benchmarks.json         # Cache database benchmark (di-generate, di-commit)
