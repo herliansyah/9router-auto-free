@@ -2,69 +2,28 @@
 
 /**
  * Free Models Sync for 9router
- * (OpenAgentic.id + Kilo.ai + OpenRouter + Poolside + Gemini + Ollama Cloud + API.airforce + Bazaarlink + Groq + Cerebras + Mistral + Cloudflare AI + NVIDIA NIM + 9router OpenCode Free)
  *
- * Automatically synchronizes today's free models from:
- *   1. OpenAgentic.id (Web & API /v1/models)
- *   2. Kilo.ai (Gateway API /api/gateway/models)
- *   3. OpenRouter (API /api/v1/models)
- *   4. Poolside (Inference API /v1/models)
- *   5. Google Gemini API (/v1beta/models)
- *   6. Ollama Cloud API (api.ollama.com/v1/models)
- *   7. API.airforce API (api.airforce/v1/models)
- *   8. Bazaarlink API (bazaarlink.ai/api/v1/models)
- *   9. 9router OpenCode (oc/* free models directly from 9router)
- *   10. Groq API (api.groq.com/openai/v1/models)
- *   11. Cerebras API (api.cerebras.ai/v1/models)
- *   12. Mistral La Plateforme free tier (api.mistral.ai/v1/models)
- *   13. Cloudflare Workers AI free neurons (native "cloudflare-ai" connection in 9router)
- *   14. NVIDIA NIM free tier (integrate.api.nvidia.com/v1/models, native "nvidia" connection)
- *   15. B.ai OpenAI-compatible free tier (api.b.ai/v1/models, native "b.ai" connection)
- * 
- * Pre-tests all candidates against 9router to drop expired/dead/paid models,
- * sorts them by coding capability specification (best to worst),
- * and injects valid models into 9router combos:
- *   - my9model-free   : Unified super-combo across all providers
- *   - openagentic-free: Dedicated OpenAgentic free combo
- *   - kilo-free       : Dedicated Kilo.ai free combo
- *   - openrouter-free : Dedicated OpenRouter free combo
- *   - poolside-free   : Dedicated Poolside free combo
- *   - gemini-free     : Dedicated Gemini free combo
- *   - ollama-free     : Dedicated Ollama Cloud free combo
- *   - b.ai-free       : Dedicated B.ai free combo
- *   - airforce-free   : Dedicated API.airforce free combo
- *   - bazaarlink-free : Dedicated Bazaarlink free combo
- *   - opencode-free   : Dedicated OpenCode free combo
- *   - groq-free       : Dedicated Groq free combo
- *   - cerebras-free   : Dedicated Cerebras free combo
- *   - mistral-free    : Dedicated Mistral free combo (requires Mistral connection)
- *   - cloudflare-free : Dedicated Cloudflare Workers AI free combo ("cloudflare-ai" connection)
- *   - nvidia-free     : Dedicated NVIDIA NIM free combo ("nvidia" connection)
- *   - my9model-smart  : Thinking / high-benchmark subset of the super-combo
- *   - my9model-fast   : Low-latency non-thinking subset of the super-combo
- *   - my9model-cooldown : Parking combo for temporarily quota-exhausted models;
- *                       the watchdog moves them back to the main combos once they recover
+ * Automatically synchronizes free models across all registered providers,
+ * pre-tests all candidates against 9router to drop expired/dead/paid models,
+ * sorts them by coding capability specification, and injects valid models
+ * into 9router combos (my9model-free, smart, fast, cooldown + per-provider combos).
  *
  * Modes:
  *   node sync.js              -> Full daily sync (scrape + live-test + inject)
  *   node sync.js --refresh    -> Intra-day watchdog: re-test existing combo models,
- *                                park quota-exhausted (429) in my9model-cooldown, drop dead ones
+ *                                park quota-exhausted (429) in my9model-cooldown
  *   node sync.js --dry-run    -> Simulate without writing
  *   node sync.js --setup-cron -> Install scheduler (systemd timer w/ Persistent=true, cron fallback)
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
-const crypto = require('node:crypto');
-const { execSync } = require('node:child_process');
 
-// Database and 9router paths
-const HOME = os.homedir();
-const NINE_ROUTER_DIR = path.join(HOME, '.9router');
-const DB_PATH = path.join(NINE_ROUTER_DIR, 'db', 'data.sqlite');
-const BETTER_SQLITE_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', 'better-sqlite3');
-const CLIENT_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', '9router', 'src', 'cli', 'api', 'client.js');
+// Deep modules
+const storage = require('./storage.js');
+const scheduler = require('./scheduler.js');
+const { PROVIDERS, PROVIDER_BY_KEY, providerByPrefix, discoverProvider, discoverAllProviders, getProviderCredentials } = require('./providers.js');
+const { BENCHMARKS_PATH, SMART_MIN_SCORE } = require('./update-benchmarks.js');
 
 // Options
 const args = process.argv.slice(2);
@@ -77,43 +36,32 @@ const isLiveBenchmarks = args.includes('--live-benchmarks') || args.includes('--
 const AGENTIC_MIN_CONTEXT = 100000;      // super-combo agentic floor (supports 128k/256k/1M models)
 const QUOTA_RETRY_DELAY_MS = 1200;       // wait before re-testing a transient failure
 const QUOTA_LATENCY_SENTINEL = 999998;   // latency marker that forces quota-exhausted models to the bottom
-const CANDIDATES_STATE_PATH = path.join(__dirname, 'candidates-state.json'); // last full-sync candidate pool (watchdog recovery)
+const CANDIDATES_STATE_PATH = path.join(__dirname, 'candidates-state.json'); // last full-sync candidate pool
+const EXCLUSIONS_PATH = path.join(__dirname, 'exclusions.json');
+const PRIORITIES_PATH = path.join(__dirname, 'priorities.json');
 const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 529]);
 
-// Provider registry (providers.js): single source of truth for every source.
-// Managed combos, the combo-prefix map, the usage-feedback provider map and
-// benchmark-match prefix stripping are all DERIVED from its records below.
-const { PROVIDERS, PROVIDER_BY_KEY, providerByPrefix } = require('./providers.js');
-// Benchmarks module owns benchmarks.json (it writes, sync.js reads) and the
-// smart-tier score floor so the boundary cannot drift between the two files.
-const { BENCHMARKS_PATH, SMART_MIN_SCORE } = require('./update-benchmarks.js');
 const escapeRegExp = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const PROVIDER_PREFIX_RE = new RegExp(
   `^(?:${PROVIDERS.flatMap(p => p.prefixes).sort((a, b) => b.length - a.length).map(escapeRegExp).join('|')})/`
 );
 
-// ponytail: shared better-sqlite3 loader helper
-function getDbClass() {
-  try {
-    return require(BETTER_SQLITE_PATH);
-  } catch {
-    return require('better-sqlite3');
-  }
+// Managed combos registry
+const MANAGED_COMBOS = [
+  'my9model-free', 'my9model-smart', 'my9model-fast', 'my9model-cooldown',
+  ...PROVIDERS.map(p => p.combo)
+];
+
+const PROVIDER_COMBO_PREFIXES = Object.fromEntries(PROVIDERS.map(p => [p.combo, p.prefixes]));
+
+function idMatchesPrefixes(fullId, prefixes) {
+  const head = String(fullId).split('/')[0].toLowerCase();
+  return prefixes.includes(head);
 }
 
-// Read 9router internal CLI auth token for API calls
-function get9routerCliToken() {
-  try {
-    const machineId = fs.readFileSync(path.join(NINE_ROUTER_DIR, 'machine-id'), 'utf8').trim();
-    const secret = fs.readFileSync(path.join(NINE_ROUTER_DIR, 'auth', 'cli-secret'), 'utf8').trim();
-    return crypto.createHash('sha256').update(machineId + '9r-cli-auth' + secret).digest('hex').substring(0, 16);
-  } catch {
-    return '';
-  }
-}
-
-// Load blacklist / exclusion rules from exclusions.json
-const EXCLUSIONS_PATH = path.join(__dirname, 'exclusions.json');
+// ----------------------------------------------------------------------------
+// Exclusion Rules Configuration
+// ----------------------------------------------------------------------------
 
 function getExclusionConfig() {
   let excludedModels = [];
@@ -145,17 +93,14 @@ function getExclusionConfig() {
     console.warn(`[!] Warning: Could not read exclusions.json: ${err.message}`);
   }
 
-  // CLI argument support: --exclude-provider=api-airforce,ollama
   const cliExcludeArg = args.find(a => a.startsWith('--exclude-provider='));
   if (cliExcludeArg) {
-    const list = cliExcludeArg.split('=')[1].split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-    excludedProviders.push(...list);
+    const raw = cliExcludeArg.split('=')[1] || '';
+    const cliExcluded = raw.split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+    excludedProviders = Array.from(new Set([...excludedProviders, ...cliExcluded]));
   }
 
-  return {
-    excludedModels,
-    excludedProviders: Array.from(new Set(excludedProviders))
-  };
+  return { excludedModels, excludedProviders };
 }
 
 function getExclusionList() {
@@ -166,15 +111,13 @@ function getExcludedProviders() {
   return getExclusionConfig().excludedProviders;
 }
 
-// Check if a provider is excluded
 function isProviderExcluded(providerName, excludedProviders = null) {
-  const list = excludedProviders || getExcludedProviders();
-  if (!list || list.length === 0) return false;
-  const name = String(providerName).trim().toLowerCase();
-  return list.some(p => p === name || name.includes(p) || (p === 'airforce' && name === 'api-airforce') || (p === 'bzl' && name === 'bazaarlink') || (p === 'bazaarlink' && name === 'bzl'));
+  const excluded = excludedProviders || getExcludedProviders();
+  const name = String(providerName || '').trim().toLowerCase();
+  if (!name) return false;
+  return excluded.includes(name);
 }
 
-// Check if a model matches any exclusion rule (exact or substring)
 function isModelExcluded(modelIdentifier, exclusions) {
   if (!exclusions || exclusions.length === 0) return false;
   const str = String(modelIdentifier).toLowerCase();
@@ -187,12 +130,14 @@ function isModelExcluded(modelIdentifier, exclusions) {
   return false;
 }
 
-// Load empirical benchmarks database
+// ----------------------------------------------------------------------------
+// Signals: Benchmarks, Priorities, Usage Penalties
+// ----------------------------------------------------------------------------
+
 function getBenchmarksDatabase() {
   try {
     if (fs.existsSync(BENCHMARKS_PATH)) {
-      const content = fs.readFileSync(BENCHMARKS_PATH, 'utf8');
-      return JSON.parse(content);
+      return JSON.parse(fs.readFileSync(BENCHMARKS_PATH, 'utf8'));
     }
   } catch (err) {
     console.warn(`[!] Warning: Could not read benchmarks.json: ${err.message}`);
@@ -200,115 +145,60 @@ function getBenchmarksDatabase() {
   return {};
 }
 
-// Find matched benchmark item for a given model identifier
 function findBenchmarkMatch(modelIdentifier, benchmarks) {
-  if (!benchmarks || Object.keys(benchmarks).length === 0) return null;
-  const str = String(modelIdentifier).toLowerCase()
-    .replace(PROVIDER_PREFIX_RE, '')
-    .replace(/:(?:free|thinking)$/, '')
-    .replace(/-free$/, '');
+  if (!benchmarks) return null;
+  const rawId = String(modelIdentifier).toLowerCase();
+  const strippedId = rawId.replace(PROVIDER_PREFIX_RE, '').replace(/:free$/, '');
+  const baseName = strippedId.split('/').pop();
 
-  // 1. Direct exact key match
-  if (benchmarks[str]) return benchmarks[str];
+  if (benchmarks[strippedId]) return benchmarks[strippedId];
+  if (benchmarks[baseName]) return benchmarks[baseName];
 
-  // 2. Substring / slug matching
   for (const [key, data] of Object.entries(benchmarks)) {
-    if (str === key || str.includes(key) || key.includes(str)) {
-      return data;
-    }
+    if (strippedId.includes(key) || baseName.includes(key)) return data;
   }
   return null;
 }
 
-// Coding capability scoring engine
-// Uses Empirical Benchmarks (SWE-bench / LiveCodeBench) with Heuristic Spec fallback
 function getCodingScore(modelIdentifier, customBenchmarks = null) {
-  const str = String(modelIdentifier).toLowerCase();
-
-  // Heavy penalty for image / non-coding models
-  if (str.includes('image') || str.includes('flux') || str.includes('wan2') || str.includes('video') || str.includes('safety') || str.includes('lyria')) {
-    return -10000;
-  }
-
   const benchmarks = customBenchmarks || getBenchmarksDatabase();
-  const benchmarkMatch = findBenchmarkMatch(modelIdentifier, benchmarks);
-
-  if (benchmarkMatch && typeof benchmarkMatch.score === 'number') {
-    let score = Math.round(benchmarkMatch.score * 100);
-    if (str.includes('thinking') || str.includes('reasoning') || str.includes('reasoner')) score += 400;
-    if (str.includes('flash') || str.includes('lightning')) score += 150;
-    return score;
+  const match = findBenchmarkMatch(modelIdentifier, benchmarks);
+  if (match && typeof match.score === 'number') {
+    return match.score * 100;
   }
 
-  // Heuristic Fallback
-  let score = 0;
+  const id = String(modelIdentifier).toLowerCase();
+  let baseScore = 4000;
 
-  // 1. Family Base Score
-  if (str.includes('claude') || str.includes('anthropic') || str.includes('sonnet') || str.includes('opus')) {
-    score += 5000;
-  } else if (str.includes('gpt') || str.includes('openai') || str.includes('o3') || str.includes('o4')) {
-    score += 5000;
-  } else if (str.includes('deepseek')) {
-    score += 4800;
-  } else if (str.includes('gemini')) {
-    score += 4600;
-  } else if (str.includes('qwen')) {
-    score += 4400;
-  } else if (str.includes('glm') || str.includes('zhipu') || str.includes('zai')) {
-    score += 4200;
-  } else if (str.includes('kimi') || str.includes('moonshot') || str.includes('step')) {
-    score += 4200;
-  } else if (str.includes('poolside') || str.includes('laguna')) {
-    score += 4100;
-  } else if (str.includes('minimax')) {
-    score += 3800;
-  } else if (str.includes('nemotron')) {
-    score += 3600;
-  } else if (str.includes('kilo-auto') || str.includes('auto')) {
-    score += 3500;
-  } else if (str.includes('mimo') || str.includes('xiaomi')) {
-    score += 3400;
-  } else if (str.includes('open-agentic') || str.includes('openagentic') || str.includes('opencode')) {
-    score += 3300;
-  } else if (str.includes('north-mini-code') || str.includes('cohere')) {
-    score += 3300;
-  } else {
-    score += 3000;
-  }
+  if (id.includes('claude') || id.includes('sonnet') || id.includes('opus')) baseScore = 8000;
+  else if (id.includes('gemini') || id.includes('gpt-4') || id.includes('o1') || id.includes('o3') || id.includes('r1')) baseScore = 7500;
+  else if (id.includes('qwen') || id.includes('deepseek') || id.includes('codestral') || id.includes('mistral') || id.includes('devin') || id.includes('glm')) baseScore = 6500;
+  else if (id.includes('coder') || id.includes('code') || id.includes('instruct')) baseScore = 5500;
+  else if (id.includes('flash') || id.includes('mini') || id.includes('small') || id.includes('lite') || id.includes('nano')) baseScore = 4500;
 
-  // 2. Version multiplier / bonus (e.g. 5.6 -> 5600, 4.5 -> 4500, 3.7 -> 3700)
-  //    Strip parameter-count tokens first (8b, 70b, 16x9b) so they are never mistaken for a version.
-  const versionMatch = str.replace(/\d+(?:\.\d+)?[xb]\b/g, '').match(/(?:v|gpt-|claude-|gemini-|qwen|glm-|kimi-k|mimo-v|minimax-m|step-|lfm-)?(\d+(?:\.\d+)?)/);
+  if (id.includes('preview') || id.includes('thinking') || id.includes('reasoner')) baseScore += 500;
+
+  const versionMatch = id.match(/(?:^|[^\d])(\d+(?:\.\d+)+)(?:[^\d]|$)/);
   if (versionMatch) {
-    const ver = parseFloat(versionMatch[1]);
-    if (!isNaN(ver) && ver > 0 && ver <= 10) {
-      score += Math.round(ver * 1000);
+    const versionNum = parseFloat(versionMatch[1]);
+    if (!isNaN(versionNum) && versionNum < 20) {
+      baseScore += Math.min(versionNum * 50, 500);
     }
   }
 
-  // 3. Coding and Reasoning Specific Modifiers
-  if (str.includes('codex') || str.includes('code') || str.includes('coder')) score += 1200;
-  if (str.includes('thinking') || str.includes('reasoning') || str.includes('reasoner')) score += 400;
-  if (str.includes('opus') || str.includes('sol') || str.includes('terra') || str.includes('luna') || str.includes('max')) score += 500;
-  if (str.includes('sonnet') || str.includes('pro')) score += 350;
-  if (str.includes('plus') || str.includes('flash') || str.includes('lightning')) score += 150;
-  if (str.includes('ultra') || str.includes('super')) score += 100;
+  if (id.includes('embed') || id.includes('image') || id.includes('vision') || id.includes('audio') || id.includes('tts') || id.includes('whisper') || id.includes('flux') || id.includes('diffusion')) {
+    baseScore = -10000;
+  }
 
-  return score;
+  return baseScore;
 }
 
-// Load user-defined custom model priorities list (priorities.json)
-const PRIORITIES_PATH = path.join(__dirname, 'priorities.json');
 function getPrioritiesList() {
   try {
     if (fs.existsSync(PRIORITIES_PATH)) {
-      const content = fs.readFileSync(PRIORITIES_PATH, 'utf8');
-      const data = JSON.parse(content);
+      const data = JSON.parse(fs.readFileSync(PRIORITIES_PATH, 'utf8'));
       if (Array.isArray(data)) {
-        return data.map(p => String(p).trim().toLowerCase()).filter(Boolean);
-      }
-      if (data && Array.isArray(data.priorities)) {
-        return data.priorities.map(p => String(p).trim().toLowerCase()).filter(Boolean);
+        return data.map(item => String(item).trim().toLowerCase()).filter(Boolean);
       }
     }
   } catch (err) {
@@ -317,1213 +207,173 @@ function getPrioritiesList() {
   return [];
 }
 
-// Find user priority rank index for a model (0 = highest priority, Infinity = no custom priority)
 function getModelPriorityRank(modelIdentifier, priorities) {
-  if (!priorities || priorities.length === 0) return Infinity;
-  const str = String(modelIdentifier).toLowerCase();
+  if (!Array.isArray(priorities) || priorities.length === 0) return Infinity;
+  const target = String(modelIdentifier).toLowerCase();
   for (let i = 0; i < priorities.length; i++) {
     const p = priorities[i];
     if (!p) continue;
-    if (str === p || str.includes(p)) {
-      return i;
-    }
+    if (target.includes(p)) return i;
   }
   return Infinity;
 }
 
-// ============================================================================
-// Usage Feedback Loop (real-world reliability signal from 9router usageHistory)
-// Models that error a lot in real traffic get a ranking penalty, so benchmark
-// score alone never keeps a broken free endpoint at the top of the combo.
-// ============================================================================
-// prefix spelling -> usageHistory provider name, derived from the registry
-const USAGE_PROVIDER_MAP = Object.fromEntries(
-  PROVIDERS.filter(p => p.usageName).flatMap(p => p.prefixes.map(prefix => [prefix, p.usageName]))
-);
-const USAGE_LOOKBACK_DAYS = 7;
-const USAGE_MIN_SAMPLES = 5;
-
-let usageFeedbackCache = null;
-let usageFeedbackLoadedAt = 0;
-
 function loadUsageFeedback(forceReload = false) {
-  // ponytail: 60s in-process cache; a long-lived daemon would want TTL invalidation
-  if (!forceReload && usageFeedbackCache && (Date.now() - usageFeedbackLoadedAt) < 60000) {
-    return usageFeedbackCache;
-  }
-  const stats = new Map();
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const since = new Date(Date.now() - USAGE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
-    const rows = db.prepare(
-      "SELECT provider, model, status, COUNT(*) as cnt FROM usageHistory WHERE timestamp >= ? GROUP BY provider, model, status"
-    ).all(since);
-    db.close();
-
-    for (const row of rows) {
-      if (!row.provider || !row.model) continue;
-      const key = `${String(row.provider).toLowerCase()}|${String(row.model).toLowerCase()}`;
-      if (!stats.has(key)) stats.set(key, { ok: 0, err: 0 });
-      const entry = stats.get(key);
-      if (String(row.status).toLowerCase() === 'ok') entry.ok += row.cnt;
-      else entry.err += row.cnt;
-    }
-  } catch (err) {
-    console.warn(`[!] Usage feedback unavailable (${err.message}). Ranking without usage penalty.`);
-  }
-  usageFeedbackCache = stats;
-  usageFeedbackLoadedAt = Date.now();
-  return stats;
+  return storage.readUsageFeedback();
 }
 
-// Compute real-world reliability penalty for a combo model id (0 = no penalty).
-// Pass `usageStats` (a Map from loadUsageFeedback) to keep this pure; omit it to
-// read the live 9router DB through the module cache.
 function getUsagePenalty(fullId, usageStats = null) {
   const stats = usageStats || loadUsageFeedback();
   if (!stats || stats.size === 0) return 0;
 
-  const slash = String(fullId).indexOf('/');
-  if (slash <= 0) return 0;
-  const provider = USAGE_PROVIDER_MAP[String(fullId).slice(0, slash).toLowerCase()];
-  if (!provider) return 0;
-  const model = String(fullId).slice(slash + 1).toLowerCase();
+  const slashIdx = String(fullId).indexOf('/');
+  if (slashIdx === -1) return 0;
+  const prefix = String(fullId).slice(0, slashIdx).toLowerCase();
+  const modelId = String(fullId).slice(slashIdx + 1).toLowerCase();
 
-  // Exact match first, then without a :free / -free suffix (usage rows may store either form)
-  const entry = stats.get(`${provider}|${model}`)
-    || stats.get(`${provider}|${model.replace(/:free$/, '')}`)
-    || stats.get(`${provider}|${model.replace(/-free$/, '')}`);
+  const providerRec = providerByPrefix(prefix);
+  const providerKey = providerRec?.usageName || prefix;
+
+  const key = `${providerKey}|${modelId}`;
+  const entry = stats.get(key);
   if (!entry) return 0;
 
   const total = entry.ok + entry.err;
-  if (total < USAGE_MIN_SAMPLES) return 0;
+  if (total < 5) return 0;
+
   const errorRate = entry.err / total;
-  if (errorRate >= 0.5) return -800;
-  if (errorRate >= 0.25) return -400;
+  if (errorRate >= 0.8) return -800;
+  if (errorRate >= 0.5) return -400;
   return 0;
 }
 
-// Extract canonical full model id from a model entry (string or object)
 function getModelFullId(m) {
-  return typeof m === 'string' ? m : (m.fullId || m.id || m.name || '');
+  return typeof m === 'object' && m !== null ? (m.fullId || m.id) : String(m);
 }
 
-// Classify a failed pre-test: quota exhaustion (demote, keep) vs hard failure (drop)
-// The ONE place that decides what a live pre-test result means. Every consumer
-// branches on `verdict` instead of re-spelling quota detection (flag vs the
-// sentinel latency encoding).
-//   'active' -> healthy now            'quota'  -> alive, upstream quota out
-//   'dead'   -> remove from combos
 function classifyTestResult(result) {
-  if (!result || typeof result !== 'object') return 'dead';
-  if (result.quotaExhausted === true) return 'quota';
-  if (result.latencyMs >= QUOTA_LATENCY_SENTINEL) return 'quota'; // parked/persisted encoding
-  return result.valid ? 'active' : 'dead';
+  if (!result) return 'dead';
+  const lat = typeof result.latencyMs === 'number' ? result.latencyMs : 0;
+  if (result.quotaExhausted === true || isParkedLatency(lat)) return 'quota';
+  if (result.valid === true || result.ok === true) return 'active';
+  return 'dead';
 }
 
-// Decode the persistence encoding for "parked at the bottom because quota".
-// QUOTA_LATENCY_SENTINEL stays the on-disk format; this is its only reader.
 function isParkedLatency(latencyMs) {
-  return Number(latencyMs) >= QUOTA_LATENCY_SENTINEL;
+  return typeof latencyMs === 'number' && latencyMs >= QUOTA_LATENCY_SENTINEL;
 }
 
-// Sort models array with User Custom Priorities -> Benchmark Capability -> Usage Reliability -> Latency Tie-Breaker.
-// `signals` = { benchmarks, priorities, usageStats } makes the call fully pure
-// (no file or SQLite reads); omitted -> legacy behaviour loads them itself.
+function isThinkingVariant(modelIdentifier) {
+  return /thinking|reasoning|reasoner/.test(String(modelIdentifier).toLowerCase());
+}
+
+function isSmartTierModel(modelIdentifier, benchmarks = null) {
+  const str = String(modelIdentifier).toLowerCase();
+  if (/thinking|reasoning|reasoner|r1\b/.test(str)) return true;
+  const match = findBenchmarkMatch(str, benchmarks || getBenchmarksDatabase());
+  return Boolean(match && typeof match.score === 'number' && match.score >= SMART_MIN_SCORE);
+}
+
+function passesAgenticGate(meta) {
+  if (!meta) return true;
+  if (meta.toolsUnsupported === true) return false;
+  if (meta.contextLength != null && meta.contextLength > 0 && meta.contextLength < AGENTIC_MIN_CONTEXT) return false;
+  return true;
+}
+
+// ----------------------------------------------------------------------------
+// Candidate Sorting & Assembly Pipeline (Candidate 3)
+// ----------------------------------------------------------------------------
+
 function sortModelsByCodingQuality(models, latencyMap = null, customPriorities = null, signals = null) {
-  const priorities = customPriorities ?? signals?.priorities ?? getPrioritiesList();
-  const benchmarks = signals?.benchmarks ?? getBenchmarksDatabase();
-  const usageStats = signals ? (signals.usageStats || new Map()) : null;
+  const priorities = (signals && signals.priorities) || customPriorities || getPrioritiesList();
+  const benchmarks = (signals && signals.benchmarks) || getBenchmarksDatabase();
+  const usageStats = (signals && signals.usageStats) || loadUsageFeedback();
+
+  const getLatency = m => {
+    if (typeof m === 'object' && m !== null && typeof m.latencyMs === 'number') return m.latencyMs;
+    const fullId = getModelFullId(m);
+    if (latencyMap && latencyMap.has(fullId)) return latencyMap.get(fullId);
+    return 9999;
+  };
 
   return [...models].sort((a, b) => {
     const idA = getModelFullId(a);
     const idB = getModelFullId(b);
 
-    const latA = typeof a === 'object' && a.latencyMs != null ? a.latencyMs : (latencyMap ? latencyMap.get(idA) ?? 99999 : 99999);
-    const latB = typeof b === 'object' && b.latencyMs != null ? b.latencyMs : (latencyMap ? latencyMap.get(idB) ?? 99999 : 99999);
+    const latA = getLatency(a);
+    const latB = getLatency(b);
 
-    // 0. Quota-exhausted models ALWAYS sink to the bottom, above every other rule
-    //    (user priorities included). Detected via object flag or the latency sentinel.
-    const quotaA = (typeof a === 'object' && (a.quotaExhausted === true || isParkedLatency(a.latencyMs))) || isParkedLatency(latA);
-    const quotaB = (typeof b === 'object' && (b.quotaExhausted === true || isParkedLatency(b.latencyMs))) || isParkedLatency(latB);
-    if (quotaA !== quotaB) {
-      return quotaA ? 1 : -1;
-    }
+    const quotaA = Boolean((typeof a === 'object' && a?.quotaExhausted) || isParkedLatency(latA));
+    const quotaB = Boolean((typeof b === 'object' && b?.quotaExhausted) || isParkedLatency(latB));
 
-    // 1. User defined priorities (e.g. priorities.json: rank 0 > rank 1 > rank 2...)
+    if (quotaA !== quotaB) return quotaA ? 1 : -1;
+
     const rankA = getModelPriorityRank(idA, priorities);
     const rankB = getModelPriorityRank(idB, priorities);
 
-    if (rankA !== rankB) {
-      return rankA - rankB;
-    }
+    if (rankA !== rankB) return rankA - rankB;
 
-    // 2. If both matched the SAME priority rule, prioritize lowest latency first
-    if (rankA !== Infinity && rankB !== Infinity) {
-      if (latA !== latB) return latA - latB;
-    }
+    const penaltyA = getUsagePenalty(idA, usageStats);
+    const penaltyB = getUsagePenalty(idB, usageStats);
 
-    // 3. Empirical benchmark / capability score minus real-world usage penalty
-    const scoreA = getCodingScore(idA, benchmarks) + getUsagePenalty(idA, usageStats);
-    const scoreB = getCodingScore(idB, benchmarks) + getUsagePenalty(idB, usageStats);
+    const scoreA = getCodingScore(idA, benchmarks) + penaltyA;
+    const scoreB = getCodingScore(idB, benchmarks) + penaltyB;
 
-    if (scoreB !== scoreA) {
-      return scoreB - scoreA;
-    }
+    if (scoreB !== scoreA) return scoreB - scoreA;
 
-    // 4. Secondary tie-breaker: fastest response latency
     return latA - latB;
   });
 }
 
-// ============================================================================
-// Credential readers - one generic shaper driven by the provider registry,
-// plus the bespoke branches it dispatches to. The legacy per-provider
-// getXxxCredentials() functions below are thin delegations kept for callers.
-// ============================================================================
-
-function getProviderCredentials(record) {
-  if (!record) return { apiKey: null };
-  if (record.credentialKind === 'scan') return scanConnectionCredentials(record);
-  if (record.credentialKind === 'kilo') return kiloConnectionCredentials(record);
-  if (record.credentialKind === 'bai') return baiConnectionCredentials(record);
-  if (record.credentialKind === 'cloudflare') return getCloudflareCredentials();
-  // default: native connection row -> { apiKey, prefix, baseUrl }
-  const parsed = record.connection ? getProviderConnection(record.connection) : null;
-  return {
-    apiKey: parsed?.apiKey || null,
-    prefix: parsed?.providerSpecificData?.prefix || record.prefixes[0],
-    baseUrl: (record.readBaseUrlFromConnection && parsed?.providerSpecificData?.baseUrl) || record.baseUrl
-  };
+function deriveTierLists(rankedAll, benchmarks = null) {
+  let smartList = rankedAll.filter(id => isSmartTierModel(id, benchmarks));
+  let fastList = rankedAll.filter(id => !isSmartTierModel(id, benchmarks) && !isThinkingVariant(id));
+  if (smartList.length < 3) smartList = rankedAll.slice(0, 5);
+  if (fastList.length < 3) fastList = rankedAll.slice(0, 5);
+  return { smartList, fastList };
 }
 
-// ponytail: only OpenAgentic needs a full-table host/name scan; add more
-// matchers here when a second provider grows the same shape.
-function scanConnectionCredentials(record) {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const rows = db.prepare("SELECT * FROM providerConnections WHERE isActive = 1").all();
-    db.close();
-
-    for (const row of rows) {
-      if (!row.data) continue;
-      try {
-        const parsed = JSON.parse(row.data);
-        const baseUrl = parsed?.providerSpecificData?.baseUrl || '';
-        const matchesHost = (record.matchHosts || []).some(host => baseUrl.includes(host));
-        if (matchesHost || (record.nameMatch && row.name?.toLowerCase().includes(record.nameMatch))) {
-          return {
-            apiKey: parsed.apiKey,
-            prefix: parsed?.providerSpecificData?.prefix || record.prefixes[0],
-            baseUrl: baseUrl || record.baseUrl
-          };
-        }
-      } catch {}
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for ${record.label}: ${err.message}`);
-  }
-  return { apiKey: null, prefix: record.prefixes[0], baseUrl: record.baseUrl };
-}
-
-function kiloConnectionCredentials(record) {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = ? AND isActive = 1").get(record.connection);
-    db.close();
-
-    if (row && row.data) {
-      const parsed = JSON.parse(row.data);
-      if (parsed.accessToken) {
-        return { accessToken: parsed.accessToken, prefix: 'kc', gatewayUrl: record.baseUrl };
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for Kilo credentials: ${err.message}`);
-  }
-  return { accessToken: null, prefix: 'kc', gatewayUrl: record.baseUrl };
-}
-
-// B.ai: preferred native "b.ai" connection; fallback to an openai-compatible
-// row whose baseUrl points at api.b.ai.
-function baiConnectionCredentials(record) {
-  const native = getProviderConnection(record.connection);
-  if (native && native.apiKey) {
-    return {
-      apiKey: native.apiKey,
-      prefix: native?.providerSpecificData?.prefix || 'b.ai',
-      baseUrl: native?.providerSpecificData?.baseUrl || record.baseUrl
-    };
-  }
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const rows = db.prepare("SELECT * FROM providerConnections WHERE isActive = 1").all();
-    db.close();
-
-    for (const row of rows) {
-      const provider = String(row.provider || '').toLowerCase();
-      if (!provider.startsWith('openai-compatible')) continue;
-      let parsed = null;
-      try { parsed = JSON.parse(row.data || '{}'); } catch { continue; }
-      const baseUrl = parsed?.providerSpecificData?.baseUrl || '';
-      if (!baseUrl.includes('api.b.ai')) continue;
-      return {
-        apiKey: parsed.apiKey || null,
-        prefix: parsed?.providerSpecificData?.prefix || 'b-ai',
-        baseUrl
-      };
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for B.ai credentials: ${err.message}`);
-  }
-  return { apiKey: null, prefix: 'b-ai', baseUrl: record.baseUrl };
-}
-
-// Extract OpenAgentic API Key and Provider Prefix from 9router Database
-// Extract OpenAgentic API Key and Provider Prefix from 9router Database
-function getOpenAgenticCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.oa);
-}
-
-// Extract Kilo.ai (KiloCode) Access Token from 9router Database
-
-// Extract Kilo.ai (KiloCode) Access Token from 9router Database
-function getKiloCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.kilo);
-}
-
-// Extract OpenRouter API Key and Provider Prefix from 9router Database
-
-// Extract OpenRouter API Key and Provider Prefix from 9router Database
-function getOpenRouterCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.openrouter);
-}
-
-// Extract Poolside API Key and Provider Prefix from 9router Database
-
-// Extract Poolside API Key and Provider Prefix from 9router Database
-function getPoolsideCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.poolside);
-}
-
-// Extract Gemini API Key and Provider Prefix from 9router Database
-
-// Extract Gemini API Key and Provider Prefix from 9router Database
-function getGeminiCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.gemini);
-}
-
-// Extract Ollama Cloud API Key and Provider Prefix from 9router Database
-
-// Extract Ollama Cloud API Key and Provider Prefix from 9router Database
-function getOllamaCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.ollama);
-}
-
-// Extract API.airforce API Key and Provider Prefix from 9router Database
-
-// Extract API.airforce API Key and Provider Prefix from 9router Database
-function getAirforceCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.airforce);
-}
-
-// Extract Bazaarlink API Key and Provider Prefix from 9router Database
-
-// Extract Bazaarlink API Key and Provider Prefix from 9router Database
-function getBazaarlinkCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.bazaarlink);
-}
-
-// Extract B.ai API Key from 9router Database. Preferred: a native "b.ai" provider
-// connection. Fallback: an openai-compatible connection whose baseUrl points at api.b.ai.
-
-// Extract B.ai API Key from 9router Database (native or openai-compatible fallback)
-function getBAiCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.bai);
-}
-
-// Scrape free models from OpenAgentic HTML landing page
-async function scrapeFreeModelsFromWeb() {
-  const freeModels = new Set();
-  try {
-    console.log('[-] Scraping OpenAgentic.id web for free tier models...');
-    const res = await fetch('https://openagentic.id/', {
-      headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64)' },
-      signal: AbortSignal.timeout(10000)
-    });
-    if (res.ok) {
-      const html = await res.text();
-      const freeCardRegex = /data-tier="free"[\s\S]*?<div class="truncate text-sm font-medium text-stone-100">([^<]+)<\/div>/g;
-      let match;
-      while ((match = freeCardRegex.exec(html)) !== null) {
-        const rawName = match[1].trim();
-        const slug = rawName.toLowerCase()
-          .replace(/\s*\(thinking\)/i, '-thinking')
-          .replace(/\s*\(free\)/i, '-free')
-          .replace(/[^a-z0-9.-]+/g, '-')
-          .replace(/^-+|-+$/g, '');
-        freeModels.add({ id: slug, name: rawName, source: 'oa-web-free-tier' });
-      }
-
-      if (html.includes('Gratis Claude Sonnet 4.5') || html.includes('claude-sonnet-4.5')) {
-        freeModels.add({ id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5', source: 'oa-web-hero-promo' });
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] Web scraping notice: ${err.message}`);
-  }
-  return Array.from(freeModels);
-}
-
-// Fetch free models from OpenAgentic API
-async function fetchFreeModelsFromApi(apiKey, baseUrl) {
-  const freeModels = [];
-  if (!apiKey) return freeModels;
-
-  try {
-    console.log('[-] Fetching model list from OpenAgentic API (/v1/models)...');
-    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
-    const res = await fetch(endpoint, {
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const data = json.data || [];
-
-      for (const m of data) {
-        const id = m.id || '';
-        const name = m.name || '';
-        const isExplicitFree = id.endsWith('-free') || name.toLowerCase().includes('free') || name.toLowerCase().includes('(free)');
-
-        if (isExplicitFree) {
-          freeModels.push({
-            id: id,
-            name: name || id,
-            source: 'oa-api-free-model'
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] OpenAgentic API fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Fetch free models from Kilo.ai Gateway API
-async function fetchKiloFreeModels(accessToken, gatewayUrl) {
-  const freeModels = [];
-  if (!accessToken) return freeModels;
-
-  try {
-    console.log('[-] Fetching free models from Kilo.ai Gateway (/api/gateway/models)...');
-    const endpoint = `${gatewayUrl.replace(/\/+$/, '')}/models`;
-    const res = await fetch(endpoint, {
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const models = Array.isArray(json) ? json : (json.data || []);
-
-      for (const m of models) {
-        const id = m.id || '';
-        const name = m.name || id;
-        const promptPrice = m.pricing?.prompt;
-        const isZeroPrice = promptPrice === '0' || promptPrice === '0.000000000000';
-        const isFree = m.isFree === true || isZeroPrice || id.endsWith(':free') || id.includes('/free');
-
-        if (isFree && !id.includes('content-safety') && !id.includes('lyria')) {
-          freeModels.push({
-            id: id,
-            name: name,
-            source: 'kilo-gateway-free'
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] Kilo.ai fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Fetch free models from OpenRouter API
-async function fetchOpenRouterFreeModels(apiKey, baseUrl = 'https://openrouter.ai/api/v1') {
-  const freeModels = [];
-  try {
-    console.log('[-] Fetching free models from OpenRouter API (/api/v1/models)...');
-    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
-    const headers = { 'User-Agent': 'Mozilla/5.0' };
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-
-    const res = await fetch(endpoint, {
-      headers,
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const models = Array.isArray(json) ? json : (json.data || []);
-
-      for (const m of models) {
-        const id = m.id || '';
-        const name = m.name || id;
-        const promptPrice = m.pricing?.prompt;
-        const isZeroPrice = promptPrice === '0' || promptPrice === '0.000000000000' || parseFloat(promptPrice) === 0;
-        const isFree = m.isFree === true || isZeroPrice || id.endsWith(':free') || id.includes('/free');
-
-        if (isFree && !id.includes('content-safety') && !id.includes('lyria') && !id.includes('embed') && !id.includes('tts')) {
-          freeModels.push({
-            id: id,
-            name: name,
-            source: 'openrouter-api-free'
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] OpenRouter fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Fetch free models from Poolside Inference API
-async function fetchPoolsideFreeModels(apiKey, baseUrl = 'https://inference.poolside.ai/v1') {
-  const freeModels = [];
-  if (!apiKey) return freeModels;
-
-  try {
-    console.log('[-] Fetching free models from Poolside API (/v1/models)...');
-    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
-    const res = await fetch(endpoint, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'User-Agent': 'Mozilla/5.0'
-      },
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const models = json.data || [];
-
-      for (const m of models) {
-        const id = m.id || '';
-        const name = m.name || id;
-        const promptPrice = m.pricing?.prompt;
-        const isZeroPrice = promptPrice === '0' || promptPrice === '0.000000000000' || parseFloat(promptPrice) === 0;
-        const isFree = m.is_free === true || isZeroPrice || id.endsWith(':free') || id.includes('/free');
-
-        if (isFree && !id.includes('content-safety') && !id.includes('lyria') && !id.includes('embed') && !id.includes('tts')) {
-          freeModels.push({
-            id: id,
-            name: name,
-            source: 'poolside-api-free'
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] Poolside fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Extract OpenCode free models directly from 9router (oc/*)
-function getTodaysOpenCodeFreeModels() {
-  console.log('[-] Extracting OpenCode free models directly from 9router...');
-  const baseOcFree = [
-    'oc/mimo-v2.5-free',
-    'oc/laguna-s-2.1-free',
-    'oc/deepseek-v4-flash-free',
-    'oc/qwen3.6-plus-free',
-    'oc/minimax-m3-free',
-    'oc/nemotron-3-ultra-free',
-    'oc/ling-3.0-flash-free',
-    'oc/north-mini-code-free'
-  ];
-
-  const modelObjects = baseOcFree.map(fullId => ({
-    id: fullId.replace(/^oc\//, ''),
-    fullId: fullId,
-    name: fullId.replace(/^oc\//, ''),
-    source: '9router-opencode'
-  }));
-
-  return {
-    prefix: 'oc',
-    models: sortModelsByCodingQuality(modelObjects)
-  };
-}
-
-// Merge and discover all free models from OpenAgentic
-async function getTodaysOpenAgenticFreeModels() {
-  const creds = getOpenAgenticCredentials();
-  const [webModels, apiModels] = await Promise.all([
-    scrapeFreeModelsFromWeb(),
-    fetchFreeModelsFromApi(creds.apiKey, creds.baseUrl)
+function buildComboMap({ free = [], cooldown = [], smart, fast, providers = [] }) {
+  const comboMap = new Map([
+    ['my9model-free', free],
+    ['my9model-cooldown', cooldown],
   ]);
-
-  const modelMap = new Map();
-  for (const m of apiModels) modelMap.set(m.id, m);
-  for (const m of webModels) {
-    if (!modelMap.has(m.id)) modelMap.set(m.id, m);
-  }
-
-  const baselineFreeIds = ['hy3-free', 'nemotron-3-ultra-free', 'mimo-v2.5-free'];
-  for (const id of baselineFreeIds) {
-    if (!modelMap.has(id)) {
-      modelMap.set(id, { id, name: id, source: 'oa-baseline' });
-    }
-  }
-
-  return {
-    prefix: creds.prefix || 'openagentic',
-    models: sortModelsByCodingQuality(Array.from(modelMap.values()))
-  };
-}
-
-// Merge and discover all free models from Kilo.ai
-async function getTodaysKiloFreeModels() {
-  const creds = getKiloCredentials();
-  const models = await fetchKiloFreeModels(creds.accessToken, creds.gatewayUrl);
-
-  return {
-    prefix: creds.prefix || 'kc',
-    models: sortModelsByCodingQuality(models)
-  };
-}
-
-// Merge and discover all free models from OpenRouter
-async function getTodaysOpenRouterFreeModels() {
-  const creds = getOpenRouterCredentials();
-  const models = await fetchOpenRouterFreeModels(creds.apiKey, creds.baseUrl);
-
-  return {
-    prefix: creds.prefix || 'openrouter',
-    models: sortModelsByCodingQuality(models)
-  };
-}
-
-// Merge and discover all free models from Poolside
-async function getTodaysPoolsideFreeModels() {
-  const creds = getPoolsideCredentials();
-  const models = await fetchPoolsideFreeModels(creds.apiKey, creds.baseUrl);
-
-  return {
-    prefix: creds.prefix || 'poolside',
-    models: sortModelsByCodingQuality(models)
-  };
-}
-
-// Fetch free models from Google Gemini API
-async function fetchGeminiFreeModels(apiKey, baseUrl = 'https://generativelanguage.googleapis.com/v1beta') {
-  const freeModels = [];
-  if (!apiKey) return freeModels;
-
-  try {
-    console.log('[-] Fetching model list from Google Gemini API (/v1beta/models)...');
-    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models?key=${apiKey}`;
-    const res = await fetch(endpoint, {
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const models = json.models || [];
-
-      for (const m of models) {
-        if (!m.supportedGenerationMethods || !m.supportedGenerationMethods.includes('generateContent')) {
-          continue;
-        }
-
-        const rawName = m.name || '';
-        const id = rawName.replace(/^models\//, '');
-        const name = m.displayName || id;
-        const lowerId = id.toLowerCase();
-
-        // Skip non-coding / audio / preview image / tts / robotics / custom tools
-        if (
-          lowerId.includes('image') ||
-          lowerId.includes('banana') ||
-          lowerId.includes('tts') ||
-          lowerId.includes('lyria') ||
-          lowerId.includes('robotics') ||
-          lowerId.includes('customtools') ||
-          lowerId.includes('embed')
-        ) {
-          continue;
-        }
-
-        freeModels.push({
-          id: id,
-          name: name,
-          source: 'gemini-api-free'
-        });
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] Gemini API fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Merge and discover all free models from Gemini
-async function getTodaysGeminiFreeModels() {
-  const creds = getGeminiCredentials();
-  const models = await fetchGeminiFreeModels(creds.apiKey, creds.baseUrl);
-
-  return {
-    prefix: creds.prefix || 'gemini',
-    models: sortModelsByCodingQuality(models)
-  };
-}
-
-// Fetch candidate models from Ollama Cloud API
-async function fetchOllamaFreeModels(apiKey, baseUrl = 'https://api.ollama.com/v1') {
-  const freeModels = [];
-  if (!apiKey) return freeModels;
-
-  try {
-    console.log('[-] Fetching model list from Ollama Cloud API (/v1/models)...');
-    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
-    const res = await fetch(endpoint, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'User-Agent': 'Mozilla/5.0'
-      },
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const models = Array.isArray(json) ? json : (json.data || json.models || []);
-
-      for (const m of models) {
-        const id = m.id || m.name || m.model || '';
-        if (!id) continue;
-        const name = m.name || id;
-
-        // Skip non-coding / audio / embed / video
-        const lowerId = id.toLowerCase();
-        if (
-          lowerId.includes('embed') ||
-          lowerId.includes('tts') ||
-          lowerId.includes('vision') ||
-          lowerId.includes('flux') ||
-          lowerId.includes('video') ||
-          lowerId.includes('safety')
-        ) {
-          continue;
-        }
-
-        // Skip models that strictly require a paid subscription on Ollama Cloud
-        if (
-          lowerId.includes('deepseek') ||
-          lowerId.includes('kimi') ||
-          lowerId.includes('glm') ||
-          lowerId.includes('mistral') ||
-          lowerId.includes('qwen') ||
-          lowerId.includes('minimax-m2.7')
-        ) {
-          continue;
-        }
-
-        freeModels.push({
-          id: id,
-          name: name,
-          source: 'ollama-cloud-free'
-        });
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] Ollama Cloud fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Merge and discover all free models from Ollama Cloud
-async function getTodaysOllamaFreeModels() {
-  const creds = getOllamaCredentials();
-  const models = await fetchOllamaFreeModels(creds.apiKey, creds.baseUrl);
-
-  return {
-    prefix: creds.prefix || 'ollama',
-    models: sortModelsByCodingQuality(models)
-  };
-}
-
-// Fetch free models from API.airforce API (/v1/models)
-async function fetchAirforceFreeModels(apiKey, baseUrl = 'https://api.airforce/v1') {
-  const freeModels = [];
-  if (!apiKey) return freeModels;
-
-  try {
-    console.log('[-] Fetching free models from API.airforce API (/v1/models)...');
-    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
-    const res = await fetch(endpoint, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'User-Agent': 'Mozilla/5.0'
-      },
-      signal: AbortSignal.timeout(10000)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const models = json.data || [];
-
-      for (const m of models) {
-        if (m.tier !== 'free' || m.status !== 'operational' || m.supports_chat === false) {
-          continue;
-        }
-
-        const id = m.id || '';
-        const name = m.name || id;
-        const lowerId = id.toLowerCase();
-
-        // Skip non-coding, music, audio, tts, reranker, image, upload
-        if (
-          lowerId.includes('suno') ||
-          lowerId.includes('voxtral') ||
-          lowerId.includes('rnj') ||
-          lowerId.includes('reranker') ||
-          lowerId.includes('embed') ||
-          lowerId.includes('tts') ||
-          lowerId.includes('mj_upload') ||
-          lowerId.includes('diffusion') ||
-          lowerId.includes('image')
-        ) {
-          continue;
-        }
-
-        freeModels.push({
-          id: id,
-          name: name,
-          source: 'airforce-api-free'
-        });
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] API.airforce fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Merge and discover all free models from API.airforce
-async function getTodaysAirforceFreeModels() {
-  const creds = getAirforceCredentials();
-  const models = await fetchAirforceFreeModels(creds.apiKey, creds.baseUrl);
-
-  return {
-    prefix: creds.prefix || 'api-airforce',
-    models: sortModelsByCodingQuality(models)
-  };
-}
-
-// Fetch free models from Bazaarlink API (/v1/models)
-async function fetchBazaarlinkFreeModels(apiKey, baseUrl = 'https://bazaarlink.ai/api/v1') {
-  const freeModels = [];
-  if (!apiKey) return freeModels;
-
-  try {
-    console.log('[-] Fetching free models from Bazaarlink API (/v1/models)...');
-    const endpoint = `${baseUrl.replace(/\/+$/, '')}/models`;
-    const res = await fetch(endpoint, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'User-Agent': 'Mozilla/5.0'
-      },
-      signal: AbortSignal.timeout(20000)
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      const models = Array.isArray(json) ? json : (json.data || []);
-
-      for (const m of models) {
-        const id = m.id || '';
-        const name = m.name || id;
-        const promptPrice = m.pricing?.prompt;
-        const isZeroPrice = promptPrice === '0' || promptPrice === '0.000000000000' || parseFloat(promptPrice) === 0;
-        const isFree = m.isFree === true || m.is_free === true || isZeroPrice || id.endsWith(':free') || id.includes('/free');
-
-        if (isFree && !id.includes('content-safety') && !id.includes('lyria') && !id.includes('embed') && !id.includes('tts') && !id.includes('image') && !id.includes('diffusion')) {
-          freeModels.push({
-            id: id,
-            name: name,
-            source: 'bazaarlink-api-free'
-          });
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[!] Bazaarlink fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Merge and discover all free models from Bazaarlink
-async function getTodaysBazaarlinkFreeModels() {
-  const creds = getBazaarlinkCredentials();
-  const models = await fetchBazaarlinkFreeModels(creds.apiKey, creds.baseUrl);
-
-  return {
-    prefix: creds.prefix || 'bazaarlink',
-    models: sortModelsByCodingQuality(models)
-  };
-}
-
-// Merge and discover all free models from B.ai (OpenAI-compatible /v1/models)
-
-async function getTodaysBAiFreeModels() {
-  const creds = getBAiCredentials();
-  const models = await fetchOpenAiCompatibleFreeModels({
-    label: 'B.ai', apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
-    skipPatterns: ['tts', 'embed', 'image', 'whisper', 'diffusion', 'rerank', 'guard', 'audio', 'speech']
-  });
-  return { prefix: creds.prefix || 'b.ai', models: sortModelsByCodingQuality(models) };
-}
-
-// ============================================================================
-// Additional free providers: Groq, Cerebras, Mistral, Cloudflare Workers AI
-// Each is optional: without a matching 9router connection the source is
-// skipped gracefully, and every candidate still passes the live pre-test
-// before it can enter any combo.
-// ============================================================================
-
-// Shared helper: read one active provider connection from the 9router database
-function getProviderConnection(providerName) {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT * FROM providerConnections WHERE provider = ? AND isActive = 1").get(providerName);
-    db.close();
-    if (row && row.data) return JSON.parse(row.data);
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for ${providerName}: ${err.message}`);
-  }
-  return null;
-}
-
-// Extract Groq API Key from 9router Database
-
-// Extract Groq API Key from 9router Database
-function getGroqCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.groq);
-}
-
-// Extract Cerebras API Key from 9router Database
-
-// Extract Cerebras API Key from 9router Database
-function getCerebrasCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.cerebras);
-}
-
-// Extract Mistral API Key from 9router Database (native 9router provider type)
-
-// Extract Mistral API Key from 9router Database (native 9router provider type)
-function getMistralCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.mistral);
-}
-
-// Extract NVIDIA NIM API Key from 9router Database (native 9router provider type)
-
-// Extract NVIDIA NIM API Key from 9router Database (native 9router provider type)
-function getNvidiaCredentials() {
-  return getProviderCredentials(PROVIDER_BY_KEY.nvidia);
-}
-
-// Cloudflare Workers AI credentials. Preferred: the native "cloudflare-ai" provider
-// connection in 9router (apiKey + providerSpecificData.accountId). Fallback: a
-// user-added openai-compatible connection whose baseUrl points at api.cloudflare.com.
-function getCloudflareCredentials() {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const rows = db.prepare("SELECT * FROM providerConnections WHERE isActive = 1").all();
-    db.close();
-
-    for (const row of rows) {
-      const provider = String(row.provider || '').toLowerCase();
-      if (provider !== 'cloudflare-ai') continue;
-      let parsed = null;
-      try { parsed = JSON.parse(row.data || '{}'); } catch { continue; }
-      const accountId = parsed?.providerSpecificData?.accountId || null;
-      if (!parsed.apiKey || !accountId) continue;
-      return { apiKey: parsed.apiKey, accountId, prefix: 'cloudflare-ai', baseUrl: '' };
-    }
-
-    for (const row of rows) {
-      const provider = String(row.provider || '').toLowerCase();
-      if (!provider.startsWith('openai-compatible')) continue;
-      let parsed = null;
-      try { parsed = JSON.parse(row.data || '{}'); } catch { continue; }
-      const baseUrl = parsed?.providerSpecificData?.baseUrl || '';
-      if (!baseUrl.includes('api.cloudflare.com')) continue;
-      const accountMatch = baseUrl.match(/accounts\/([^/]+)/);
-      return {
-        apiKey: parsed.apiKey || null,
-        accountId: accountMatch ? accountMatch[1] : null,
-        prefix: parsed?.providerSpecificData?.prefix || 'cloudflare-ai',
-        baseUrl
-      };
-    }
-  } catch (err) {
-    console.warn(`[!] Warning: Could not read 9router DB for Cloudflare: ${err.message}`);
-  }
-  return { apiKey: null, accountId: null, prefix: 'cloudflare-ai', baseUrl: '' };
-}
-
-// Generic OpenAI-compatible /models fetcher with per-provider free filtering
-async function fetchOpenAiCompatibleFreeModels({ label, apiKey, baseUrl, prefix, skipPatterns = [], requireApiKey = true }) {
-  const freeModels = [];
-  if (requireApiKey && !apiKey) {
-    console.log(`[⊘] ${label}: no API key/connection found in 9router, skipping (add the connection to enable).`);
-    return freeModels;
-  }
-
-  try {
-    console.log(`[-] Fetching free models from ${label} (/models)...`);
-    const headers = { 'User-Agent': 'Mozilla/5.0' };
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-
-    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/models`, {
-      headers,
-      signal: AbortSignal.timeout(15000)
-    });
-    if (!res.ok) {
-      console.warn(`[!] ${label} fetch notice: HTTP ${res.status}`);
-      return freeModels;
-    }
-
-    const json = await res.json();
-    const models = Array.isArray(json) ? json : (json.data || json.models || []);
-
-    // Alias-aware dedupe: providers like Mistral list canonical ids, dated snapshots
-    // and marketing names as SEPARATE rows that reference each other through
-    // circular `aliases` arrays. Group ids connected via aliases (union-find) and
-    // keep exactly one representative per group, preferring the "-latest" id.
-    const parentMap = new Map();
-    const findRoot = x => {
-      // Iterative find with path halving; always advance x toward the root
-      while (parentMap.get(x) !== x) {
-        const next = parentMap.get(parentMap.get(x));
-        if (next == null || next === undefined) break;
-        parentMap.set(x, next);
-        x = next;
-      }
-      return parentMap.get(x) ?? x;
-    };
-    const unionIds = (a, b) => {
-      const ra = findRoot(a);
-      const rb = findRoot(b);
-      if (ra !== rb) parentMap.set(ra, rb);
-    };
-    const ensureId = x => { if (!parentMap.has(x)) parentMap.set(x, x); };
-
-    const modelById = new Map();
-    for (const m of models) {
-      const id = String(m.id || m.name || m.model || '').toLowerCase();
-      if (!id) continue;
-      ensureId(id);
-      modelById.set(id, m);
-      for (const alias of (Array.isArray(m?.aliases) ? m.aliases : [])) {
-        const key = String(alias).toLowerCase();
-        if (!key) continue;
-        ensureId(key);
-        unionIds(id, key);
-      }
-    }
-
-    const representativeOfRoot = new Map();
-    const preferCandidate = (candidate, incumbent) => {
-      if (!incumbent) return true;
-      const candidateLatest = candidate.endsWith('-latest');
-      const incumbentLatest = incumbent.endsWith('-latest');
-      if (candidateLatest !== incumbentLatest) return candidateLatest;
-      return candidate.length < incumbent.length;
-    };
-    for (const id of modelById.keys()) {
-      const root = findRoot(id);
-      if (preferCandidate(id, representativeOfRoot.get(root))) {
-        representativeOfRoot.set(root, id);
-      }
-    }
-    const keepIds = new Set(representativeOfRoot.values());
-
-    const seenIds = new Set();
-    for (const m of models) {
-      const id = m.id || m.name || m.model || '';
-      if (!id || seenIds.has(id)) continue;
-      const name = m.name || m.summary || id;
-      const lowerId = id.toLowerCase();
-
-      if (skipPatterns.some(pat => lowerId.includes(pat))) continue;
-      if (!keepIds.has(lowerId)) continue;
-      seenIds.add(id);
-
-      freeModels.push({
-        id,
-        name,
-        source: `${prefix}-api-free`,
-        contextLength: Number(m.context_window || m.context_length || m.max_context_length || 0) || undefined
-      });
-    }
-  } catch (err) {
-    console.warn(`[!] ${label} fetch notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Fetch zero-cost text-generation models from Cloudflare Workers AI (free daily neurons)
-async function fetchCloudflareFreeModels(creds) {
-  const freeModels = [];
-  if (!creds.apiKey || !creds.accountId) {
-    console.log('[⊘] Cloudflare Workers AI: no "cloudflare-ai" connection found in 9router, skipping.');
-    console.log('    Add one in 9router (provider "Cloudflare", API token + Account ID from dash.cloudflare.com).');
-    return freeModels;
-  }
-
-  try {
-    console.log('[-] Fetching free models from Cloudflare Workers AI (models/search)...');
-    const endpoint = `https://api.cloudflare.com/client/v4/accounts/${creds.accountId}/ai/models/search`;
-    const perPage = 100;
-
-    for (let page = 1; page <= 5; page++) {
-      const res = await fetch(`${endpoint}?task=${encodeURIComponent('Text Generation')}&per_page=${perPage}&page=${page}`, {
-        headers: { 'Authorization': `Bearer ${creds.apiKey}`, 'User-Agent': 'Mozilla/5.0' },
-        signal: AbortSignal.timeout(15000)
-      });
-      if (!res.ok) {
-        console.warn(`[!] Cloudflare models/search notice: HTTP ${res.status}`);
-        break;
-      }
-
-      const json = await res.json();
-      const models = json.data || json.result || [];
-
-      for (const m of models) {
-        // The search API returns a UUID in `id`; the real model name (e.g.
-        // "@cf/zai-org/glm-5.2") lives in `name` and is what the API routes on.
-        const id = m.name || '';
-        if (!id) continue;
-        const lowerId = id.toLowerCase();
-
-        // Text-generation models only; drop embed/image/audio/tts/rerank/moderation
-        if (/embed|image|audio|speech|tts|whisper|flux|diffusion|rerank|guard|moderation/.test(lowerId)) continue;
-
-        // properties is an array of { property_id, value } pairs
-        const props = Object.fromEntries((Array.isArray(m.properties) ? m.properties : [])
-          .map(prop => [prop.property_id, prop.value]));
-
-        // Keep only models runnable on the free plan: no per-token price entry and
-        // no explicit "requires Workers paid plan" flag. Priced models answer 403
-        // on free accounts, so fetching them would only create combo churn.
-        const hasPrice = Array.isArray(props.price) && props.price.length > 0;
-        const needsPaid = String(props.require_workers_paid) === 'true';
-        if (hasPrice || needsPaid) continue;
-
-        freeModels.push({
-          id,
-          name: m.name || id,
-          source: 'cloudflare-workersai-free',
-          contextLength: Number(props.context_window || 0) || undefined
-        });
-      }
-
-      if (models.length < perPage) break;
-    }
-  } catch (err) {
-    console.warn(`[!] Cloudflare models/search notice: ${err.message}`);
-  }
-  return freeModels;
-}
-
-// Merge and discover all free models from Groq
-async function getTodaysGroqFreeModels() {
-  return discoverProvider(PROVIDER_BY_KEY.groq);
-}
-
-// Merge and discover all free models from Cerebras
-async function getTodaysCerebrasFreeModels() {
-  return discoverProvider(PROVIDER_BY_KEY.cerebras);
-}
-
-// Merge and discover all free models from Mistral (free "Experiment" tier)
-async function getTodaysMistralFreeModels() {
-  return discoverProvider(PROVIDER_BY_KEY.mistral);
-}
-
-// Merge and discover all free models from NVIDIA NIM (build.nvidia.com free credits)
-// The catalog response carries no pricing fields: every model on integrate.api.nvidia.com
-// runs on the account's free developer credits, so usability is decided by the live
-// pre-test. Skip patterns only remove non-LLM entries (embed/rerank/audio/vision/guard).
-async function getTodaysNvidiaFreeModels() {
-  return discoverProvider(PROVIDER_BY_KEY.nvidia);
-}
-
-// Merge and discover all free models from Cloudflare Workers AI
-async function getTodaysCloudflareFreeModels() {
-  const creds = getCloudflareCredentials();
-  const models = await fetchCloudflareFreeModels(creds);
-  return { prefix: creds.prefix || 'cloudflare-ai', models: sortModelsByCodingQuality(models) };
-}
-
-// ============================================================================
-// Provider discovery - driven by the registry in providers.js. Each entry
-// receives the provider record and returns { prefix, models }.
-// Adding a provider with a bespoke API means adding ONE entry here plus its
-// implementation; everything else (combos, wiring, exclusions) follows the
-// registry automatically.
-// ============================================================================
-const PROVIDER_DISCOVERY = {
-  openagentic: () => getTodaysOpenAgenticFreeModels(),
-  kilo: () => getTodaysKiloFreeModels(),
-  opencode: () => getTodaysOpenCodeFreeModels(),
-  openrouter: () => getTodaysOpenRouterFreeModels(),
-  poolside: () => getTodaysPoolsideFreeModels(),
-  gemini: () => getTodaysGeminiFreeModels(),
-  ollama: () => getTodaysOllamaFreeModels(),
-  airforce: () => getTodaysAirforceFreeModels(),
-  bazaarlink: () => getTodaysBazaarlinkFreeModels(),
-  bai: () => getTodaysBAiFreeModels(),
-  cloudflare: () => getTodaysCloudflareFreeModels(),
-  'openai-compatible': async record => {
-    const creds = getProviderCredentials(record);
-    const models = await fetchOpenAiCompatibleFreeModels({
-      label: record.label, apiKey: creds.apiKey, baseUrl: creds.baseUrl, prefix: creds.prefix,
-      skipPatterns: record.skipPatterns || [], requireApiKey: record.requireApiKey !== false
-    });
-    return { prefix: creds.prefix || record.prefixes[0], models: sortModelsByCodingQuality(models) };
-  }
-};
-
-// Discover free-model candidates for one provider record from the registry
-function discoverProvider(record) {
-  const impl = PROVIDER_DISCOVERY[record.kind];
-  if (!impl) throw new Error(`No discovery implementation for provider kind "${record.kind}"`);
-  return impl(record);
+  if (Array.isArray(smart)) comboMap.set('my9model-smart', smart);
+  if (Array.isArray(fast)) comboMap.set('my9model-fast', fast);
+  for (const [name, ids] of providers) comboMap.set(name, ids);
+  return comboMap;
 }
 
 /**
- * Pre-test a model via 9router internal test endpoint
- * - Definitive failures (401 promo ended, 402 paid, 403 subscription, 404 missing): dropped immediately.
- * - Transient failures (timeouts, network errors, 408/429/5xx): retried once before a verdict,
- *   so a single hiccup or burst rate-limit never evicts a healthy model for the whole day.
- * - Quota exhaustion (429 / "quota exceeded" after retry): flagged `quotaExhausted` so callers
- *   can demote the model to the bottom of the combo instead of dropping it. It comes back
- *   automatically once its upstream quota resets.
- * Measures response latency (ms) to prioritize faster connections.
+ * Deep ranking and assembly interface:
+ * Consolidates agentic gating, quality ranking, and multi-tier partitioning into one pure call.
  */
+function assembleCombos({ candidates, latencyMap = new Map(), metaMap = new Map(), signals = null }) {
+  const allIds = Array.from(new Set(candidates.map(getModelFullId)));
+
+  // Super-combo agentic readiness gate
+  const gatedIds = allIds.filter(id => passesAgenticGate(metaMap.get(id)));
+  const gatedActiveIds = gatedIds.filter(id => !isParkedLatency(latencyMap.get(id) ?? 0));
+  const gatedQuotaIds = gatedIds.filter(id => !gatedActiveIds.includes(id));
+
+  const unifiedList = sortModelsByCodingQuality(gatedActiveIds, latencyMap, null, signals);
+  const cooldownList = sortModelsByCodingQuality(gatedQuotaIds, latencyMap, null, signals);
+  const tiers = deriveTierLists(unifiedList, signals?.benchmarks);
+
+  return {
+    unified: unifiedList,
+    cooldown: cooldownList,
+    smart: tiers.smartList,
+    fast: tiers.fastList,
+    gatedOutCount: allIds.length - gatedIds.length
+  };
+}
+
+// ----------------------------------------------------------------------------
+// Pre-Testing Engine
+// ----------------------------------------------------------------------------
+
 async function testModelWith9router(fullModelId, token, attempt = 1, fetchImpl = null) {
   if (!token) return { valid: true, ok: true, latencyMs: 9999, verdict: 'active', note: '9router token unavailable' };
 
@@ -1543,31 +393,24 @@ async function testModelWith9router(fullModelId, token, attempt = 1, fetchImpl =
     const latencyMs = Date.now() - startTime;
     const data = await res.json().catch(() => ({}));
 
-    // 200 OK -> Reachable & Active
     if (data.ok) return { valid: true, ok: true, latencyMs, verdict: 'active' };
 
     const status = Number(data.status || res.status);
-    // Keep enough of the error body for reliable classification (some providers bury
-    // "Resource Exhausted" / quota markers deep in JSON), but display a short slice.
     const fullReason = String(data.error || `HTTP ${data.status || res.status}`).replace(/\s+/g, ' ').trim();
     const reason = fullReason.slice(0, 75);
     const quotaish = status === 429 || /quota|rate.?limit|resource.?exhaust|capacity/i.test(fullReason.slice(0, 400));
 
-    // Transient status -> retry once before judging
     if (TRANSIENT_HTTP_STATUSES.has(status) && attempt < 2) {
       await new Promise(r => setTimeout(r, QUOTA_RETRY_DELAY_MS));
       return { ...(await testModelWith9router(fullModelId, token, attempt + 1, fetchImpl)), retried: true };
     }
 
     const result = { valid: false, ok: false, latencyMs, status, reason };
-    if (quotaish) {
-      result.quotaExhausted = true;
-    }
+    if (quotaish) result.quotaExhausted = true;
     result.verdict = quotaish ? 'quota' : 'dead';
     return result;
   } catch (err) {
     const latencyMs = Date.now() - startTime;
-    // Network error / timeout -> transient, retry once before judging
     if (attempt < 2) {
       await new Promise(r => setTimeout(r, QUOTA_RETRY_DELAY_MS));
       return { ...(await testModelWith9router(fullModelId, token, attempt + 1, fetchImpl)), retried: true };
@@ -1578,9 +421,6 @@ async function testModelWith9router(fullModelId, token, attempt = 1, fetchImpl =
   }
 }
 
-/**
- * Filter model candidate list using exclusions and concurrency pool testing
- */
 async function validateCandidateModels(models, prefix) {
   const exclusions = getExclusionList();
   const nonExcludedModels = [];
@@ -1595,7 +435,7 @@ async function validateCandidateModels(models, prefix) {
     }
   }
 
-  const token = get9routerCliToken();
+  const token = storage.get9routerCliToken();
   if (!token) {
     console.log('[-] 9router CLI auth token not found or server offline, skipping live test.');
     return nonExcludedModels;
@@ -1614,7 +454,6 @@ async function validateCandidateModels(models, prefix) {
       const m = queue.shift();
       const fullId = m.fullId || `${prefix}/${m.id}`;
 
-      // Rate-limited providers (e.g. API.airforce's global 1-req/sec free tier)
       if (providerRecord?.throttleMs) await new Promise(r => setTimeout(r, providerRecord.throttleMs));
 
       const result = await testModelWith9router(fullId, token);
@@ -1625,9 +464,6 @@ async function validateCandidateModels(models, prefix) {
         console.log(`    [✓ Active] ${fullId} (${msText}) ${result.note ? '(' + result.note + ')' : ''}`);
         activeModels.push({ ...m, latencyMs: result.latencyMs });
       } else if (verdict === 'quota') {
-        // Quota exhausted today: keep the model but park it at the very bottom of the
-        // combo so IDE fallback never wastes latency on it first. It returns to its
-        // natural rank on the next sync once the upstream quota resets.
         console.log(`    [⏳ Quota] ${fullId} -> Kept at bottom (${result.reason})`);
         quotaLimitedModels.push({ ...m, latencyMs: QUOTA_LATENCY_SENTINEL, quotaExhausted: true });
       } else {
@@ -1645,11 +481,9 @@ async function validateCandidateModels(models, prefix) {
   ];
 }
 
-// ============================================================================
-// Delta notifications (optional): Telegram bot or Discord webhook via env vars
-//   TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID   and/or   DISCORD_WEBHOOK_URL
-// Unset -> silently skipped, sync keeps working without any notification.
-// ============================================================================
+// ----------------------------------------------------------------------------
+// Notifications & State Persistence
+// ----------------------------------------------------------------------------
 
 async function sendTextNotification(text) {
   const results = [];
@@ -1672,15 +506,9 @@ async function sendTextNotification(text) {
   };
 
   const jobs = [];
-  if (tgToken && tgChat) {
-    jobs.push(post('telegram', `https://api.telegram.org/bot${tgToken}/sendMessage`, {
-      chat_id: tgChat,
-      text
-    }));
-  }
-  if (discordUrl) {
-    jobs.push(post('discord', discordUrl, { content: text }));
-  }
+  if (tgToken && tgChat) jobs.push(post('telegram', `https://api.telegram.org/bot${tgToken}/sendMessage`, { chat_id: tgChat, text }));
+  if (discordUrl) jobs.push(post('discord', discordUrl, { content: text }));
+
   if (jobs.length > 0) {
     await Promise.all(jobs);
     console.log(`[*] Notification results: ${results.join(', ')}`);
@@ -1699,7 +527,6 @@ function buildDeltaMessage({ mode, added, removed, total }) {
   return lines.join('\n');
 }
 
-// Compute set difference between two model id lists
 function computeComboDelta(oldList, newList) {
   const oldSet = new Set((oldList || []).map(String));
   const newSet = new Set((newList || []).map(String));
@@ -1709,39 +536,6 @@ function computeComboDelta(oldList, newList) {
   };
 }
 
-// Read a combo's current model list straight from SQLite (pre-write snapshot)
-function readCurrentComboModels(comboName) {
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
-    const row = db.prepare("SELECT models FROM combos WHERE name = ?").get(comboName);
-    db.close();
-    if (row && row.models) {
-      const parsed = JSON.parse(row.models);
-      if (Array.isArray(parsed)) return parsed.map(String);
-    }
-  } catch {}
-  return [];
-}
-
-// All free combos managed by this tool: the super-combos plus one derived from
-// every provider record in the registry
-const MANAGED_COMBOS = [
-  'my9model-free', 'my9model-smart', 'my9model-fast', 'my9model-cooldown',
-  ...PROVIDERS.map(p => p.combo)
-];
-
-// Combo name -> model-id prefixes belonging to it (first segment of fullId),
-// derived from the provider registry
-const PROVIDER_COMBO_PREFIXES = Object.fromEntries(PROVIDERS.map(p => [p.combo, p.prefixes]));
-
-function idMatchesPrefixes(fullId, prefixes) {
-  const head = String(fullId).split('/')[0].toLowerCase();
-  return prefixes.includes(head);
-}
-
-// Persist the full validated candidate pool after a successful full sync so the
-// watchdog can re-admit models that recover from quota exhaustion later in the day.
 function saveCandidateState(defs, prefixedByProvider) {
   try {
     const providers = {};
@@ -1756,7 +550,6 @@ function saveCandidateState(defs, prefixedByProvider) {
   }
 }
 
-// Load the candidate pool as prefix -> Set(fullId). Returns an empty Map when absent.
 function loadCandidatePool() {
   try {
     if (!fs.existsSync(CANDIDATES_STATE_PATH)) return new Map();
@@ -1775,82 +568,12 @@ function loadCandidatePool() {
   }
 }
 
-// Derive the smart/fast tier sub-lists from an already-ranked super-combo list.
-// Pass `benchmarks` to keep derivation free of file reads.
-function deriveTierLists(rankedAll, benchmarks = null) {
-  let smartList = rankedAll.filter(id => isSmartTierModel(id, benchmarks));
-  let fastList = rankedAll.filter(id => !isSmartTierModel(id, benchmarks) && !isThinkingVariant(id));
-  if (smartList.length < 3) smartList = rankedAll.slice(0, 5);
-  if (fastList.length < 3) fastList = rankedAll.slice(0, 5);
-  return { smartList, fastList };
-}
-
-/**
- * Write combo updates: 9router API first (live server), SQLite as fallback.
- * Also snapshots the pre-write my9model-free list and notifies the delta.
- */
-async function persistCombos(comboMap, mode = 'daily-sync') {
-  const previousUnified = readCurrentComboModels('my9model-free');
+async function persistAndNotifyCombos(comboMap, mode = 'daily-sync') {
+  const previousUnified = storage.readCurrentComboModels('my9model-free');
   const delta = computeComboDelta(previousUnified, comboMap.get('my9model-free') || []);
 
-  // 1. Try updating via 9router API client if server is running
-  let updatedViaApi = false;
-  try {
-    const client = require(CLIENT_PATH);
-    if (client && typeof client.getCombos === 'function') {
-      const res = await client.getCombos();
-      if (res.success && res.data && res.data.combos) {
-        for (const combo of res.data.combos) {
-          const newList = comboMap.get(combo.name);
-          if (!Array.isArray(newList)) continue;
-          await client.updateCombo(combo.id, { name: combo.name, models: newList });
-          console.log(`[✓] Updated combo '${combo.name}' via 9router API (${newList.length} models)`);
-          updatedViaApi = true;
-        }
-      }
-    }
-  } catch {}
+  await storage.persistCombos(comboMap);
 
-  // 2. Direct SQLite update (also creates brand-new combos on first run)
-  try {
-    const Database = getDbClass();
-    const db = new Database(DB_PATH);
-    const existingCombos = db.prepare("SELECT * FROM combos").all();
-    const now = new Date().toISOString();
-
-    for (const [comboName, modelList] of comboMap) {
-      if (!Array.isArray(modelList)) continue;
-      const found = existingCombos.find(c => c.name === comboName);
-      if (found) {
-        db.prepare("UPDATE combos SET models = ?, updatedAt = ? WHERE id = ?").run(
-          JSON.stringify(modelList),
-          now,
-          found.id
-        );
-        console.log(`[✓] Synchronized combo '${comboName}' in 9router SQLite (${modelList.length} models)`);
-      } else {
-        const newId = crypto.randomUUID();
-        db.prepare("INSERT INTO combos (id, name, kind, models, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)").run(
-          newId,
-          comboName,
-          null,
-          JSON.stringify(modelList),
-          now,
-          now
-        );
-        console.log(`[✓] Created combo '${comboName}' in 9router SQLite (${modelList.length} models)`);
-      }
-    }
-
-    db.close();
-  } catch (err) {
-    if (!updatedViaApi) {
-      console.error(`[X] Error updating 9router database: ${err.message}`);
-      process.exit(1);
-    }
-  }
-
-  // 3. Notify the delta (silent no-op when no webhook/token configured)
   try {
     await sendTextNotification(buildDeltaMessage({
       mode,
@@ -1861,59 +584,36 @@ async function persistCombos(comboMap, mode = 'daily-sync') {
   } catch {}
 }
 
-// Assemble a managed combo map from already-ranked id lists. Pure: callers
-// decide WHICH combos to write by passing exactly those entries; keys left
-// out leave the persisted combo untouched (watchdog skips empty tiers,
-// daily sync always writes them).
-function buildComboMap({ free = [], cooldown = [], smart, fast, providers = [] }) {
-  const comboMap = new Map([
-    ['my9model-free', free],
-    ['my9model-cooldown', cooldown],
-  ]);
-  if (Array.isArray(smart)) comboMap.set('my9model-smart', smart);
-  if (Array.isArray(fast)) comboMap.set('my9model-fast', fast);
-  for (const [name, ids] of providers) comboMap.set(name, ids);
-  return comboMap;
-}
+// ----------------------------------------------------------------------------
+// Core Orchestration: Full Sync & Watchdog Refresh
+// ----------------------------------------------------------------------------
 
-/**
- * Watchdog refresh (--refresh): intra-day health pass over existing combo members.
- * - Never discovers/adds new models (that is the daily sync's job).
- * - Re-tests every member: healthy keep their rank (fresh latency),
- *   quota-exhausted are demoted to the bottom instead of dropped,
- *   hard-dead models (401 promo ended / 402 paid / 404 gone) are removed.
- */
 async function refreshCombos() {
   console.log('[*] Watchdog refresh: re-testing existing combo members (no discovery)...');
-  const token = get9routerCliToken();
+  const token = storage.get9routerCliToken();
   if (!token) {
     console.error('[X] 9router CLI auth token unavailable; live re-test impossible. Aborting without changes.');
     process.exit(1);
   }
 
-  // Load current managed combos
-  const current = new Map(); // name -> [ids]
+  const current = new Map();
   for (const name of MANAGED_COMBOS) {
-    const models = readCurrentComboModels(name);
+    const models = storage.readCurrentComboModels(name);
     if (models.length > 0) current.set(name, models);
   }
   const previousMembers = new Set(MANAGED_COMBOS.flatMap(n => current.get(n) || []));
 
-  // Candidate pool saved by the last full sync: lets models that recover from
-  // quota exhaustion rejoin their provider combo within the hour.
   const candidatePool = loadCandidatePool();
   const poolIds = Array.from(new Set([...candidatePool.values()].flatMap(s => [...s])));
   if (poolIds.length > 0) {
     console.log(`[*] Candidate pool: ${poolIds.length} ids from last full sync (recovered models can rejoin).`);
-  } else {
-    console.log('[*] No candidates-state.json yet — run a full sync once to enable recovery.');
   }
 
   const superIds = current.get('my9model-free') || [];
   const extraSuper = new Set([
     ...(current.get('my9model-smart') || []),
     ...(current.get('my9model-fast') || []),
-    ...(current.get('my9model-cooldown') || []) // parked models must keep being re-tested for recovery
+    ...(current.get('my9model-cooldown') || [])
   ]);
   const allIds = Array.from(new Set([
     ...superIds,
@@ -1927,7 +627,6 @@ async function refreshCombos() {
     return;
   }
 
-  // Live re-test with a bounded worker pool (staggered for rate-limited providers)
   const activeSet = new Set();
   const quotaSet = new Set();
   const latencyRefresh = new Map();
@@ -1958,7 +657,6 @@ async function refreshCombos() {
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, allIds.length) }, () => worker()));
 
-  // Rank helpers for rebuilds
   const rankedActive = sortModelsByCodingQuality(Array.from(activeSet), latencyRefresh);
   const rankedQuota = sortModelsByCodingQuality(Array.from(quotaSet), latencyRefresh);
 
@@ -1969,8 +667,6 @@ async function refreshCombos() {
 
   const tiers = deriveTierLists(rankedActive);
 
-  // Provider combos are CLEAN lists: only currently-active models qualify.
-  // Quota-exhausted models sit them out until they pass a live test again.
   const providerEntries = [];
   for (const name of MANAGED_COMBOS) {
     if (name.startsWith('my9model')) continue;
@@ -1981,13 +677,9 @@ async function refreshCombos() {
       ...poolIds.filter(id => idMatchesPrefixes(id, prefixes))
     ]);
     if (eligible.size === 0) continue;
-    // Fresh test evidence backs this write: an empty list means every member was
-    // re-tested this run and none passed — an honest empty state beats a stale list.
     providerEntries.push([name, rankedActive.filter(id => eligible.has(id))]);
   }
 
-  // Main super-combo is active-only; quota-exhausted models park in my9model-cooldown
-  // and are moved back automatically once they pass a live test again.
   const comboMap = buildComboMap({
     free: rankedActive,
     cooldown: rankedQuota,
@@ -2003,53 +695,17 @@ async function refreshCombos() {
     return;
   }
 
-  await persistCombos(comboMap, 'watchdog-refresh');
+  await persistAndNotifyCombos(comboMap, 'watchdog-refresh');
   console.log('\n[🎉] Watchdog refresh completed successfully.');
 }
 
-// ============================================================================
-// Agentic readiness helpers (super-combo quality gate)
-// ============================================================================
-
-// A model is "smart tier" when it has an empirical benchmark >= SMART_MIN_SCORE
-// or is a thinking/reasoning variant. Pass `benchmarks` to keep it pure.
-function isSmartTierModel(modelIdentifier, benchmarks = null) {
-  const str = String(modelIdentifier).toLowerCase();
-  if (/thinking|reasoning|reasoner|r1\b/.test(str)) return true;
-  const match = findBenchmarkMatch(str, benchmarks || getBenchmarksDatabase());
-  return Boolean(match && typeof match.score === 'number' && match.score >= SMART_MIN_SCORE);
-}
-
-// Thinking variants always belong to the smart combo, never the fast one
-function isThinkingVariant(modelIdentifier) {
-  return /thinking|reasoning|reasoner/.test(String(modelIdentifier).toLowerCase());
-}
-
-// Super-combo agentic gate: drop models whose provider metadata explicitly says
-// tool-calling is unsupported, and require a usable context window when known.
-function passesAgenticGate(meta) {
-  if (!meta) return true; // unknown metadata -> let it in (live pre-test already passed)
-  if (meta.toolsUnsupported === true) return false;
-  if (meta.contextLength != null && meta.contextLength > 0 && meta.contextLength < AGENTIC_MIN_CONTEXT) return false;
-  return true;
-}
-
-/**
- * Inject free models into 9router combos.
- * Accepts a single providers object:
- *   { oa, kilo, oc, openrouter, poolside, gemini, ollama, airforce, bazaarlink,
- *     groq, cerebras, mistral, cloudflare, nvidia }
- * Each entry: { prefix, models: [...] , excluded?: true }
- */
 async function injectInto9router(providers) {
   const p = providers || {};
-  // One def per registry record; missing entries count as excluded
   const defs = PROVIDERS.map(rec => {
     const data = p[rec.key] || { prefix: rec.prefixes[0], models: [], excluded: true };
     return [rec.key, data, rec.label];
   });
 
-  // Live-test each source (skipped when the whole provider is excluded)
   for (const [key, data] of defs) {
     if (data && !data.excluded && Array.isArray(data.models)) {
       data.validated = await validateCandidateModels(data.models, data.prefix);
@@ -2058,10 +714,9 @@ async function injectInto9router(providers) {
     }
   }
 
-  // Prefixed id list + metadata map per provider
   const prefixedByProvider = {};
-  const activeByProvider = {}; // CLEAN lists: quota-exhausted models excluded
-  const metaMap = new Map(); // fullId -> { contextLength?, toolsUnsupported? }
+  const activeByProvider = {};
+  const metaMap = new Map();
   const latencyMap = new Map();
 
   for (const [key, data] of defs) {
@@ -2080,7 +735,6 @@ async function injectInto9router(providers) {
     }
   }
 
-  // Per-provider validation report
   for (const [key, data, label] of defs) {
     if (data.excluded) {
       console.log(`\n[⊘] ${label}: Skipped (provider excluded)`);
@@ -2095,32 +749,21 @@ async function injectInto9router(providers) {
     }
   }
 
-  // Super-combo candidates: union of every provider, deduplicated
-  const allIds = Array.from(new Set(defs.flatMap(([key]) => prefixedByProvider[key])));
+  const allCandidates = defs.flatMap(([key]) => prefixedByProvider[key]);
+  const assembled = assembleCombos({
+    candidates: allCandidates,
+    latencyMap,
+    metaMap
+  });
 
-  // Agentic gate only applies to the super-combos (per-provider combos stay untouched)
-  const gatedIds = allIds.filter(id => passesAgenticGate(metaMap.get(id)));
-  const gatedOut = allIds.length - gatedIds.length;
-  if (gatedOut > 0) {
-    console.log(`\n[⚙] Agentic gate: ${gatedOut} model(s) left out of super-combo (no tools support or context < ${AGENTIC_MIN_CONTEXT}). Still kept in their dedicated provider combo.`);
+  if (assembled.gatedOutCount > 0) {
+    console.log(`\n[⚙] Agentic gate: ${assembled.gatedOutCount} model(s) left out of super-combo (no tools support or context < ${AGENTIC_MIN_CONTEXT}). Still kept in their dedicated provider combo.`);
   }
 
-  // Active-only main list; quota-exhausted models park in my9model-cooldown
-  const gatedActiveIds = gatedIds.filter(id => !isParkedLatency(latencyMap.get(id) ?? 0));
-  const gatedQuotaIds = gatedIds.filter(id => !gatedActiveIds.includes(id));
-  const unifiedList = sortModelsByCodingQuality(gatedActiveIds, latencyMap);
-  const cooldownList = sortModelsByCodingQuality(gatedQuotaIds, latencyMap);
+  console.log(`\n[+] Super-combo my9model-free: ${assembled.unified.length} models (all active)`);
+  console.log(`[+] my9model-smart: ${assembled.smart.length} models | my9model-fast: ${assembled.fast.length} models`);
+  console.log(`[+] my9model-cooldown: ${assembled.cooldown.length} model(s) parked (quota-exhausted)`);
 
-  // Fast / smart split (both fall back to the unified top-5 so they are never empty)
-  const tiers = deriveTierLists(unifiedList);
-  const smartList = tiers.smartList;
-  const fastList = tiers.fastList;
-
-  console.log(`\n[+] Super-combo my9model-free: ${unifiedList.length} models (all active)`);
-  console.log(`[+] my9model-smart: ${smartList.length} models | my9model-fast: ${fastList.length} models`);
-  console.log(`[+] my9model-cooldown: ${cooldownList.length} model(s) parked (quota-exhausted)`);
-
-  // Notice when a whole provider is temporarily quota-exhausted
   for (const [key, data, label] of defs) {
     if (!data.excluded && (data.validated || []).length > 0 && activeByProvider[key].length === 0) {
       console.log(`[i] ${label}: all ${(data.validated || []).length} models currently quota-exhausted — ${label}-free cleared until they recover.`);
@@ -2140,182 +783,18 @@ async function injectInto9router(providers) {
     })
     .filter(Boolean);
 
-  await persistCombos(buildComboMap({
-    free: unifiedList,
-    smart: smartList,
-    fast: fastList,
-    cooldown: cooldownList,
+  await persistAndNotifyCombos(buildComboMap({
+    free: assembled.unified,
+    smart: assembled.smart,
+    fast: assembled.fast,
+    cooldown: assembled.cooldown,
     providers: providerEntries
-  }));
-  saveCandidateState(defs, prefixedByProvider);
+  }), 'daily-sync');
 
+  saveCandidateState(defs, prefixedByProvider);
   console.log('\n[🎉] Synchronization completed successfully.');
 }
 
-// ============================================================================
-// Scheduler installation: systemd user timers first (Persistent=true gives
-// catch-up after the machine was off), crontab as fallback. Installs three jobs:
-//   - daily full sync      00:05
-//   - hourly watchdog      hh:35 (--refresh)
-//   - weekly benchmarks    Monday 04:17
-// ============================================================================
-function writeSystemdUnit(unitsDir, name, content) {
-  fs.mkdirSync(unitsDir, { recursive: true });
-  fs.writeFileSync(path.join(unitsDir, name), content);
-}
-
-function installScheduler() {
-  console.log('[*] Installing scheduler (systemd timers preferred, cron fallback)...');
-  const scriptPath = path.resolve(__filename);
-  const benchPath = path.join(path.dirname(scriptPath), 'update-benchmarks.js');
-  const logPath = path.join(path.dirname(scriptPath), 'sync.log');
-  const unitsDir = path.join(HOME, '.config', 'systemd', 'user');
-
-  const serviceUnit = `[Unit]
-Description=9router free models daily full sync
-
-[Service]
-Type=oneshot
-WorkingDirectory=${path.dirname(scriptPath)}
-ExecStart=/usr/bin/node ${scriptPath}
-`;
-
-  const serviceTimer = `[Unit]
-Description=Daily 00:05 full sync of free models into 9router
-
-[Timer]
-OnCalendar=*-*-* 00:05:00
-Persistent=true
-Unit=9router-auto-free.service
-
-[Install]
-WantedBy=timers.target
-`;
-
-  const watchdogService = `[Unit]
-Description=9router free combo watchdog (intra-day quota re-check)
-
-[Service]
-Type=oneshot
-WorkingDirectory=${path.dirname(scriptPath)}
-ExecStart=/usr/bin/node ${scriptPath} --refresh
-`;
-
-  const watchdogTimer = `[Unit]
-Description=Hourly watchdog re-test of free combos (quota demotion)
-
-[Timer]
-OnCalendar=*-*-* *:35:00
-Persistent=true
-Unit=9router-free-watchdog.service
-
-[Install]
-WantedBy=timers.target
-`;
-
-  const benchService = `[Unit]
-Description=Weekly live coding-benchmark database update
-
-[Service]
-Type=oneshot
-WorkingDirectory=${path.dirname(scriptPath)}
-ExecStart=/usr/bin/node ${benchPath}
-`;
-
-  const benchTimer = `[Unit]
-Description=Weekly benchmark update (Monday 04:17)
-
-[Timer]
-OnCalendar=Mon *-*-* 04:17:00
-Persistent=true
-Unit=9router-bench-update.service
-
-[Install]
-WantedBy=timers.target
-`;
-
-  // 1) Try systemd user timers
-  if (fs.existsSync('/run/systemd/system') || fs.existsSync('/usr/bin/systemctl')) {
-    try {
-      writeSystemdUnit(unitsDir, '9router-auto-free.service', serviceUnit);
-      writeSystemdUnit(unitsDir, '9router-auto-free.timer', serviceTimer);
-      writeSystemdUnit(unitsDir, '9router-free-watchdog.service', watchdogService);
-      writeSystemdUnit(unitsDir, '9router-free-watchdog.timer', watchdogTimer);
-      writeSystemdUnit(unitsDir, '9router-bench-update.service', benchService);
-      writeSystemdUnit(unitsDir, '9router-bench-update.timer', benchTimer);
-
-      // Avoid double-runs: strip any legacy cron lines installed by older versions
-      removeLegacyCronLines(scriptPath);
-
-      execSync('systemctl --user daemon-reload');
-      execSync('systemctl --user enable --now 9router-auto-free.timer 9router-free-watchdog.timer 9router-bench-update.timer');
-
-      let lingerNote = '';
-      try {
-        execSync(`loginctl enable-linger ${os.userInfo().username}`, { stdio: 'ignore' });
-      } catch {
-        lingerNote = '\n    Note: could not enable linger; timers run while you are logged in.\n    Run `sudo loginctl enable-linger ' + os.userInfo().username + '` for boot-level persistence.';
-      }
-
-      console.log('[✓] systemd user timers installed:');
-      console.log('    - 9router-auto-free.timer     daily 00:05 (full sync, Persistent=true)');
-      console.log('    - 9router-free-watchdog.timer hourly :35   (--refresh quota watchdog)');
-      console.log('    - 9router-bench-update.timer  Mon 04:17    (benchmark update)');
-      console.log(`    Log file: ${logPath}${lingerNote}`);
-      return;
-    } catch (err) {
-      console.warn(`[!] systemd installation failed (${String(err.message).split('\n')[0]}); falling back to crontab.`);
-    }
-  }
-
-  // 2) Crontab fallback
-  try {
-    const lines = [
-      '# Free Models Sync for 9router (installed by sync.js)',
-      `5 0 * * * /usr/bin/node ${scriptPath} >> ${logPath} 2>&1`,
-      `35 * * * * /usr/bin/node ${scriptPath} --refresh >> ${logPath} 2>&1`,
-      `17 4 * * 1 /usr/bin/node ${benchPath} >> ${logPath} 2>&1`
-    ];
-
-    let currentCrontab = '';
-    try { currentCrontab = execSync('crontab -l 2>/dev/null', { encoding: 'utf8' }); } catch {}
-
-    const filtered = currentCrontab.split('\n')
-      .filter(line => !line.includes('9router-auto-free') && !line.includes(scriptPath))
-      .filter(line => line.trim().length > 0);
-
-    filtered.push(...lines);
-    const newCrontab = filtered.join('\n') + '\n';
-    execSync(`echo "${newCrontab.replace(/"/g, '\"')}" | crontab -`);
-
-    console.log('[✓] Cron fallback installed:');
-    console.log('    - daily 00:05 full sync');
-    console.log('    - hourly :35 watchdog refresh (--refresh)');
-    console.log('    - Monday 04:17 benchmark update');
-    console.log(`    Log file: ${logPath}`);
-  } catch (err) {
-    console.error(`[X] Failed to install any scheduler: ${err.message}`);
-    console.log("    You can manually add the schedules shown above to 'crontab -e'.");
-  }
-}
-
-// Remove legacy per-version cron entries for this script (prevents double-runs)
-function removeLegacyCronLines(scriptPath) {
-  try {
-    const currentCrontab = execSync('crontab -l 2>/dev/null', { encoding: 'utf8' });
-    const filtered = currentCrontab.split('\n')
-      .filter(line => line.trim().length > 0)
-      .filter(line => !(line.includes('9router-auto-free') || line.includes(scriptPath)));
-
-    if (filtered.length === 0) {
-      execSync('crontab -r 2>/dev/null');
-      return;
-    }
-    execSync(`echo "${filtered.join('\n').replace(/"/g, '\"')}" | crontab -`);
-  } catch {}
-}
-
-// Main execution
 async function main() {
   const mode = isRefreshMode ? 'WATCHDOG REFRESH' : (isCronSetup ? 'SETUP SCHEDULER' : 'DAILY FULL SYNC');
   console.log('====================================================');
@@ -2327,7 +806,7 @@ async function main() {
   console.log('====================================================\n');
 
   if (isCronSetup) {
-    installScheduler();
+    scheduler.installScheduler();
     console.log('\n[*] Scheduler installed. Exiting (run `npm run sync` manually anytime).');
     return;
   }
@@ -2351,16 +830,7 @@ async function main() {
     console.log(`[⊘] Excluded providers via config (${excludedProviders.length}): ${excludedProviders.join(', ')}\n`);
   }
 
-  // Discover every registry provider in parallel; a provider is skipped when
-  // ANY of its alias spellings is excluded.
-  const results = {};
-  await Promise.all(PROVIDERS.map(async rec => {
-    const excluded = rec.prefixes.some(name => isProviderExcluded(name, excludedProviders));
-    results[rec.key] = excluded
-      ? { prefix: rec.prefixes[0], models: [], excluded: true }
-      : await discoverProvider(rec);
-  }));
-
+  const results = await discoverAllProviders({ excludedProviders });
   await injectInto9router(results);
 }
 
@@ -2392,66 +862,27 @@ module.exports = {
   buildComboMap,
   computeComboDelta,
   buildDeltaMessage,
-  readCurrentComboModels,
+  readCurrentComboModels: storage.readCurrentComboModels,
   MANAGED_COMBOS,
   getExclusionConfig,
   getExclusionList,
   getExcludedProviders,
   isProviderExcluded,
   isModelExcluded,
-  getOpenAgenticCredentials,
-  getKiloCredentials,
-  getOpenRouterCredentials,
-  getPoolsideCredentials,
-  getGeminiCredentials,
-  getOllamaCredentials,
-  getAirforceCredentials,
-  getBazaarlinkCredentials,
-  getBAiCredentials,
-  getGroqCredentials,
-  getCerebrasCredentials,
-  getMistralCredentials,
-  getCloudflareCredentials,
-  getNvidiaCredentials,
-  getTodaysOpenAgenticFreeModels,
-  getTodaysKiloFreeModels,
-  getTodaysOpenRouterFreeModels,
-  getTodaysPoolsideFreeModels,
-  getTodaysGeminiFreeModels,
-  getTodaysOllamaFreeModels,
-  getTodaysAirforceFreeModels,
-  getTodaysBazaarlinkFreeModels,
-  getTodaysBAiFreeModels,
-  getTodaysGroqFreeModels,
-  getTodaysCerebrasFreeModels,
-  getTodaysMistralFreeModels,
-  getTodaysCloudflareFreeModels,
-  getTodaysNvidiaFreeModels,
-  getTodaysOpenCodeFreeModels,
+  getProviderCredentials,
+  discoverProvider,
+  discoverAllProviders,
   testModelWith9router,
   validateCandidateModels,
-  scrapeFreeModelsFromWeb,
-  fetchFreeModelsFromApi,
-  fetchKiloFreeModels,
-  fetchOpenRouterFreeModels,
-  fetchPoolsideFreeModels,
-  fetchGeminiFreeModels,
-  fetchOllamaFreeModels,
-  fetchAirforceFreeModels,
-  fetchBazaarlinkFreeModels,
-  fetchOpenAiCompatibleFreeModels,
-  fetchCloudflareFreeModels,
   refreshCombos,
   injectInto9router,
+  assembleCombos,
   saveCandidateState,
   loadCandidatePool,
   deriveTierLists,
   PROVIDER_COMBO_PREFIXES,
   idMatchesPrefixes,
-  getCodingScore,
   PROVIDERS,
   PROVIDER_BY_KEY,
-  providerByPrefix,
-  discoverProvider,
-  getProviderCredentials
+  providerByPrefix
 };
