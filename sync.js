@@ -410,8 +410,22 @@ function getModelFullId(m) {
 }
 
 // Classify a failed pre-test: quota exhaustion (demote, keep) vs hard failure (drop)
-function isQuotaExhaustedResult(result) {
-  return Boolean(result && result.quotaExhausted);
+// The ONE place that decides what a live pre-test result means. Every consumer
+// branches on `verdict` instead of re-spelling quota detection (flag vs the
+// sentinel latency encoding).
+//   'active' -> healthy now            'quota'  -> alive, upstream quota out
+//   'dead'   -> remove from combos
+function classifyTestResult(result) {
+  if (!result || typeof result !== 'object') return 'dead';
+  if (result.quotaExhausted === true) return 'quota';
+  if (result.latencyMs >= QUOTA_LATENCY_SENTINEL) return 'quota'; // parked/persisted encoding
+  return result.valid ? 'active' : 'dead';
+}
+
+// Decode the persistence encoding for "parked at the bottom because quota".
+// QUOTA_LATENCY_SENTINEL stays the on-disk format; this is its only reader.
+function isParkedLatency(latencyMs) {
+  return Number(latencyMs) >= QUOTA_LATENCY_SENTINEL;
 }
 
 // Sort models array with User Custom Priorities -> Benchmark Capability -> Usage Reliability -> Latency Tie-Breaker.
@@ -431,8 +445,8 @@ function sortModelsByCodingQuality(models, latencyMap = null, customPriorities =
 
     // 0. Quota-exhausted models ALWAYS sink to the bottom, above every other rule
     //    (user priorities included). Detected via object flag or the latency sentinel.
-    const quotaA = (typeof a === 'object' && (a.quotaExhausted === true || a.latencyMs >= QUOTA_LATENCY_SENTINEL)) || latA >= QUOTA_LATENCY_SENTINEL;
-    const quotaB = (typeof b === 'object' && (b.quotaExhausted === true || b.latencyMs >= QUOTA_LATENCY_SENTINEL)) || latB >= QUOTA_LATENCY_SENTINEL;
+    const quotaA = (typeof a === 'object' && (a.quotaExhausted === true || isParkedLatency(a.latencyMs))) || isParkedLatency(latA);
+    const quotaB = (typeof b === 'object' && (b.quotaExhausted === true || isParkedLatency(b.latencyMs))) || isParkedLatency(latB);
     if (quotaA !== quotaB) {
       return quotaA ? 1 : -1;
     }
@@ -1510,12 +1524,13 @@ function discoverProvider(record) {
  *   automatically once its upstream quota resets.
  * Measures response latency (ms) to prioritize faster connections.
  */
-async function testModelWith9router(fullModelId, token, attempt = 1) {
-  if (!token) return { valid: true, ok: true, latencyMs: 9999, note: '9router token unavailable' };
+async function testModelWith9router(fullModelId, token, attempt = 1, fetchImpl = null) {
+  if (!token) return { valid: true, ok: true, latencyMs: 9999, verdict: 'active', note: '9router token unavailable' };
 
+  const doFetch = fetchImpl || fetch;
   const startTime = Date.now();
   try {
-    const res = await fetch('http://127.0.0.1:20128/api/models/test', {
+    const res = await doFetch('http://127.0.0.1:20128/api/models/test', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1529,7 +1544,7 @@ async function testModelWith9router(fullModelId, token, attempt = 1) {
     const data = await res.json().catch(() => ({}));
 
     // 200 OK -> Reachable & Active
-    if (data.ok) return { valid: true, ok: true, latencyMs };
+    if (data.ok) return { valid: true, ok: true, latencyMs, verdict: 'active' };
 
     const status = Number(data.status || res.status);
     // Keep enough of the error body for reliable classification (some providers bury
@@ -1541,22 +1556,23 @@ async function testModelWith9router(fullModelId, token, attempt = 1) {
     // Transient status -> retry once before judging
     if (TRANSIENT_HTTP_STATUSES.has(status) && attempt < 2) {
       await new Promise(r => setTimeout(r, QUOTA_RETRY_DELAY_MS));
-      return { ...(await testModelWith9router(fullModelId, token, attempt + 1)), retried: true };
+      return { ...(await testModelWith9router(fullModelId, token, attempt + 1, fetchImpl)), retried: true };
     }
 
     const result = { valid: false, ok: false, latencyMs, status, reason };
     if (quotaish) {
       result.quotaExhausted = true;
     }
+    result.verdict = quotaish ? 'quota' : 'dead';
     return result;
   } catch (err) {
     const latencyMs = Date.now() - startTime;
     // Network error / timeout -> transient, retry once before judging
     if (attempt < 2) {
       await new Promise(r => setTimeout(r, QUOTA_RETRY_DELAY_MS));
-      return { ...(await testModelWith9router(fullModelId, token, attempt + 1)), retried: true };
+      return { ...(await testModelWith9router(fullModelId, token, attempt + 1, fetchImpl)), retried: true };
     }
-    const result = { valid: false, ok: false, latencyMs, reason: err.message.slice(0, 75) };
+    const result = { valid: false, ok: false, latencyMs, reason: err.message.slice(0, 75), verdict: 'dead' };
     if (/timed?\s*out|abort/i.test(err.message)) result.timedOut = true;
     return result;
   }
@@ -1602,12 +1618,13 @@ async function validateCandidateModels(models, prefix) {
       if (providerRecord?.throttleMs) await new Promise(r => setTimeout(r, providerRecord.throttleMs));
 
       const result = await testModelWith9router(fullId, token);
+      const verdict = classifyTestResult(result);
 
-      if (result.valid) {
+      if (verdict === 'active') {
         const msText = `${result.latencyMs}ms`;
         console.log(`    [✓ Active] ${fullId} (${msText}) ${result.note ? '(' + result.note + ')' : ''}`);
         activeModels.push({ ...m, latencyMs: result.latencyMs });
-      } else if (isQuotaExhaustedResult(result)) {
+      } else if (verdict === 'quota') {
         // Quota exhausted today: keep the model but park it at the very bottom of the
         // combo so IDE fallback never wastes latency on it first. It returns to its
         // natural rank on the next sync once the upstream quota resets.
@@ -1844,6 +1861,21 @@ async function persistCombos(comboMap, mode = 'daily-sync') {
   } catch {}
 }
 
+// Assemble a managed combo map from already-ranked id lists. Pure: callers
+// decide WHICH combos to write by passing exactly those entries; keys left
+// out leave the persisted combo untouched (watchdog skips empty tiers,
+// daily sync always writes them).
+function buildComboMap({ free = [], cooldown = [], smart, fast, providers = [] }) {
+  const comboMap = new Map([
+    ['my9model-free', free],
+    ['my9model-cooldown', cooldown],
+  ]);
+  if (Array.isArray(smart)) comboMap.set('my9model-smart', smart);
+  if (Array.isArray(fast)) comboMap.set('my9model-fast', fast);
+  for (const [name, ids] of providers) comboMap.set(name, ids);
+  return comboMap;
+}
+
 /**
  * Watchdog refresh (--refresh): intra-day health pass over existing combo members.
  * - Never discovers/adds new models (that is the daily sync's job).
@@ -1912,10 +1944,11 @@ async function refreshCombos() {
       if (throttled?.throttleMs) await new Promise(r => setTimeout(r, throttled.throttleMs));
 
       const result = await testModelWith9router(fullId, token);
-      if (result.valid) {
+      const verdict = classifyTestResult(result);
+      if (verdict === 'active') {
         latencyRefresh.set(fullId, result.latencyMs);
         activeSet.add(fullId);
-      } else if (isQuotaExhaustedResult(result)) {
+      } else if (verdict === 'quota') {
         console.log(`    [⏳ Quota] ${fullId} demoted to bottom (${result.reason})`);
         quotaSet.add(fullId);
       } else {
@@ -1934,19 +1967,13 @@ async function refreshCombos() {
     if (!previousMembers.has(id)) recoveredCount++;
   }
 
-  const comboMap = new Map();
-  // Main super-combo is active-only; quota-exhausted models park in my9model-cooldown
-  // and are moved back automatically once they pass a live test again.
-  comboMap.set('my9model-free', rankedActive);
   const tiers = deriveTierLists(rankedActive);
-  if (tiers.smartList.length > 0) comboMap.set('my9model-smart', tiers.smartList);
-  if (tiers.fastList.length > 0) comboMap.set('my9model-fast', tiers.fastList);
-  comboMap.set('my9model-cooldown', rankedQuota);
 
   // Provider combos are CLEAN lists: only currently-active models qualify.
   // Quota-exhausted models sit them out until they pass a live test again.
+  const providerEntries = [];
   for (const name of MANAGED_COMBOS) {
-    if (name === 'my9model-free' || name === 'my9model-smart' || name === 'my9model-fast') continue;
+    if (name.startsWith('my9model')) continue;
     const prefixes = PROVIDER_COMBO_PREFIXES[name];
     if (!prefixes) continue;
     const eligible = new Set([
@@ -1956,8 +1983,18 @@ async function refreshCombos() {
     if (eligible.size === 0) continue;
     // Fresh test evidence backs this write: an empty list means every member was
     // re-tested this run and none passed — an honest empty state beats a stale list.
-    comboMap.set(name, rankedActive.filter(id => eligible.has(id)));
+    providerEntries.push([name, rankedActive.filter(id => eligible.has(id))]);
   }
+
+  // Main super-combo is active-only; quota-exhausted models park in my9model-cooldown
+  // and are moved back automatically once they pass a live test again.
+  const comboMap = buildComboMap({
+    free: rankedActive,
+    cooldown: rankedQuota,
+    smart: tiers.smartList.length > 0 ? tiers.smartList : undefined,
+    fast: tiers.fastList.length > 0 ? tiers.fastList : undefined,
+    providers: providerEntries
+  });
 
   console.log(`\n[Σ] Refresh result: ${activeSet.size} active, ${quotaSet.size} parked in cooldown, ${allIds.length - activeSet.size - quotaSet.size} removed permanently, ${recoveredCount} recovered into provider combos.`);
 
@@ -2031,7 +2068,7 @@ async function injectInto9router(providers) {
     const prefix = data.prefix;
     prefixedByProvider[key] = (data.validated || []).map(m => m.fullId || `${prefix}/${m.id}`);
     activeByProvider[key] = (data.validated || [])
-      .filter(m => !(m.quotaExhausted === true || m.latencyMs >= QUOTA_LATENCY_SENTINEL))
+      .filter(m => classifyTestResult({ valid: true, latencyMs: m.latencyMs }) === 'active')
       .map(m => m.fullId || `${prefix}/${m.id}`);
     for (const m of (data.validated || [])) {
       const fullId = m.fullId || `${prefix}/${m.id}`;
@@ -2069,7 +2106,7 @@ async function injectInto9router(providers) {
   }
 
   // Active-only main list; quota-exhausted models park in my9model-cooldown
-  const gatedActiveIds = gatedIds.filter(id => (latencyMap.get(id) ?? 0) < QUOTA_LATENCY_SENTINEL);
+  const gatedActiveIds = gatedIds.filter(id => !isParkedLatency(latencyMap.get(id) ?? 0));
   const gatedQuotaIds = gatedIds.filter(id => !gatedActiveIds.includes(id));
   const unifiedList = sortModelsByCodingQuality(gatedActiveIds, latencyMap);
   const cooldownList = sortModelsByCodingQuality(gatedQuotaIds, latencyMap);
@@ -2095,21 +2132,21 @@ async function injectInto9router(providers) {
     return;
   }
 
-  const comboMap = new Map([
-    ['my9model-free', unifiedList],
-    ['my9model-smart', smartList],
-    ['my9model-fast', fastList],
-    ['my9model-cooldown', cooldownList],
-    ...PROVIDERS.map(rec => {
+  const providerEntries = PROVIDERS
+    .map(rec => {
       const d = p[rec.key];
-      return [rec.combo, (!d?.excluded && (d?.validated?.length || 0) > 0) ? activeByProvider[rec.key] : null];
+      const list = (!d?.excluded && (d?.validated?.length || 0) > 0) ? activeByProvider[rec.key] : null;
+      return list ? [rec.combo, list] : null;
     })
-  ]);
-  for (const [name, list] of Array.from(comboMap)) {
-    if (!Array.isArray(list)) comboMap.delete(name);
-  }
+    .filter(Boolean);
 
-  await persistCombos(comboMap);
+  await persistCombos(buildComboMap({
+    free: unifiedList,
+    smart: smartList,
+    fast: fastList,
+    cooldown: cooldownList,
+    providers: providerEntries
+  }));
   saveCandidateState(defs, prefixedByProvider);
 
   console.log('\n[🎉] Synchronization completed successfully.');
@@ -2344,13 +2381,15 @@ module.exports = {
   findBenchmarkMatch,
   getUsagePenalty,
   loadUsageFeedback,
-  isQuotaExhaustedResult,
   isSmartTierModel,
   isThinkingVariant,
   passesAgenticGate,
   AGENTIC_MIN_CONTEXT,
   QUOTA_LATENCY_SENTINEL,
   TRANSIENT_HTTP_STATUSES,
+  classifyTestResult,
+  isParkedLatency,
+  buildComboMap,
   computeComboDelta,
   buildDeltaMessage,
   readCurrentComboModels,

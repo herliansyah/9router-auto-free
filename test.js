@@ -235,7 +235,8 @@ async function runTests() {
     passesAgenticGate,
     AGENTIC_MIN_CONTEXT,
     getUsagePenalty,
-    isQuotaExhaustedResult,
+    classifyTestResult,
+  buildComboMap,
     getModelFullId
   } = require('./sync.js');
 
@@ -276,9 +277,12 @@ async function runTests() {
   assert.strictEqual(getUsagePenalty('no-slash-id'), 0, 'Ids without prefix carry no penalty');
 
   // Quota classification
-  assert.strictEqual(isQuotaExhaustedResult({ quotaExhausted: true }), true, 'Quota flag must be honored');
-  assert.strictEqual(isQuotaExhaustedResult({ reason: 'HTTP 402' }), false, 'Paid model is not a quota case');
-  assert.strictEqual(isQuotaExhaustedResult(null), false, 'Null result is not a quota case');
+  assert.strictEqual(classifyTestResult({ quotaExhausted: true }), 'quota', 'Quota flag must map to the quota verdict');
+  assert.strictEqual(classifyTestResult({ reason: 'HTTP 402' }), 'dead', 'Paid model is dead');
+  assert.strictEqual(classifyTestResult(null), 'dead', 'Null result is dead');
+  assert.strictEqual(classifyTestResult({ valid: true, latencyMs: 1200 }), 'active', 'Healthy result is active');
+  assert.strictEqual(classifyTestResult({ valid: true, latencyMs: QUOTA_LATENCY_SENTINEL }), 'quota', 'Sentinel latency decodes to quota');
+  assert.strictEqual(classifyTestResult({ valid: false, latencyMs: QUOTA_LATENCY_SENTINEL + 5 }), 'quota', 'Parked encoding wins over valid flag');
 
   // Combo snapshot reader
   assert.ok(Array.isArray(readCurrentComboModels('my9model-free')), 'Combo reader must return an array');
@@ -419,6 +423,40 @@ async function runTests() {
         seen.set(alias, rec.key);
       }
     }
+  }
+
+  // 23. Verdict classifier drives an offline testModelWith9router (fake fetch)
+  {
+    const okJson = async () => ({ ok: true });
+    const fakeFetch = (url, opts) => {
+      const body = JSON.parse(opts.body);
+      return Promise.resolve({
+        status: 429,
+        json: async () => {
+          if (body.model.includes('good')) return { ok: true };
+          if (body.model.includes('quota')) return { ok: false, status: 429, error: 'rate limit exceeded' };
+          return { ok: false, status: 402, error: 'payment required' };
+        }
+      });
+    };
+    const active = await testModelWith9router('openrouter/good-model', 'tok', 1, fakeFetch);
+    assert.strictEqual(active.verdict, 'active', '200 path must carry the active verdict');
+    const quota = await testModelWith9router('openrouter/quota-model', 'tok', 1, fakeFetch);
+    assert.strictEqual(quota.verdict, 'quota', '429 after retry must carry the quota verdict');
+    assert.strictEqual(quota.quotaExhausted, true, 'persistence flag kept alongside verdict');
+    const dead = await testModelWith9router('openrouter/paid-model', 'tok', 1, fakeFetch);
+    assert.strictEqual(dead.verdict, 'dead', '402 must carry the dead verdict');
+    // No network happened: fakeFetch never touched 127.0.0.1 — proof is the test passing offline.
+
+    const comboMap = buildComboMap({
+      free: ['a', 'b'],
+      cooldown: ['c'],
+      smart: ['a'],
+      providers: [['openrouter-free', ['a']]]
+    });
+    assert.deepStrictEqual(Array.from(comboMap.get('my9model-free')), ['a', 'b']);
+    assert.strictEqual(comboMap.has('my9model-fast'), false, 'omitted keys must stay unwritten');
+    assert.deepStrictEqual(comboMap.get('my9model-cooldown'), ['c']);
   }
 
   console.log('[✓] All tests passed successfully!');
