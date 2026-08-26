@@ -84,6 +84,9 @@ const TRANSIENT_HTTP_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504, 529]
 // Managed combos, the combo-prefix map, the usage-feedback provider map and
 // benchmark-match prefix stripping are all DERIVED from its records below.
 const { PROVIDERS, PROVIDER_BY_KEY, providerByPrefix } = require('./providers.js');
+// Benchmarks module owns benchmarks.json (it writes, sync.js reads) and the
+// smart-tier score floor so the boundary cannot drift between the two files.
+const { BENCHMARKS_PATH, SMART_MIN_SCORE } = require('./update-benchmarks.js');
 const escapeRegExp = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const PROVIDER_PREFIX_RE = new RegExp(
   `^(?:${PROVIDERS.flatMap(p => p.prefixes).sort((a, b) => b.length - a.length).map(escapeRegExp).join('|')})/`
@@ -185,7 +188,6 @@ function isModelExcluded(modelIdentifier, exclusions) {
 }
 
 // Load empirical benchmarks database
-const BENCHMARKS_PATH = path.join(__dirname, 'benchmarks.json');
 function getBenchmarksDatabase() {
   try {
     if (fs.existsSync(BENCHMARKS_PATH)) {
@@ -375,9 +377,11 @@ function loadUsageFeedback(forceReload = false) {
   return stats;
 }
 
-// Compute real-world reliability penalty for a combo model id (0 = no penalty)
-function getUsagePenalty(fullId) {
-  const stats = loadUsageFeedback();
+// Compute real-world reliability penalty for a combo model id (0 = no penalty).
+// Pass `usageStats` (a Map from loadUsageFeedback) to keep this pure; omit it to
+// read the live 9router DB through the module cache.
+function getUsagePenalty(fullId, usageStats = null) {
+  const stats = usageStats || loadUsageFeedback();
   if (!stats || stats.size === 0) return 0;
 
   const slash = String(fullId).indexOf('/');
@@ -410,10 +414,13 @@ function isQuotaExhaustedResult(result) {
   return Boolean(result && result.quotaExhausted);
 }
 
-// Sort models array with User Custom Priorities -> Benchmark Capability -> Usage Reliability -> Latency Tie-Breaker
-function sortModelsByCodingQuality(models, latencyMap = null, customPriorities = null) {
-  const priorities = customPriorities || getPrioritiesList();
-  const benchmarks = getBenchmarksDatabase();
+// Sort models array with User Custom Priorities -> Benchmark Capability -> Usage Reliability -> Latency Tie-Breaker.
+// `signals` = { benchmarks, priorities, usageStats } makes the call fully pure
+// (no file or SQLite reads); omitted -> legacy behaviour loads them itself.
+function sortModelsByCodingQuality(models, latencyMap = null, customPriorities = null, signals = null) {
+  const priorities = customPriorities ?? signals?.priorities ?? getPrioritiesList();
+  const benchmarks = signals?.benchmarks ?? getBenchmarksDatabase();
+  const usageStats = signals ? (signals.usageStats || new Map()) : null;
 
   return [...models].sort((a, b) => {
     const idA = getModelFullId(a);
@@ -444,8 +451,8 @@ function sortModelsByCodingQuality(models, latencyMap = null, customPriorities =
     }
 
     // 3. Empirical benchmark / capability score minus real-world usage penalty
-    const scoreA = getCodingScore(idA, benchmarks) + getUsagePenalty(idA);
-    const scoreB = getCodingScore(idB, benchmarks) + getUsagePenalty(idB);
+    const scoreA = getCodingScore(idA, benchmarks) + getUsagePenalty(idA, usageStats);
+    const scoreB = getCodingScore(idB, benchmarks) + getUsagePenalty(idB, usageStats);
 
     if (scoreB !== scoreA) {
       return scoreB - scoreA;
@@ -1752,9 +1759,10 @@ function loadCandidatePool() {
 }
 
 // Derive the smart/fast tier sub-lists from an already-ranked super-combo list.
-function deriveTierLists(rankedAll) {
-  let smartList = rankedAll.filter(id => isSmartTierModel(id));
-  let fastList = rankedAll.filter(id => !isSmartTierModel(id) && !isThinkingVariant(id));
+// Pass `benchmarks` to keep derivation free of file reads.
+function deriveTierLists(rankedAll, benchmarks = null) {
+  let smartList = rankedAll.filter(id => isSmartTierModel(id, benchmarks));
+  let fastList = rankedAll.filter(id => !isSmartTierModel(id, benchmarks) && !isThinkingVariant(id));
   if (smartList.length < 3) smartList = rankedAll.slice(0, 5);
   if (fastList.length < 3) fastList = rankedAll.slice(0, 5);
   return { smartList, fastList };
@@ -1966,12 +1974,13 @@ async function refreshCombos() {
 // Agentic readiness helpers (super-combo quality gate)
 // ============================================================================
 
-// A model is "smart tier" when it has an empirical benchmark >= 60 or is a thinking/reasoning variant
-function isSmartTierModel(modelIdentifier) {
+// A model is "smart tier" when it has an empirical benchmark >= SMART_MIN_SCORE
+// or is a thinking/reasoning variant. Pass `benchmarks` to keep it pure.
+function isSmartTierModel(modelIdentifier, benchmarks = null) {
   const str = String(modelIdentifier).toLowerCase();
   if (/thinking|reasoning|reasoner|r1\b/.test(str)) return true;
-  const match = findBenchmarkMatch(str, getBenchmarksDatabase());
-  return Boolean(match && typeof match.score === 'number' && match.score >= 60);
+  const match = findBenchmarkMatch(str, benchmarks || getBenchmarksDatabase());
+  return Boolean(match && typeof match.score === 'number' && match.score >= SMART_MIN_SCORE);
 }
 
 // Thinking variants always belong to the smart combo, never the fast one
@@ -2340,6 +2349,8 @@ module.exports = {
   isThinkingVariant,
   passesAgenticGate,
   AGENTIC_MIN_CONTEXT,
+  QUOTA_LATENCY_SENTINEL,
+  TRANSIENT_HTTP_STATUSES,
   computeComboDelta,
   buildDeltaMessage,
   readCurrentComboModels,

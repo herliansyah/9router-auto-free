@@ -5,6 +5,11 @@
 
 const assert = require('node:assert');
 const {
+  QUOTA_LATENCY_SENTINEL,
+  MANAGED_COMBOS,
+  PROVIDER_COMBO_PREFIXES,
+  PROVIDERS,
+  getProviderCredentials,
   getCodingScore,
   sortModelsByCodingQuality,
   getPrioritiesList,
@@ -151,9 +156,10 @@ async function runTests() {
   const excludedProviders = getExcludedProviders();
   assert.ok(Array.isArray(exclusions) && exclusions.length > 0, 'Exclusions list must not be empty');
   assert.ok(Array.isArray(excludedProviders) && excludedProviders.includes('api-airforce'), 'api-airforce must be in excludedProviders');
-  assert.strictEqual(isProviderExcluded('api-airforce'), true, 'api-airforce must be reported as excluded');
-  assert.strictEqual(isProviderExcluded('gemini'), false, 'gemini must not be excluded');
-  assert.strictEqual(isProviderExcluded('bazaarlink'), false, 'bazaarlink must not be excluded');
+  assert.strictEqual(isProviderExcluded('api-airforce'), excludedProviders.includes('api-airforce'), 'isProviderExcluded must agree with the config for api-airforce');
+  for (const name of ['gemini', 'bazaarlink', 'openrouter', 'kilocode']) {
+    assert.strictEqual(isProviderExcluded(name), excludedProviders.includes(name), `isProviderExcluded must agree with the config for ${name}`);
+  }
   assert.ok(isModelExcluded('ollama/nemotron-3-nano:30b', exclusions), 'nano models must be excluded');
   assert.ok(isModelExcluded('openrouter/liquid/lfm-2.5-2.6b:free', exclusions), 'lfm small models must be excluded');
   assert.ok(isModelExcluded('poolside/poolside/laguna-xs-2.1', exclusions), 'laguna-xs models must be excluded');
@@ -363,6 +369,57 @@ async function runTests() {
   );
   assert.ok(scoreOf('groq/llama-3.3-70b-versatile') > 3000 && scoreOf('groq/llama-3.3-70b-versatile') < 9000, '"70b" ignored, real version 3.3 scored');
   assert.strictEqual(scoreOf('x/image'), -10000, 'non-coding models keep heavy penalty');
+
+  // 21. Ranking is deterministic when signals are injected (pure interface)
+  {
+    // Equal benchmark scores -> ordering comes purely from latency / usage penalty
+    const benchmarks = { 'a-fast': { score: 50 }, 'b-mid': { score: 50 }, 'c-slow': { score: 50 }, 'z-flaky': { score: 50 } };
+    const mk = (id, latencyMs) => ({ id, fullId: `openrouter/${id}`, name: id, latencyMs });
+    const models = [mk('z-flaky', 10), mk('c-slow', 200), mk('b-mid', 100), mk('a-fast', 50)];
+
+    const noStats = sortModelsByCodingQuality(models, null, null, { benchmarks, priorities: [], usageStats: new Map() }).map(m => m.id);
+    assert.deepStrictEqual(noStats, ['z-flaky', 'a-fast', 'b-mid', 'c-slow'], 'equal scores tie-break on ascending latency');
+
+    // 80% error rate over >= 5 samples -> -800 penalty sinks z-flaky despite its tiny latency
+    const usageStats = new Map([['openrouter|z-flaky', { ok: 2, err: 8 }]]);
+    const penalised = sortModelsByCodingQuality(models, null, null, { benchmarks, priorities: [], usageStats }).map(m => m.id);
+    assert.strictEqual(penalised.indexOf('z-flaky'), 3, 'penalised model must rank last');
+    assert.strictEqual(penalised.indexOf('a-fast'), 0, 'healthy models keep latency order');
+
+    // Below-min-sample stats (< 5 total) apply no penalty at all
+    const sparse = new Map([['openrouter|z-flaky', { ok: 2, err: 8 - 6 }]]);
+    const sparseRanked = sortModelsByCodingQuality(models, null, null, { benchmarks, priorities: [], usageStats: sparse }).map(m => m.id);
+    assert.strictEqual(sparseRanked.indexOf('z-flaky'), 0, 'insufficient samples -> no penalty');
+
+    // Quota sentinel sinks regardless of any signals
+    const quotaList = sortModelsByCodingQuality([{ ...mk('a-fast', QUOTA_LATENCY_SENTINEL), quotaExhausted: true }, mk('z-flaky', 10)], null, null, { benchmarks, priorities: [], usageStats: new Map() }).map(m => m.id);
+    assert.deepStrictEqual(quotaList, ['z-flaky', 'a-fast'], 'quota-exhausted models always sink');
+  }
+
+  // 22. Registry completeness: every record yields a coherent provider
+  {
+    const combos = new Set();
+    for (const rec of PROVIDERS) {
+      assert.ok(rec.key && rec.label && rec.combo && Array.isArray(rec.prefixes) && rec.prefixes.length > 0, `${rec.key}: key/label/combo/prefixes required`);
+      assert.ok(!combos.has(rec.combo), `combo name ${rec.combo} must be unique`);
+      combos.add(rec.combo);
+      assert.ok(typeof rec.kind === 'string' && rec.kind.length > 0, `${rec.key}: kind required`);
+      assert.ok(typeof getProviderCredentials === 'function', 'registry-driven credentials available');
+    }
+    assert.strictEqual(MANAGED_COMBOS.length, 3 + PROVIDERS.length, 'managed combos = 3 super-combos + one per provider');
+    for (const rec of PROVIDERS) {
+      assert.ok(Array.isArray(PROVIDER_COMBO_PREFIXES[rec.combo]), `prefix map must cover ${rec.combo}`);
+      assert.ok(MANAGED_COMBOS.includes(rec.combo), `managed combos must include ${rec.combo}`);
+    }
+    // Every alias spelling resolves to exactly one provider
+    const seen = new Map();
+    for (const rec of PROVIDERS) {
+      for (const alias of rec.prefixes) {
+        assert.ok(!seen.has(alias), `alias "${alias}" claimed by both ${seen.get(alias)} and ${rec.key}`);
+        seen.set(alias, rec.key);
+      }
+    }
+  }
 
   console.log('[✓] All tests passed successfully!');
 }

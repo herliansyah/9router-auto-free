@@ -227,4 +227,8 @@ if (require.main === module) {
   updateBenchmarks().catch(console.error);
 }
 
-module.exports = { updateBenchmarks, determineTier, normalizeKey, fetchSweBenchVerified, fetchLiveCodeBench };
+// Benchmark score floor for smart-tier combo membership (the A/B boundary of
+// determineTier). sync.js imports this instead of restating the number.
+const SMART_MIN_SCORE = 60;
+
+module.exports = { updateBenchmarks, determineTier, normalizeKey, fetchSweBenchVerified, fetchLiveCodeBench, SMART_MIN_SCORE, BENCHMARKS_PATH };
