@@ -1727,7 +1727,7 @@ function readCurrentComboModels(comboName) {
 // All free combos managed by this tool: the super-combos plus one derived from
 // every provider record in the registry
 const MANAGED_COMBOS = [
-  'my9model-free', 'my9model-smart', 'my9model-fast',
+  'my9model-free', 'my9model-smart', 'my9model-fast', 'my9model-cooldown',
   ...PROVIDERS.map(p => p.combo)
 ];
 

@@ -412,7 +412,8 @@ async function runTests() {
       assert.ok(typeof rec.kind === 'string' && rec.kind.length > 0, `${rec.key}: kind required`);
       assert.ok(typeof getProviderCredentials === 'function', 'registry-driven credentials available');
     }
-    assert.strictEqual(MANAGED_COMBOS.length, 3 + PROVIDERS.length, 'managed combos = 3 super-combos + one per provider');
+    assert.strictEqual(MANAGED_COMBOS.length, 4 + PROVIDERS.length, 'managed combos = 4 my9model-* super-combos + one per provider');
+    assert.ok(MANAGED_COMBOS.includes('my9model-cooldown'), 'cooldown parking lot must count as managed');
     for (const rec of PROVIDERS) {
       assert.ok(Array.isArray(PROVIDER_COMBO_PREFIXES[rec.combo]), `prefix map must cover ${rec.combo}`);
       assert.ok(MANAGED_COMBOS.includes(rec.combo), `managed combos must include ${rec.combo}`);
