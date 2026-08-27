@@ -1,410 +1,151 @@
+<p align="center">
+  <strong>English</strong> | <a href="README.id.md">Bahasa Indonesia</a>
+</p>
+
 # 9router-auto-free
 
-Otomasi harian untuk mengumpulkan **model AI gratis** dari 15 sumber provider, memvalidasinya dengan **live pre-test** langsung melalui 9router, mengurutkannya berdasarkan kapabilitas coding, lalu menyuntikkannya ke dalam combo 9router (`my9model-free`, `openagentic-free`, `kilo-free`, dll.) — sehingga IDE atau tool AI Anda selalu mendapat daftar model gratis yang benar-benar aktif, berkualitas, dan tercepat.
+Automated intelligent system that aggregates **100+ free AI coding models** from top providers, validates them via **live pre-tests** directly through 9router, ranks them by empirical coding benchmarks & latency, and injects them into ready-to-use 9router combos (`my9model-free`, `my9model-smart`, `my9model-fast`, `openagentic-free`, `kilo-free`, etc.) — allowing Cursor, Claude Code, Cline, and your IDEs to always use active, high-quality, and lowest-latency free AI models without key management headaches.
 
-> Script ini membaca kredensial provider dari **koneksi yang sudah dikonfigurasi di 9router**. Tidak ada API key yang disimpan di repositori ini.
-
----
-
-## Cara Kerja
-
-Setiap siklus sinkronisasi menjalankan enam tahap:
-
-1. **Kumpul kandidat** — scrape/fetch daftar model gratis dari 15 sumber (lihat [Sumber Model Gratis](#sumber-model-gratis)).
-2. **Filter blacklist** — kandidat dicek terhadap `exclusions.json` dan flag `--exclude-provider`.
-3. **Live pre-test paralel** — setiap kandidat dites langsung melalui endpoint internal 9router (`POST /api/models/test`) dengan pengukuran latensi riil.
-4. **Vonis** — model valid diterima; model kuota-habis (429) diparkirkan; model mati/berbayar/promo-habis dibuang; kegagalan transient di-retest sekali.
-5. **Ranking** — skor benchmark coding dikurangi penalti error-rate trafik nyata, di-tie-break dengan latensi, dan diutamakan oleh `priorities.json`.
-6. **Injeksi combo** — hasil ditulis ke database 9router; pool kandidat disimpan ke `candidates-state.json` sebagai bahan recovery watchdog.
+> **Security Note**: This script reads provider credentials from **connections already configured in your 9router SQLite database**. No API keys are stored in or transmitted by this repository.
 
 ---
 
-## Fitur Utama
+## 🌐 Modern Interactive Web Management Console
 
-### Validasi Live Pre-Test
+9router-auto-free includes a built-in dark-themed **Web Management Console** on port `20129`:
 
-Model tidak langsung masuk combo — semuanya diverifikasi hidup terlebih dahulu:
-
-| Hasil Test | Perlakuan |
-|---|---|
-| HTTP 200 | Diterima ke combo, latensi dicatat |
-| HTTP 429 / tanda *quota exceeded* | Diparkir ke `my9model-cooldown` (tidak dibuang), balik otomatis saat kuota reset |
-| HTTP 401 (promo berakhir), 402 (berbayar), 403 (subscription), 404 (hilang), timeout definitif | Dibuang |
-| Transient (timeout, network error, HTTP 408/425/429/5xx) | Di-retest satu kali sebelum divonis — satu hiccup jaringan tidak membuang model sehat |
-
-### Watchdog Intra-Hari (`--refresh`)
-
-Re-test ringan tiap jam (menit :35) **tanpa scrape ulang** untuk menutup celah "kuota habis di tengah hari":
-
-- Model sehat → tetap di ranking, latensi disegarkan.
-- Model kuota-habis → dipindah ke dasar `my9model-cooldown`.
-- Model yang pulih → otomatis kembali ke combo utama & combo providernya (recovery pool: `candidates-state.json`).
-- Model mati permanen (promo berakhir/berbayar/hilang) → dibuang.
-
-### Feedback Loop Usage Nyata
-
-Skor ranking bukan hanya benchmark statis. Script membaca tabel `usageHistory` milik 9router (7 hari terakhir) dan memberi **penalti ranking** pada model dengan error-rate tinggi di trafik nyata:
-
-| Error Rate | Sampel Minimum | Penalti |
-|---|---|---|
-| >= 50% | >= 5 request | -800 |
-| >= 25% | >= 5 request | -400 |
-
-Benchmark tetap sumber utama; penalti hanya menurunkan model yang terbukti sering gagal di dunia nyata.
-
-### Agentic Readiness Gate (Super-Combo)
-
-Super-combo (`my9model-free`, `-smart`, `-fast`) hanya menerima model siap-agentic:
-
-- Metadata eksplisit *tool-calling unsupported* → keluar dari super-combo (tetap ada di combo providernya).
-- Context window diketahui < 100.000 token → keluar dari super-combo.
-
-Threshold dapat diubah lewat konstanta `AGENTIC_MIN_CONTEXT` di `sync.js`.
-
-### Combo Turunan `smart` / `fast`
-
-- **`my9model-smart`**: model thinking/reasoning, atau benchmark >= `SMART_MIN_SCORE` — 60, diekspor `update-benchmarks.js` (untuk tugas berat).
-- **`my9model-fast`**: model non-thinking di luar tier smart (untuk respons cepat).
-- Jika salah satunya beranggota kurang dari 3 model, daftar itu diisi top-5 super-combo supaya tidak pernah kosong.
-
----
-
-## Sumber Model Gratis
-
-| # | Provider | Cara Ambil | Kriteria Gratis | Contoh ID |
-|---|---|---|---|---|
-| 1 | OpenAgentic.id | Web landing page (tier `free` + hero promo) dan Catalog API `/v1/models` via koneksi `openagentic` | Tier free / harga 0 | `openagentic/assistant-sonnet-4.5-thinking` |
-| 2 | Kilo.ai (KiloCode) | Gateway API `api.kilo.ai/api/gateway/models` via token OAuth | Harga 0 / `:free` | `kc/nvidia/nemotron-3-super-120b-a12b:free` |
-| 3 | OpenRouter | API `openrouter.ai/api/v1/models` | Harga 0 / `:free` | `openrouter/z-ai/glm-5.2:free` |
-| 4 | Poolside | Inference API `inference.poolside.ai/v1/models` | Harga 0 / `is_free: true` | `poolside/poolside/laguna-s-2.1` |
-| 5 | Google Gemini | Generative Language API `v1beta/models` via Gemini API Key | Free-tier AI Studio | `gemini/gemini-3.1-pro-preview` |
-| 6 | Ollama Cloud | API `api.ollama.com/v1/models` | Tanpa subscription | `ollama/minimax-m3` |
-| 7 | Groq | API `api.groq.com/openai/v1/models` | Semua model teks free-tier (rate-limited per model) | `groq/qwen/qwen3.6-27b` |
-| 8 | Bazaarlink | API `bazaarlink.ai/api/v1/models` | Harga 0 / `:free` | `bazaarlink/qwen/qwen3.7-flash:free` |
-| 9 | 9router OpenCode | Routing node OpenCode di 9router | Model `oc/*` gratis | `oc/laguna-s-2.1-free` |
-| 10 | Cerebras | API `api.cerebras.ai/v1/models` | Free-tier | - |
-| 11 | NVIDIA NIM | API `integrate.api.nvidia.com/v1/models` via koneksi native `nvidia` (key `nvapi-...` dari build.nvidia.com) | Kredit prototyping NVIDIA Developer Program; katalog tanpa kolom harga sehingga semua kandidat teks divalidasi live (embed/rerank/TTS/vision/guardrail dibuang lewat skip pattern) | `nvidia/meta/llama-3.1-70b-instruct` |
-| 12 | Mistral La Plateforme | API `api.mistral.ai/v1/models` via koneksi `mistral` | Mode free; deduplikasi alias otomatis ke id kanonik `-latest`; model berbayar dibuang oleh live pre-test | `mistral/devstral-latest` |
-| 13 | Cloudflare Workers AI | Koneksi native `cloudflare-ai` di 9router (fallback koneksi *openai-compatible*) | Hanya model tanpa harga dan tanpa flag `require_workers_paid` | `cloudflare-ai/@cf/meta/llama-3.1-8b-instruct` |
-| 14 | API.airforce | API `api.airforce/v1/models` via koneksi `api-airforce` | Model berlabel `tier: "free"` | `api-airforce/llama-3.3-70b-instruct-fp8-fast` |
-| 15 | B.ai | API `api.b.ai/v1/models` — koneksi *openai-compatible* di 9router dengan baseUrl `https://api.b.ai/v1` (fallback koneksi native `b.ai`) | Free-tier (filter live pre-test); non-coding di-skip | `b-ai/hy3` |
-
-### 🌐 Dynamic Provider Auto-Discovery (Semua Provider Lainnya)
-
-Selain 15 sumber bawaan di atas, sistem **otomatis mendeteksi provider OpenAI-compatible baru** yang Anda tambahkan di 9router (seperti *DeepSeek, SiliconFlow, Together AI, Fireworks, Chutes, Novita, Nebius, Qwen, Ollama, LMStudio, vLLM*, atau *Custom Node*):
-- Model ditarik secara dinamis dari endpoint `/models` / `/v1/models`.
-- Langsung diuji lewat *Live Pre-Test* dan diinjeksi ke combo super serta combo provider (`<provider>-free`).
-- Partisipasi sync dapat diaktifkan/dinonaktifkan secara instan via tombol toggle **Auto-Sync Free** di Web Dashboard.
-
-
-Delapan provider dinonaktifkan secara default melalui [`exclusions.json`](exclusions.json): **API.airforce** (rate limit ketat 1 req/detik di plan gratis), **Cloudflare** (plan gratis hanya menyisakan sedikit model LoRA lama), **Mistral** (mayoritas katalog sudah berbayar), **NVIDIA NIM**, **Groq**, **Bazaarlink**, **Cerebras**, dan **B.ai**. Hapus entri mereka di `excludedProviders` bila ingin mengaktifkan kembali.
-
-> Catatan: integrasi GitHub Models **tidak ditambahkan** karena layanan ini sudah di-retire GitHub per 30 Juli 2026 (endpoint `models.github.ai` mengembalikan HTTP 410 permanen).
-
----
-
-## Combo yang Dikelola
-
-Sync harian menulis ulang semua combo di bawah; watchdog menyegarkan combo yang anggotanya lolos re-test (tier kosong dibiarkan). Combo lain milik pengguna tidak disentuh.
-
-| Combo | Isi |
-|---|---|
-| `my9model-free` | Super-combo lintas provider — 100% model aktif, urut skor coding & latensi |
-| `my9model-smart` | Subset thinking/reasoning & benchmark tinggi dari super-combo |
-| `my9model-fast` | Subset non-thinking tercepat dari super-combo |
-| `my9model-cooldown` | Parkiran model kuota-habis (429); watchdog memindahkan balik saat lolos re-test |
-| `openagentic-free` | Model gratis OpenAgentic.id yang aktif |
-| `kilo-free` | Model gratis Kilo.ai yang aktif |
-| `openrouter-free` | Model gratis OpenRouter yang aktif |
-| `poolside-free` | Model gratis Poolside yang aktif |
-| `gemini-free` | Model gratis Google Gemini yang aktif |
-| `ollama-free` | Model gratis Ollama Cloud yang aktif |
-| `opencode-free` | Model gratis OpenCode (`oc/*`) yang aktif |
-| `groq-free` | Model gratis Groq yang aktif (jika tidak di-exclude) |
-| `cerebras-free` | Model gratis Cerebras yang aktif (jika tidak di-exclude) |
-| `mistral-free` | Model gratis Mistral yang aktif (jika tidak di-exclude) |
-| `airforce-free` | Model gratis API.airforce yang aktif (jika tidak di-exclude) |
-| `bazaarlink-free` | Model gratis Bazaarlink yang aktif (jika tidak di-exclude) |
-| `b.ai-free` | Model gratis B.ai yang aktif (jika tidak di-exclude) |
-| `cloudflare-free` | Model gratis Cloudflare Workers AI yang aktif (jika tidak di-exclude) |
-| `nvidia-free` | Model gratis NVIDIA NIM yang aktif (jika tidak di-exclude) |
-
-Combo per-provider hanya memuat model yang **sedang hidup** — model kuota-habis dikeluarkan agar daftar di IDE selalu bisa dipakai, lalu masuk lagi otomatis begitu kuota reset dan lolos re-test watchdog.
-
----
-
-## Konfigurasi
-
-### Blacklist Provider & Model (`exclusions.json`)
-
-Anda dapat mengecualikan provider tertentu, atau model-model dengan kualitas kurang bagus, ukuran kecil (*nano*, *tiny*, *xs*, *lfm*), maupun non-coding (TTS, embed, video, dsb.). Aturan model berupa substring/ID dan dievaluasi **sebelum** live test, sehingga menghemat panggilan test:
-
-```json
-{
-  "excludedProviders": [
-    "api-airforce",
-    "cloudflare",
-    "mistral",
-    "nvidia",
-    "groq",
-    "bazaarlink",
-    "cerebras",
-    "b.ai"
-  ],
-  "excludedModels": [
-    "nano",
-    "tiny",
-    "laguna-xs",
-    "north-mini",
-    "lfm",
-    "gemma",
-    "gpt-oss",
-    "bazaarlink/auto:free",
-    "dots-studio",
-    "openrouter/free",
-    "content-safety",
-    "tts",
-    "embed",
-    "image",
-    "flux",
-    "wan2",
-    "video",
-    "lyria",
-    "kilo-auto/free"
-  ]
-}
-```
-
-- **`excludedProviders`**: provider yang terdaftar di-skip total — tidak di-query dan tidak masuk super-combo.
-- **`excludedModels`**: model yang cocok dengan aturan substring/ID otomatis di-skip sejak awal.
-- Format lama (array polos berisi string `"provider:nama"` dan nama model) tetap didukung.
-- Eksklusi provider juga bisa lewat CLI tanpa mengubah file: `node sync.js --exclude-provider=api-airforce,ollama`.
-
-### Prioritas Model Kustom (`priorities.json`)
-
-Tentukan sendiri urutan model favorit. Nama tidak harus persis — cukup *keyword*/substring yang mirip:
-
-```json
-[
-  "0x-alpha",
-  "ox-alpha",
-  "hy3",
-  "laguna",
-  "longcat"
-]
-```
-
-- Model yang cocok dengan item pertama ditempatkan di posisi #1, item kedua di #2, dst.
-- Jika beberapa model cocok dengan aturan yang sama, **latensi tercepat** menempati urutan teratas dalam kelompok itu.
-- Model lain tetap diurutkan otomatis di bawahnya berdasarkan skor benchmark coding.
-
----
-
-## Pemeringkatan Kapabilitas Coding
-
-Skor model dihitung empiris dari leaderboard coding publik, bukan tebakan statis.
-
-### Database Benchmark (`benchmarks.json`)
-
-Perintah `update-benchmarks.js` menggabungkan tiga sumber resmi ke satu cache terpadu (350+ model):
-
-| Sumber | Data Diambil |
-|---|---|
-| [EvalPlus Leaderboard](https://github.com/evalplus/evalplus.github.io) | HumanEval+ (bobot 60%) + MBPP+ (bobot 40%) |
-| [SWE-bench Verified](https://www.swebench.com/) | Resolved rate per model dari leaderboard resmi |
-| [LiveCodeBench](https://livecodebench.github.io/) | Rata-rata pass@1 (model dengan >= 20 soal terekam) |
-
-Hasil gabungan ditulis ke [`benchmarks.json`](benchmarks.json). *Calibrated baseline* untuk model frontier/proprietary (Gemini, Claude Sonnet, DeepSeek, GLM, Step, dll.) **selalu menang** pada nilai skor; sumber live hanya mengisi model yang belum tercakup. Label tier sendiri **tidak pernah diketik manual** — setiap kali database ditulis, semua tier dihitung ulang dari skornya lewat `determineTier()`, sehingga label selalu konsisten dengan skala di atas.
-
-### Formula Skor
-
-- Skor benchmark dikali 100, ditambah bonus: `thinking`/`reasoning` (+400), `flash`/`lightning` (+150).
-- Model baru yang belum terdaftar dinilai lewat **heuristic fallback**: keluarga arsitektur (Claude/GPT/DeepSeek/Gemini/Qwen/GLM/poolside, dll.), generasi versi, dan modifier coding/thinking.
-- Label tier pada database mengikuti skala: **S** (>= 80), **A+** (70-79), **A** (60-69), **B+** (50-59), **B** (45-49), **C+** (< 45).
-
-### Tie-Breaker Latensi
-
-Ketika dua atau lebih model memiliki skor atau prioritas setara, sistem mengukur waktu respons riil (*round-trip*) dari live pre-test dan menempatkan koneksi tercepat di urutan atas. Model kuota-habis ditandai sentinel latensi khusus sehingga selalu berada di dasar combo.
-
----
-
-## Prasyarat
-
-- **Node.js >= 18** (memakai `fetch` global dan `AbortSignal.timeout`).
-- **9router** terinstall dan berjalan di `http://localhost:20128`, beserta modul global `better-sqlite3` (biasanya terpasang bersama 9router).
-- **Koneksi provider aktif** di 9router (OpenAgentic, KiloCode, OpenRouter, Gemini, dst.) — kredensial dibaca read-only dari database 9router.
-- Tidak ada dependency lokal yang perlu di-install (`package.json` bebas dependency runtime); `npm install` opsional.
-
----
-
-## Instalasi & Penggunaan via NPM / NPX
-
-Jika Anda menginstall dari **NPM Registry**, Anda dapat menjalankannya langsung:
+- **Unified Authentication**: Login using the same password as your 9router dashboard.
+- **Top 5 Leaderboard**: Real-time ranking of top free coding models with benchmark scores & latencies.
+- **Provider Catalog & Auto-Sync**: Manage provider connections and toggle auto-discovery per provider.
+- **Visual Exclusions & Priorities**: Manage `exclusions.json` and `priorities.json` with tag-based UI or raw JSON editor.
+- **Real-Time Streaming CLI Console**: Execute *Sync*, *Dry Run*, *Watchdog Refresh*, and *Scheduler Setup* with live SSE log streaming.
+- **Full Bilingual Support**: Instant toggle between **English 🇬🇧** and **Bahasa Indonesia 🇮🇩**.
 
 ```bash
-# 1. Jalankan langsung via NPX (Zero-Install):
-npx 9router-auto-free                 # Full sync harian
-npx 9router-auto-free --web           # Web Console Dashboard (port 20129)
-npx 9router-auto-free --setup-cron    # Pasang scheduler otomatis (systemd/cron)
+# Start the Web Console
+npx 9router-auto-free --web
+# Or locally: npm run web
+```
+Access in your browser: `http://localhost:20129`
 
-# 2. ATAU install secara Global:
+---
+
+## 🚀 Installation & Usage via NPM / NPX
+
+### 1. Zero-Install (via NPX)
+
+```bash
+# Run Full Daily Sync immediately
+npx 9router-auto-free
+
+# Launch Web Console Dashboard
+npx 9router-auto-free --web
+
+# Simulate sync without modifying SQLite database (Dry Run)
+npx 9router-auto-free --dry-run
+
+# Intra-day watchdog refresh (check quota & HTTP 429 status)
+npx 9router-auto-free --refresh
+
+# Setup automated daily & hourly scheduling
+npx 9router-auto-free --setup-cron
+```
+
+### 2. Global Installation
+
+```bash
 npm install -g 9router-auto-free
 
-# Gunakan command kapan saja di terminal:
-9router-auto-free                     # Full sync harian
-9router-auto-free-web                 # Jalankan Web Console
-9router-auto-free --setup-cron        # Pasang scheduler otomatis
+# Run commands directly from terminal
+9router-auto-free
+9router-auto-free --web
+9router-auto-free --dry-run
 ```
 
 ---
 
-## Perintah & Penggunaan (Clone Repository Lokal)
+## ⚙️ How It Works (6-Stage Automated Pipeline)
 
-Jika Anda clone repository git ini:
+1. **Scrape & Discover**: Fetches candidate free model lists across 15+ built-in providers and active dynamic SQLite connections.
+2. **Exclusions Filter**: Discards non-coding models (TTS, embeddings, vision-only, nano models) and blacklisted providers.
+3. **Parallel Live Pre-Test**: Tests each model candidate through 9router's internal endpoints (`POST /api/models/test`) to measure real HTTP status and latency.
+4. **Verdict & Auto-Cooldown**: HTTP 200 models pass; rate-limited (429) models are parked in `my9model-cooldown`; dead models are pruned.
+5. **Coding Quality Ranking**: Ranks models by empirical benchmarks (EvalPlus, SWE-bench), adjusted by usage reliability penalties and latency.
+6. **SQLite Injection**: Writes the ranked model lists directly to 9router SQLite database. Your IDE immediately benefits from fresh models.
 
-```bash
-# Sinkronisasi harian: scrape + live pre-test + ranking + injeksi combo
-npm run sync
+---
 
-# Watchdog intra-hari: re-test anggota combo, parkir kuota-habis, buang model mati
-npm run refresh
+## 📦 Managed Combos
 
-# Simulasi (dry run) tanpa mengubah database 9router
-npm run dry-run
+### 🌟 Unified Super Combos (Cross-Provider)
 
-# Perbarui database benchmark coding secara live
-# (EvalPlus + SWE-bench Verified + LiveCodeBench; calibrated baseline selalu menang)
-npm run update-benchmarks
-
-# Sinkronisasi harian sekaligus update benchmark live
-node sync.js --live-benchmarks
-
-# Jalankan Web Console Dashboard (port 20129)
-npm run web
-
-# Pasang scheduler otomatis (systemd user timers, fallback crontab)
-npm run setup-cron
-
-# Unit test self-check (integrasi live; butuh 9router & jaringan)
-npm test
-```
-
-Flag tambahan pada `sync.js`:
-
-| Flag | Fungsi |
+| Combo | Description & Recommendation |
 |---|---|
-| `--web` / `--ui` | Jalankan Web Console Dashboard (`node sync.js --web`) |
-| `--refresh` / `--watchdog` | Mode watchdog intra-hari (tanpa discovery model baru) |
-| `--dry-run` | Simulasi penuh, tanpa tulis database |
-| `--live-benchmarks` / `--update-benchmarks` | Update benchmark sebelum sync |
-| `--setup-cron` / `--setup-scheduler` | Install scheduler |
-| `--exclude-provider=a,b` | Skip provider tertentu hanya untuk sesi ini |
-| `--nine-router-dir=<path>` | Tentukan lokasi folder data 9router kustom |
-| `--db-path=<path>` | Tentukan file database SQLite 9router kustom |
-| `--router-url=<url>` | Tentukan endpoint 9router kustom (default: `http://127.0.0.1:20128`) |
+| `my9model-free` | **Main super combo**: Comprehensive pool of all active free models across all providers, ranked with top coding capability and lowest latency first. Best for daily programming. |
+| `my9model-smart` | **High reasoning & thinking tier**: Dedicated to thinking models (Claude 3.7 Sonnet Thinking, Qwen Coder, DeepSeek R1) or highest coding benchmarks. Best for complex architectures & tough debugging. |
+| `my9model-fast` | **Ultra-low latency tier**: Lightning-fast models (Groq, Cerebras, Kilo, etc.) with sub-second response times. Perfect for autocomplete and inline code completions. |
+| `my9model-cooldown` | **Rate-limit quarantine (429)**: Holding area for models whose daily quota is exhausted. The hourly watchdog automatically restores them once quotas reset. |
 
-### Lokasi 9router Non-Default (Docker / Windows / Custom Path)
+### 🔌 Provider-Specific Combos
 
-Aplikasi otomatis mendeteksi folder 9router di:
-- **Linux / macOS**: `~/.9router`
-- **Windows**: `%APPDATA%/9router` atau `~/.9router`
-- **Docker**: `/app/data`
+| Provider | Prefix | Output Combo |
+|---|---|---|
+| **OpenAgentic.id** | `openagentic` | `openagentic-free` |
+| **Kilo.ai (KiloCode)** | `kc` | `kilo-free` |
+| **OpenRouter** | `openrouter` | `openrouter-free` |
+| **Google Gemini** | `gemini` | `gemini-free` |
+| **Groq** | `groq` | `groq-free` |
+| **Cerebras** | `cerebras` | `cerebras-free` |
+| **Mistral AI** | `mistral` | `mistral-free` |
+| **Cloudflare Workers AI** | `cloudflare-ai` | `cloudflare-free` |
+| **Poolside** | `poolside` | `poolside-free` |
+| **Ollama Cloud** | `ollama` | `ollama-free` |
+| **API.airforce** | `api-airforce` | `airforce-free` |
+| **Bazaarlink** | `bazaarlink` | `bazaarlink-free` |
+| **B.ai** | `b-ai` | `b.ai-free` |
+| **NVIDIA NIM** | `nvidia` | `nvidia-free` |
+| **9router OpenCode** | `oc` | `opencode-free` |
+| **Dynamic OpenAI Nodes** | `<prefix>` | `<prefix>-free` |
 
-Jika Anda menggunakan lokasi kustom, tentukan lewat Environment Variable atau CLI flag:
+---
+
+## 💻 Connecting to IDEs & AI Coding Tools
+
+Point your OpenAI-Compatible client to 9router:
+
+- **OpenAI Base URL**: `http://localhost:20128/v1`
+- **API Key**: API Key from your 9router Dashboard
+- **Model Name**: `my9model-free` (or `my9model-smart`, `my9model-fast`)
+
+### Quick Setup Examples:
+- **Claude Code**:
+  ```bash
+  claude --model openai/my9model-free
+  ```
+- **Cursor**:
+  - Open *Settings* &rarr; *Models* &rarr; *OpenAI API*.
+  - Set Base URL to `http://localhost:20128/v1` and Model to `my9model-free`.
+- **Aider**:
+  ```bash
+  export OPENAI_API_BASE=http://localhost:20128/v1
+  aider --model openai/my9model-free
+  ```
+
+---
+
+## ⏰ Automated Scheduling
+
+Enable the automated daily sync (00:05) and hourly quota watchdog (:35) with:
 
 ```bash
-# Set folder 9router kustom
-export NINEROUTER_DIR="/custom/path/to/9router"
-
-# Atau set langsung lokasi file database SQLite
-export NINEROUTER_DB_PATH="/custom/path/db/data.sqlite"
-
-# Set URL / Port endpoint 9router jika berbeda
-export NINEROUTER_URL="http://127.0.0.1:20128"
+npx 9router-auto-free --setup-cron
 ```
-
+*(On Linux it automatically installs Systemd User Timers; on macOS/Windows/WSL it installs crontab).*
 
 ---
 
-## Web Console & Dashboard
+## 📄 License & Author
 
-Antarmuka web interaktif mandiri yang matching dengan tema clean dark 9router:
+Created by **[Herliansyah](https://github.com/herliansyah)**.
 
-```bash
-npm run web
-# atau
-node web.js --port=20129
-```
-
-Fitur Web Console:
-- **Autentikasi 9router**: Login dengan password yang sama dengan dashboard 9router Anda (diverifikasi langsung via bcrypt hash SQLite `settings`).
-- **Combos Inspector**: Tinjau super-combos (`my9model-free`, `-smart`, `-fast`, `-cooldown`) dan combo provider beserta model di dalamnya.
-- **Dynamic Provider Engine & Auto-Sync Toggle**: Otomatis menemukan model dari provider OpenAI-compatible baru di 9router tanpa hardcode, lengkap dengan tombol on/off Auto-Sync per provider di UI.
-- **Provider Management**: Tambah koneksi provider baru ke 9router dengan pencegahan duplikasi (provider yang sudah terpasang/aktif otomatis disabled).
-- **Exclusions & Priorities Manager**: Visual tag manager + raw JSON editor untuk mengedit `exclusions.json` dan `priorities.json`.
-- **Live Terminal & CLI Runner**: Jalankan *Full Sync*, *Dry Run*, *Watchdog Refresh*, *Update Benchmarks*, dan *Setup Scheduler* dengan live streaming logs stdout/stderr via Server-Sent Events (SSE).
-
-
----
-
-## Penjadwalan Otomatis
-
-Jalankan `npx 9router-auto-free --setup-cron` (atau `9router-auto-free --setup-cron`, atau klik tombol **Setup Scheduler** di tab *CLI Ops* Web Dashboard). Perintah ini otomatis memasang tiga job dengan preferensi **systemd user timers** (Persistent=true, catch-up otomatis setelah boot) dan **crontab** sebagai fallback:
-
-| Jadwal | Job |
-|---|---|
-| Harian 00:05 | Full sync (scrape + live test + injeksi) |
-| Tiap jam menit :35 | Watchdog refresh (`--refresh`) |
-| Senin 04:17 | Update benchmark |
-
----
-
-## Notifikasi Delta Sync (Opsional)
-
-Ringkasan perubahan (model masuk/keluar) setiap sync/watchdog dapat dikirim ke Telegram dan/atau Discord:
-
-```bash
-export TELEGRAM_BOT_TOKEN="123:abc"   # dari @BotFather
-export TELEGRAM_CHAT_ID="123456789"   # dari @userinfobot
-# dan/atau
-export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
-```
-
-Variabel tidak diset → notifikasi dilewati diam-diam, sync tetap berjalan normal.
-
----
-
-## Menggunakan Combo di IDE / Tool AI
-
-Arahkan client OpenAI-compatible Anda ke endpoint 9router:
-
-```
-http://localhost:20128/v1
-```
-
-lalu pilih nama combo sebagai model (mis. `my9model-free`). Lihat daftar lengkap di [Combo yang Dikelola](#combo-yang-dikelola).
-
----
-
-## Struktur Proyek
-
-```
-9router-auto-free/
-├── sync.js                 # Script utama: scrape, live test, ranking, injeksi, watchdog, scheduler
-├── providers.js            # Registry provider: satu record per source free-model (tabel lain diturunkan dari sini)
-├── CONTEXT.md              # Glosarium istilah domain (combo, verdict, signals, dst.)
-├── update-benchmarks.js    # Penggabung benchmark live (EvalPlus + SWE-bench + LiveCodeBench)
-├── test.js                 # Self-check integrasi (butuh 9router berjalan + akses jaringan)
-├── benchmarks.json         # Cache database benchmark (di-generate, di-commit)
-├── exclusions.json         # Blacklist provider & model (milik pengguna)
-├── priorities.json         # Urutan prioritas model kustom (milik pengguna)
-└── candidates-state.json   # Pool kandidat sync terakhir untuk recovery watchdog (gitignored)
-```
-
----
-
-## Lisensi & Pembuat
-
-Dibuat oleh [Herliansyah](https://github.com/herliansyah).
-
-Dirilis di bawah lisensi [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE).

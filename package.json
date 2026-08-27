@@ -21,7 +21,8 @@
     "custom-providers.json",
     "CONTEXT.md",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "README.id.md"
   ],
   "scripts": {
     "start": "node sync.js",
