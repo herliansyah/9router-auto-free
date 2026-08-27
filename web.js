@@ -509,11 +509,18 @@ const server = http.createServer(async (req, res) => {
   res.end('404 Not Found');
 });
 
-if (require.main === module) {
-  server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[✓] 9router-auto-free Web Console listening on http://localhost:${PORT}`);
-    console.log(`    Dashboard auth is synchronized with 9router SQLite database.`);
+function startServer(port = PORT, host = '0.0.0.0') {
+  return server.listen(port, host, () => {
+    console.log(`\n====================================================`);
+    console.log(`  9router Auto-Free Web Console`);
+    console.log(`  URL: http://localhost:${port}`);
+    console.log(`  Auth: Synchronized with 9router SQLite password`);
+    console.log(`====================================================\n`);
   });
 }
 
-module.exports = { server, PORT };
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { server, PORT, startServer };

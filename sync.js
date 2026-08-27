@@ -821,6 +821,12 @@ async function injectInto9router(providers) {
 }
 
 async function main() {
+  if (args.includes('--web') || args.includes('--ui') || args.includes('--dashboard')) {
+    const { startServer } = require('./web.js');
+    startServer();
+    return;
+  }
+
   const mode = isRefreshMode ? 'WATCHDOG REFRESH' : (isCronSetup ? 'SETUP SCHEDULER' : 'DAILY FULL SYNC');
   console.log('====================================================');
   console.log('  Free Models Sync -> 9router Combos               ');
@@ -829,11 +835,6 @@ async function main() {
   console.log(`  Mode: ${mode}  `);
   console.log(`  Time: ${new Date().toISOString()}`);
   console.log('====================================================\n');
-
-  if (args.includes('--web') || args.includes('--ui')) {
-    require('./web.js');
-    return;
-  }
 
   if (isCronSetup) {
     scheduler.installScheduler();
