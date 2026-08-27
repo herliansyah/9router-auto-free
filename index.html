@@ -127,7 +127,7 @@
 
       <!-- Welcome Banner with Live System Status -->
       <div class="bg-gradient-to-r from-emerald-950/40 via-dark-card to-zinc-900/60 border border-emerald-500/20 rounded-2xl p-5 flex items-center justify-between flex-wrap gap-4 shadow-lg shadow-black/40">
-        <div class="space-y-1.5">
+        <div class="space-y-1.5 max-w-2xl">
           <div class="flex items-center space-x-2.5">
             <span class="relative flex h-2.5 w-2.5">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -136,14 +136,24 @@
             <span class="text-sm font-bold text-white tracking-wide">9router Auto-Free Active</span>
             <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Auto-Free Engine</span>
           </div>
-          <p class="text-xs text-zinc-300 max-w-3xl leading-relaxed">
+          <p class="text-xs text-zinc-300 leading-relaxed">
             Sistem otomatis mengumpulkan model AI gratis dari seluruh provider, memvalidasi via <em>live pre-test</em>, menyortir berdasarkan benchmark coding & latensi, lalu menginjeksinya ke combo 9router siap pakai di Cursor, Claude Code, dan IDE Anda.
           </p>
         </div>
-        <div class="flex items-center space-x-2">
-          <button onclick="triggerCliAction('sync')" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-            <span>Sync Sekarang</span>
+
+        <!-- Live Status Chips (Option B) -->
+        <div class="flex items-center space-x-3 bg-zinc-950/80 border border-dark-border/80 px-4 py-2.5 rounded-xl text-xs">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-1.5">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span class="font-bold text-white text-[11px]">Sistem Terhubung</span>
+            </div>
+            <div class="text-[10px] text-zinc-400 font-mono" id="bannerLastSyncText">Sync: Memeriksa...</div>
+          </div>
+          <div class="h-6 w-px bg-dark-border"></div>
+          <button onclick="switchTab('docs')" title="Buka Dokumentasi & Setup IDE" class="text-zinc-400 hover:text-emerald-400 transition text-[11px] font-semibold flex items-center space-x-1">
+            <span>Panduan</span>
+            <span>&rarr;</span>
           </button>
         </div>
       </div>
@@ -1044,6 +1054,9 @@ aider --model openai/my9model-free</pre>
         document.getElementById('statProviders').textContent = s.activeConnectionsCount;
         document.getElementById('statCandidates').textContent = s.candidatesCount;
         document.getElementById('statCandidatesSync').textContent = s.candidatesLastSync ? 'Sync: ' + new Date(s.candidatesLastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Belum sync';
+        if (document.getElementById('bannerLastSyncText')) {
+          document.getElementById('bannerLastSyncText').textContent = s.candidatesLastSync ? 'Sync: ' + new Date(s.candidatesLastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Sync: Belum ada';
+        }
         document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd' : 'Cron') : 'Inactive';
         document.getElementById('statSchedulerDetail').textContent = s.schedulerActive ? 'Active (00:05 & :35)' : 'Inactive';
         document.getElementById('schedulerBadge').textContent = s.schedulerActive ? 'Scheduler: ' + s.schedulerType : 'Scheduler: Inactive';
