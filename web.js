@@ -180,13 +180,26 @@ async function handleApi(req, res, url) {
         };
       });
 
+    let totalCandidatesCount = 0;
+    if (candidates && candidates.providers) {
+      for (const p of Object.values(candidates.providers)) {
+        if (p && Array.isArray(p.ids)) totalCandidatesCount += p.ids.length;
+      }
+    } else if (candidates && Array.isArray(candidates.candidates)) {
+      totalCandidatesCount = candidates.candidates.length;
+    } else {
+      totalCandidatesCount = freeModelsList.length;
+    }
+
+    const lastSyncTime = candidates?.updatedAt || candidates?.timestamp || freeCombo?.updatedAt || null;
+
     return sendJson(res, 200, {
       success: true,
       stats: {
         activeConnectionsCount: rawConnections.filter(c => c.isActive).length,
         totalCombosCount: combos.length,
-        candidatesCount: candidates ? (candidates.candidates || []).length : 0,
-        candidatesLastSync: candidates ? candidates.timestamp : null,
+        candidatesCount: totalCandidatesCount,
+        candidatesLastSync: lastSyncTime,
         exclusionsCount: Array.isArray(exclusions) ? exclusions.length : (exclusions.excludedModels || []).length,
         prioritiesCount: priorities.length,
         schedulerActive: schedulerStatus.active,

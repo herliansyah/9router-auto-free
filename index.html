@@ -1635,9 +1635,16 @@ aider --model openai/my9model-free</pre>
         document.getElementById('statCombos').textContent = s.totalCombosCount;
         document.getElementById('statProviders').textContent = s.activeConnectionsCount;
         document.getElementById('statCandidates').textContent = s.candidatesCount;
-        document.getElementById('statCandidatesSync').textContent = s.candidatesLastSync ? 'Sync: ' + new Date(s.candidatesLastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Belum sync';
+
+        const syncDate = s.candidatesLastSync ? new Date(s.candidatesLastSync) : null;
+        const isValidDate = syncDate && !isNaN(syncDate.getTime());
+        const timeStr = isValidDate
+          ? syncDate.toLocaleTimeString(currentLang === 'id' ? 'id-ID' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+          : null;
+
+        document.getElementById('statCandidatesSync').textContent = timeStr ? `Sync: ${timeStr}` : (currentLang === 'id' ? 'Belum sync' : 'No sync yet');
         if (document.getElementById('bannerLastSyncText')) {
-          document.getElementById('bannerLastSyncText').textContent = s.candidatesLastSync ? 'Sync: ' + new Date(s.candidatesLastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Sync: Belum ada';
+          document.getElementById('bannerLastSyncText').textContent = timeStr ? `Sync: ${timeStr}` : t('sync_none');
         }
         document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd' : 'Cron') : 'Inactive';
         document.getElementById('statSchedulerDetail').textContent = s.schedulerActive ? 'Active (00:05 & :35)' : 'Inactive';
