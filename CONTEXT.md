@@ -44,3 +44,24 @@ saat istilah baru dinamai atau makna lama berubah.
 - `sync.js` → `providers.js` → (tidak ada), `sync.js` → `update-benchmarks.js`.
 - `benchmarks.json` dimiliki penulisnya (`update-benchmarks.js`); `sync.js`
   hanya membaca via path yang diekspor module tersebut.
+
+## Web Dashboard & Auth
+- **Web Dashboard**: Antarmuka web mandiri (`web.js`, port default 20129) yang
+  menyajikan visualisasi combo, kontrol CLI (sync, dry-run, refresh, benchmark),
+  manajemen exclusions, dan priorities.
+- **9router Auth Session**: Autentikasi berbasis password yang dicocokkan langsung
+  dengan hash bcrypt di SQLite 9router (`settings.password`), mengeluarkan signed
+  HttpOnly session cookie.
+- **Provider Connection Guard**: Proteksi pada penambahan provider agar provider
+  yang sudah terpasang dan aktif di 9router (`providerConnections`) tidak dapat
+  didaftarkan ganda.
+
+## Storage & Path Resolution
+- **Dynamic Path Resolution**: Mekanisme penentuan lokasi data 9router (`NINE_ROUTER_DIR`, `DB_PATH`, `NINEROUTER_URL`) dengan auto-discovery platform (Linux `~/.9router`, Windows `%APPDATA%/9router`, Docker `/app/data`) serta override via env vars (`NINEROUTER_DIR`, `NINEROUTER_DB_PATH`, `NINEROUTER_URL`) dan flag CLI (`--nine-router-dir`, `--db-path`, `--router-url`).
+
+## Dynamic Provider Engine
+- **Dynamic Provider Auto-Discovery**: Kemampuan menemukan dan menarik kandidat model dari koneksi provider OpenAI-compatible aktif manapun di SQLite 9router tanpa modifikasi kode, dengan fallback endpoint `/models` & `/v1/models`.
+- **Auto-Sync Toggle**: Konfigurasi granular (`custom-providers.json` & Web UI) untuk mengaktifkan atau menonaktifkan partisipasi provider dinamis dalam injeksi combo super dan pembuatan combo per-provider.
+
+
+

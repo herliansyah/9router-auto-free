@@ -535,10 +535,14 @@ async function fetchBazaarlinkFreeModels(apiKey, baseUrl = 'https://bazaarlink.a
   return freeModels;
 }
 
-async function fetchOpenAiCompatibleFreeModels({ label, apiKey, baseUrl, prefix, skipPatterns = [], requireApiKey = true }) {
+async function fetchOpenAiCompatibleFreeModels({ label, apiKey, baseUrl, prefix, skipPatterns = [], freePattern = null, requireApiKey = true }) {
   const freeModels = [];
   if (requireApiKey && !apiKey) {
     console.log(`[⊘] ${label}: no API key/connection found in 9router, skipping (add the connection to enable).`);
+    return freeModels;
+  }
+  if (!baseUrl) {
+    console.log(`[⊘] ${label}: no Base URL configured, skipping.`);
     return freeModels;
   }
 
@@ -547,16 +551,35 @@ async function fetchOpenAiCompatibleFreeModels({ label, apiKey, baseUrl, prefix,
     const headers = { 'User-Agent': 'Mozilla/5.0' };
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-    const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/models`, {
-      headers,
-      signal: AbortSignal.timeout(15000)
-    });
-    if (!res.ok) {
-      console.warn(`[!] ${label} fetch notice: HTTP ${res.status}`);
+    const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
+    const candidateUrls = [
+      `${cleanBaseUrl}/models`,
+      cleanBaseUrl.endsWith('/v1') ? `${cleanBaseUrl.replace(/\/v1$/, '')}/models` : `${cleanBaseUrl}/v1/models`,
+      cleanBaseUrl
+    ];
+
+    let json = null;
+    let successfulUrl = null;
+
+    for (const targetUrl of candidateUrls) {
+      try {
+        const res = await fetch(targetUrl, {
+          headers,
+          signal: AbortSignal.timeout(15000)
+        });
+        if (res.ok) {
+          json = await res.json();
+          successfulUrl = targetUrl;
+          break;
+        }
+      } catch {}
+    }
+
+    if (!json) {
+      console.warn(`[!] ${label} fetch notice: Endpoint /models not responding on ${cleanBaseUrl}`);
       return freeModels;
     }
 
-    const json = await res.json();
     const models = Array.isArray(json) ? json : (json.data || json.models || []);
 
     const parentMap = new Map();
@@ -614,6 +637,12 @@ async function fetchOpenAiCompatibleFreeModels({ label, apiKey, baseUrl, prefix,
       const lowerId = id.toLowerCase();
 
       if (skipPatterns.some(pat => lowerId.includes(pat))) continue;
+
+      // If freePattern is specified (e.g. ":free"), enforce it
+      if (freePattern && !lowerId.includes(freePattern.toLowerCase()) && m.is_free !== true) {
+        continue;
+      }
+
       if (!keepIds.has(lowerId)) continue;
       seenIds.add(id);
 
@@ -792,24 +821,64 @@ async function discoverProvider(recordOrKey) {
 
 /**
  * Deep discovery interface: discover free model candidates for all registered providers in parallel.
+ * Automatically combines built-in provider adapters with dynamic 9router connections (OpenAI-compatible).
  */
 async function discoverAllProviders(options = {}) {
   const excludedProviders = options.excludedProviders || [];
-  const isExcluded = rec => rec.prefixes.some(p => excludedProviders.includes(p.toLowerCase()));
+  const isExcluded = rec => (rec.prefixes || [rec.prefix]).some(p => excludedProviders.includes(p.toLowerCase()));
 
   const results = {};
+
+  // 1. Discover Built-in Providers
   await Promise.all(PROVIDERS.map(async rec => {
     if (isExcluded(rec)) {
-      results[rec.key] = { prefix: rec.prefixes[0], models: [], excluded: true };
+      results[rec.key] = { prefix: rec.prefixes[0], models: [], excluded: true, label: rec.label, combo: rec.combo };
     } else {
       try {
-        results[rec.key] = await discoverProvider(rec);
+        const res = await discoverProvider(rec);
+        results[rec.key] = { ...res, label: rec.label, combo: rec.combo };
       } catch (err) {
         console.warn(`[!] Failed to discover ${rec.label}: ${err.message}`);
-        results[rec.key] = { prefix: rec.prefixes[0], models: [] };
+        results[rec.key] = { prefix: rec.prefixes[0], models: [], label: rec.label, combo: rec.combo };
       }
     }
   }));
+
+  // 2. Discover Dynamic Providers from 9router Active Connections
+  try {
+    const dynamicProviders = storage.getDynamicProviders ? storage.getDynamicProviders() : [];
+    await Promise.all(dynamicProviders.map(async dp => {
+      if (!dp.enabled || isExcluded(dp) || excludedProviders.includes(dp.provider.toLowerCase())) {
+        results[dp.key] = { prefix: dp.prefix, models: [], excluded: true, label: dp.label, combo: dp.combo, isDynamic: true };
+        return;
+      }
+
+      if (!dp.baseUrl) {
+        console.log(`[⊘] Dynamic Provider ${dp.label}: No Base URL configured, skipping.`);
+        results[dp.key] = { prefix: dp.prefix, models: [], label: dp.label, combo: dp.combo, isDynamic: true };
+        return;
+      }
+
+      try {
+        const models = await fetchOpenAiCompatibleFreeModels({
+          label: dp.label,
+          apiKey: dp.apiKey,
+          baseUrl: dp.baseUrl,
+          prefix: dp.prefix,
+          skipPatterns: dp.skipPatterns,
+          freePattern: dp.freePattern,
+          requireApiKey: false
+        });
+        results[dp.key] = { prefix: dp.prefix, models, label: dp.label, combo: dp.combo, isDynamic: true };
+      } catch (err) {
+        console.warn(`[!] Failed to discover dynamic provider ${dp.label}: ${err.message}`);
+        results[dp.key] = { prefix: dp.prefix, models: [], label: dp.label, combo: dp.combo, isDynamic: true };
+      }
+    }));
+  } catch (err) {
+    console.warn(`[!] Dynamic provider discovery notice: ${err.message}`);
+  }
+
   return results;
 }
 

@@ -54,9 +54,27 @@ const MANAGED_COMBOS = [
 
 const PROVIDER_COMBO_PREFIXES = Object.fromEntries(PROVIDERS.map(p => [p.combo, p.prefixes]));
 
+function getDynamicManagedCombos() {
+  const dynamicProviders = storage.getDynamicProviders ? storage.getDynamicProviders() : [];
+  return [
+    'my9model-free', 'my9model-smart', 'my9model-fast', 'my9model-cooldown',
+    ...PROVIDERS.map(p => p.combo),
+    ...dynamicProviders.map(p => p.combo)
+  ];
+}
+
+function getDynamicProviderComboPrefixes() {
+  const base = Object.fromEntries(PROVIDERS.map(p => [p.combo, p.prefixes]));
+  const dynamicProviders = storage.getDynamicProviders ? storage.getDynamicProviders() : [];
+  for (const dp of dynamicProviders) {
+    base[dp.combo] = dp.prefixes || [dp.prefix];
+  }
+  return base;
+}
+
 function idMatchesPrefixes(fullId, prefixes) {
   const head = String(fullId).split('/')[0].toLowerCase();
-  return prefixes.includes(head);
+  return (prefixes || []).some(p => p.toLowerCase() === head);
 }
 
 // ----------------------------------------------------------------------------
@@ -379,8 +397,9 @@ async function testModelWith9router(fullModelId, token, attempt = 1, fetchImpl =
 
   const doFetch = fetchImpl || fetch;
   const startTime = Date.now();
+  const routerUrl = storage.resolveNineRouterUrl ? storage.resolveNineRouterUrl() : (process.env.NINEROUTER_URL || 'http://127.0.0.1:20128');
   try {
-    const res = await doFetch('http://127.0.0.1:20128/api/models/test', {
+    const res = await doFetch(`${routerUrl}/api/models/test`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -615,10 +634,13 @@ async function refreshCombos() {
     ...(current.get('my9model-fast') || []),
     ...(current.get('my9model-cooldown') || [])
   ]);
+  const dynamicManagedCombos = getDynamicManagedCombos();
+  const dynamicPrefixesMap = getDynamicProviderComboPrefixes();
+
   const allIds = Array.from(new Set([
     ...superIds,
     ...extraSuper,
-    ...MANAGED_COMBOS.filter(n => !n.startsWith('my9model')).flatMap(n => current.get(n) || []),
+    ...dynamicManagedCombos.filter(n => !n.startsWith('my9model')).flatMap(n => current.get(n) || []),
     ...poolIds
   ]));
 
@@ -668,9 +690,9 @@ async function refreshCombos() {
   const tiers = deriveTierLists(rankedActive);
 
   const providerEntries = [];
-  for (const name of MANAGED_COMBOS) {
+  for (const name of dynamicManagedCombos) {
     if (name.startsWith('my9model')) continue;
-    const prefixes = PROVIDER_COMBO_PREFIXES[name];
+    const prefixes = dynamicPrefixesMap[name];
     if (!prefixes) continue;
     const eligible = new Set([
       ...(current.get(name) || []),
@@ -701,9 +723,13 @@ async function refreshCombos() {
 
 async function injectInto9router(providers) {
   const p = providers || {};
-  const defs = PROVIDERS.map(rec => {
-    const data = p[rec.key] || { prefix: rec.prefixes[0], models: [], excluded: true };
-    return [rec.key, data, rec.label];
+  const allKeys = new Set([...PROVIDERS.map(r => r.key), ...Object.keys(p)]);
+  const defs = Array.from(allKeys).map(key => {
+    const rec = PROVIDERS.find(r => r.key === key);
+    const data = p[key] || (rec ? { prefix: rec.prefixes[0], models: [], excluded: true } : { prefix: key, models: [], excluded: true });
+    const label = data.label || rec?.label || key;
+    const combo = data.combo || rec?.combo || `${data.prefix || key}-free`;
+    return [key, data, label, combo];
   });
 
   for (const [key, data] of defs) {
@@ -764,9 +790,9 @@ async function injectInto9router(providers) {
   console.log(`[+] my9model-smart: ${assembled.smart.length} models | my9model-fast: ${assembled.fast.length} models`);
   console.log(`[+] my9model-cooldown: ${assembled.cooldown.length} model(s) parked (quota-exhausted)`);
 
-  for (const [key, data, label] of defs) {
+  for (const [key, data, label, combo] of defs) {
     if (!data.excluded && (data.validated || []).length > 0 && activeByProvider[key].length === 0) {
-      console.log(`[i] ${label}: all ${(data.validated || []).length} models currently quota-exhausted — ${label}-free cleared until they recover.`);
+      console.log(`[i] ${label}: all ${(data.validated || []).length} models currently quota-exhausted — ${combo} cleared until they recover.`);
     }
   }
 
@@ -775,11 +801,10 @@ async function injectInto9router(providers) {
     return;
   }
 
-  const providerEntries = PROVIDERS
-    .map(rec => {
-      const d = p[rec.key];
-      const list = (!d?.excluded && (d?.validated?.length || 0) > 0) ? activeByProvider[rec.key] : null;
-      return list ? [rec.combo, list] : null;
+  const providerEntries = defs
+    .map(([key, data, label, combo]) => {
+      const list = (!data?.excluded && (data?.validated?.length || 0) > 0) ? activeByProvider[key] : null;
+      return list ? [combo, list] : null;
     })
     .filter(Boolean);
 
@@ -804,6 +829,11 @@ async function main() {
   console.log(`  Mode: ${mode}  `);
   console.log(`  Time: ${new Date().toISOString()}`);
   console.log('====================================================\n');
+
+  if (args.includes('--web') || args.includes('--ui')) {
+    require('./web.js');
+    return;
+  }
 
   if (isCronSetup) {
     scheduler.installScheduler();

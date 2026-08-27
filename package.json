@@ -3,6 +3,26 @@
   "version": "1.0.0",
   "description": "Daily automated scraper and injector for OpenAgentic free models into 9router combos",
   "main": "sync.js",
+  "bin": {
+    "9router-auto-free": "sync.js",
+    "9router-auto-free-web": "web.js"
+  },
+  "files": [
+    "sync.js",
+    "web.js",
+    "index.html",
+    "storage.js",
+    "scheduler.js",
+    "providers.js",
+    "update-benchmarks.js",
+    "benchmarks.json",
+    "exclusions.json",
+    "priorities.json",
+    "custom-providers.json",
+    "CONTEXT.md",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node sync.js",
     "sync": "node sync.js",
@@ -10,15 +30,23 @@
     "test": "node test.js",
     "update-benchmarks": "node update-benchmarks.js",
     "setup-cron": "node sync.js --setup-cron",
-    "refresh": "node sync.js --refresh"
+    "refresh": "node sync.js --refresh",
+    "web": "node web.js"
   },
   "keywords": [
-    "openagentic",
     "9router",
+    "openagentic",
     "openrouter",
     "free-models",
+    "llm",
+    "ai",
+    "claude-code",
+    "cursor",
     "sync"
   ],
   "author": "herliansyah@gmail.com",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3"
+  }
 }

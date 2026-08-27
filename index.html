@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>9Router Auto-Free Console</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            },
+            dark: {
+              base: '#09090b',
+              card: '#121215',
+              cardHover: '#18181b',
+              border: '#27272a',
+              input: '#1f1f23',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    pre, code, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #09090b; }
+    ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  </style>
+</head>
+<body class="bg-dark-base text-zinc-100 min-h-screen flex flex-col selection:bg-emerald-500/30 selection:text-emerald-300">
+
+  <!-- TOP NAVBAR -->
+  <header class="border-b border-dark-border bg-dark-card/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="h-9 w-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-900/30">
+          <span class="font-bold text-white text-lg tracking-tight">9</span>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-base tracking-tight text-white">9router</span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">auto-free</span>
+          </div>
+          <p class="text-[11px] text-zinc-400 hidden sm:block">Automated Scraper & Injector for 9router</p>
+        </div>
+      </div>
+
+      <div id="authNav" class="hidden flex items-center space-x-4">
+        <div class="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-zinc-900/80 border border-dark-border text-xs text-zinc-300">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="schedulerBadge">Checking scheduler...</span>
+        </div>
+        <button onclick="logout()" class="text-xs px-3 py-1.5 rounded-lg border border-dark-border hover:bg-zinc-800 text-zinc-300 hover:text-white transition">
+          Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- LOGIN CONTAINER -->
+  <div id="loginView" class="flex-1 flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-dark-card border border-dark-border rounded-2xl p-8 shadow-2xl shadow-black/60">
+      <div class="text-center mb-6">
+        <div class="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <h2 class="text-xl font-bold text-white">Login Dashboard 9router</h2>
+        <p class="text-sm text-zinc-400 mt-1">Masukkan password yang sama dengan dashboard 9router Anda.</p>
+      </div>
+
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">Password 9router</label>
+          <input id="passwordInput" type="password" required placeholder="Default: 123456" 
+            class="w-full bg-dark-input border border-dark-border rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
+        </div>
+        <div id="loginError" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5 text-center"></div>
+        <button type="submit" id="loginBtn"
+          class="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-zinc-950 font-bold py-2.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 flex items-center justify-center">
+          Masuk ke Auto-Free Console
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <main id="appView" class="hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+
+    <!-- NAVIGATION TABS -->
+    <div class="flex items-center justify-between border-b border-dark-border pb-3 flex-wrap gap-3">
+      <nav class="flex space-x-1 sm:space-x-2 bg-dark-card p-1 rounded-xl border border-dark-border">
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-emerald-500 text-zinc-950 shadow">Overview</button>
+        <button onclick="switchTab('combos')" id="tab-combos" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">Combos</button>
+        <button onclick="switchTab('providers')" id="tab-providers" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">Providers</button>
+        <button onclick="switchTab('exclusions')" id="tab-exclusions" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">Exclusions</button>
+        <button onclick="switchTab('priorities')" id="tab-priorities" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">Priorities</button>
+        <button onclick="switchTab('cli')" id="tab-cli" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">CLI Console</button>
+        <button onclick="switchTab('docs')" id="tab-docs" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition flex items-center space-x-1"><span>📖 Panduan</span></button>
+      </nav>
+
+      <div class="flex items-center space-x-2">
+        <button onclick="triggerCliAction('dry-run')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-dark-border transition flex items-center space-x-1.5">
+          <svg class="w-3.5 h-3.5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          <span>Dry Run</span>
+        </button>
+        <button onclick="triggerCliAction('sync')" class="text-xs font-bold px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span>Full Sync</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB 1: OVERVIEW -->
+    <div id="view-dashboard" class="tab-view space-y-6">
+
+      <!-- Welcome Banner -->
+      <div class="bg-gradient-to-r from-emerald-950/40 via-dark-card to-zinc-900/60 border border-emerald-500/20 rounded-2xl p-5 flex items-center justify-between flex-wrap gap-4 shadow-lg shadow-black/40">
+        <div class="space-y-1">
+          <div class="flex items-center space-x-2">
+            <span class="text-sm font-bold text-white">Apa itu 9router Auto-Free?</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Otomasi Model AI Gratis</span>
+          </div>
+          <p class="text-xs text-zinc-300 max-w-3xl leading-relaxed">
+            Sistem otomatis yang mengumpulkan model AI gratis dari berbagai provider, memvalidasinya dengan <em>live pre-test</em>, menyortir berdasarkan benchmark coding & latensi, lalu menyuntikkannya ke combo 9router agar siap digunakan langsung di Cursor, Claude Code, VS Code, dan IDE favorit Anda.
+          </p>
+        </div>
+        <button onclick="switchTab('docs')" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5">
+          <span>Baca Panduan Lengkap</span>
+          <span>&rarr;</span>
+        </button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5">
+          <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Super Combos</span>
+          <div class="text-2xl font-bold text-white mt-2" id="statCombos">0</div>
+          <span class="text-xs text-emerald-400 mt-1 block">my9model-free / smart / fast</span>
+        </div>
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5">
+          <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Active Providers</span>
+          <div class="text-2xl font-bold text-white mt-2" id="statProviders">0</div>
+          <span class="text-xs text-zinc-400 mt-1 block">Terkoneksi di 9router SQLite</span>
+        </div>
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5">
+          <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Candidate Models</span>
+          <div class="text-2xl font-bold text-white mt-2" id="statCandidates">0</div>
+          <span class="text-xs text-zinc-400 mt-1 block" id="statCandidatesSync">Pool model tersimpan</span>
+        </div>
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5">
+          <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Scheduler</span>
+          <div class="text-2xl font-bold text-white mt-2" id="statScheduler">-</div>
+          <span class="text-xs text-zinc-400 mt-1 block" id="statSchedulerDetail">Daily & Hourly watchdog</span>
+        </div>
+      </div>
+
+      <!-- Quick Actions Grid -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6">
+        <h3 class="text-base font-bold text-white mb-4 flex items-center justify-between">
+          <span>Aksi Cepat CLI</span>
+          <span class="text-xs font-normal text-zinc-400">Jalankan langsung dengan streaming log</span>
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <button onclick="triggerCliAction('sync')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
+            <div class="font-bold text-sm text-white group-hover:text-emerald-400">Full Daily Sync</div>
+            <div class="text-xs text-zinc-400 mt-1">Scrape, live pre-test & inject model ke semua combo 9router.</div>
+          </button>
+          <button onclick="triggerCliAction('dry-run')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
+            <div class="font-bold text-sm text-white group-hover:text-yellow-400">Dry Run Sync</div>
+            <div class="text-xs text-zinc-400 mt-1">Simulasi live pre-test tanpa mengubah database SQLite.</div>
+          </button>
+          <button onclick="triggerCliAction('refresh')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
+            <div class="font-bold text-sm text-white group-hover:text-cyan-400">Watchdog Refresh</div>
+            <div class="text-xs text-zinc-400 mt-1">Cek ulang status kuota model (429) & parkir ke cooldown.</div>
+          </button>
+          <button onclick="triggerCliAction('benchmarks')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
+            <div class="font-bold text-sm text-white group-hover:text-purple-400">Update Benchmarks</div>
+            <div class="text-xs text-zinc-400 mt-1">Perbarui database skor coding benchmark dari sumber live.</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- System Paths & Connection Diagnostics -->
+      <div class="bg-zinc-950/70 border border-dark-border rounded-xl p-3.5 text-[11px] text-zinc-400 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center space-x-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          <span class="font-semibold text-zinc-300">9router Dir:</span>
+          <span class="font-mono text-zinc-400 truncate max-w-[200px]" id="statNineRouterDir">~/.9router</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="font-semibold text-zinc-300">SQLite DB:</span>
+          <span class="font-mono text-zinc-400 truncate max-w-[260px]" id="statDbPath">db/data.sqlite</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="font-semibold text-zinc-300">API:</span>
+          <span class="font-mono text-emerald-400" id="statNineRouterUrl">http://127.0.0.1:20128</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: COMBOS -->
+    <div id="view-combos" class="tab-view hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-white">Daftar Combos di 9router</h2>
+          <p class="text-xs text-zinc-400">Combos yang dikelola oleh 9router-auto-free dan provider-specific combos.</p>
+        </div>
+        <button onclick="loadCombos()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition">
+          Refresh Data
+        </button>
+      </div>
+
+      <div id="combosList" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Rendered via JS -->
+      </div>
+    </div>
+
+    <!-- TAB 3: PROVIDERS -->
+    <div id="view-providers" class="tab-view hidden space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-white">Manajemen Provider 9router</h2>
+          <p class="text-xs text-zinc-400">Daftar semua provider yang didukung 9router (Free AI, Major LLM, Aggregators, Custom Node). Provider aktif tidak bisa ditambahkan ganda.</p>
+        </div>
+        <button onclick="openAddProviderModal()" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          <span>+ Tambah Provider</span>
+        </button>
+      </div>
+
+      <!-- Filters and Search -->
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center space-x-1.5 bg-dark-card p-1 rounded-xl border border-dark-border text-xs">
+          <button onclick="setProviderFilter('all')" id="pfilter-all" class="pfilter-btn px-3 py-1 rounded-lg font-semibold bg-zinc-800 text-white">Semua</button>
+          <button onclick="setProviderFilter('installed')" id="pfilter-installed" class="pfilter-btn px-3 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Terpasang</button>
+          <button onclick="setProviderFilter('available')" id="pfilter-available" class="pfilter-btn px-3 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Belum Terpasang</button>
+        </div>
+
+        <div class="w-full sm:w-64">
+          <input id="providerSearchInput" oninput="renderProvidersTable()" type="text" placeholder="Cari provider / prefix..."
+            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
+        </div>
+      </div>
+
+      <div class="bg-dark-card border border-dark-border rounded-2xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-zinc-900/80 border-b border-dark-border text-zinc-400 uppercase font-semibold">
+              <tr>
+                <th class="px-5 py-3">Provider</th>
+                <th class="px-5 py-3">Kategori</th>
+                <th class="px-5 py-3">Prefix / Alias</th>
+                <th class="px-5 py-3">Endpoint Base URL</th>
+                <th class="px-5 py-3">Status di 9router</th>
+                <th class="px-5 py-3 text-center">Auto-Sync Free</th>
+                <th class="px-5 py-3 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="providersTable" class="divide-y divide-dark-border text-zinc-300">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: EXCLUSIONS -->
+    <div id="view-exclusions" class="tab-view hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-white">Exclusion Rules (<span class="font-mono text-emerald-400">exclusions.json</span>)</h2>
+          <p class="text-xs text-zinc-400">Model atau provider yang dimasukkan di sini akan dilewati saat sinkronisasi.</p>
+        </div>
+        <button onclick="saveExclusions()" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition">
+          Simpan Perubahan
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Visual Manager -->
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-4">
+          <h3 class="text-sm font-bold text-white">Visual Tag Manager</h3>
+          
+          <div class="flex gap-2">
+            <input id="newExclusionInput" type="text" placeholder="Contoh: provider:kilo atau model: gpt-3.5" 
+              class="flex-1 bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
+            <button onclick="addExclusionTag()" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold rounded-xl text-white border border-dark-border transition">
+              + Tambah
+            </button>
+          </div>
+
+          <div class="text-[11px] text-zinc-400">
+            Gunakan format <code class="text-emerald-400">provider:nama</code> untuk memblokir seluruh provider, atau nama model untuk memblokir model tertentu.
+          </div>
+
+          <div id="exclusionTags" class="flex flex-wrap gap-2 pt-2 min-h-[100px] p-3 rounded-xl bg-zinc-950/40 border border-dark-border">
+            <!-- Tags rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Raw JSON Editor -->
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white">Raw JSON Editor</h3>
+            <button onclick="formatExclusionsJson()" class="text-[11px] text-zinc-400 hover:text-emerald-400">Format JSON</button>
+          </div>
+          <textarea id="exclusionsJsonEditor" rows="12" class="w-full font-mono bg-zinc-950 border border-dark-border rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: PRIORITIES -->
+    <div id="view-priorities" class="tab-view hidden space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-white">Model Priorities (<span class="font-mono text-emerald-400">priorities.json</span>)</h2>
+          <p class="text-xs text-zinc-400">Model dalam urutan prioritas tertinggi yang akan dipromosikan ke urutan teratas super-combo.</p>
+        </div>
+        <button onclick="savePriorities()" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition">
+          Simpan Perubahan
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Visual Manager -->
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-4">
+          <h3 class="text-sm font-bold text-white">Visual Priority List (Top-Down)</h3>
+          
+          <div class="flex gap-2">
+            <input id="newPriorityInput" type="text" placeholder="Contoh: openagentic/claude-3-7-sonnet" 
+              class="flex-1 bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
+            <button onclick="addPriorityTag()" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold rounded-xl text-white border border-dark-border transition">
+              + Tambah
+            </button>
+          </div>
+
+          <div id="priorityList" class="space-y-1.5 min-h-[100px] p-3 rounded-xl bg-zinc-950/40 border border-dark-border">
+            <!-- Priority items rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Raw JSON Editor -->
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white">Raw JSON Editor</h3>
+            <button onclick="formatPrioritiesJson()" class="text-[11px] text-zinc-400 hover:text-emerald-400">Format JSON</button>
+          </div>
+          <textarea id="prioritiesJsonEditor" rows="12" class="w-full font-mono bg-zinc-950 border border-dark-border rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: CLI CONSOLE & LOGS -->
+    <div id="view-cli" class="tab-view hidden space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-white">CLI Execution & Log Stream</h2>
+          <p class="text-xs text-zinc-400">Output real-time stdout/stderr dari eksekusi sync, refresh, dan benchmarks.</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button onclick="clearConsole()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition">
+            Clear
+          </button>
+          <button onclick="loadLatestLogs()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition">
+            Load sync.log
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Buttons Bar -->
+      <div class="flex flex-wrap gap-2 p-3 bg-dark-card border border-dark-border rounded-xl">
+        <button onclick="triggerCliAction('sync')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition">Full Sync (node sync.js)</button>
+        <button onclick="triggerCliAction('dry-run')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-yellow-500 hover:bg-yellow-600 text-zinc-950 transition">Dry Run (--dry-run)</button>
+        <button onclick="triggerCliAction('refresh')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-zinc-950 transition">Watchdog Refresh (--refresh)</button>
+        <button onclick="triggerCliAction('benchmarks')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-500 hover:bg-purple-600 text-white transition">Update Benchmarks</button>
+        <button onclick="triggerCliAction('setup-cron')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-700 hover:bg-zinc-600 text-white transition">Setup Scheduler (--setup-cron)</button>
+      </div>
+
+      <!-- Terminal Output Window -->
+      <div class="bg-zinc-950 border border-dark-border rounded-2xl p-4 shadow-inner">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-2.5 mb-3 text-xs text-zinc-400">
+          <div class="flex items-center space-x-2">
+            <span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-yellow-500"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+            <span class="ml-2 font-mono text-zinc-300" id="terminalTitle">idle</span>
+          </div>
+          <span id="terminalStatus" class="font-mono text-[11px] text-zinc-500">READY</span>
+        </div>
+        <pre id="terminalOutput" class="font-mono text-xs text-emerald-400 whitespace-pre-wrap overflow-y-auto max-h-[500px] min-h-[300px] leading-relaxed p-1">9router-auto-free console siap. Pilih aksi di atas untuk menjalankan.</pre>
+      </div>
+    </div>
+
+    <!-- TAB 7: DOCUMENTATION & USER GUIDE -->
+    <div id="view-docs" class="tab-view hidden space-y-6">
+      
+      <!-- Hero Intro -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 sm:p-8 space-y-4">
+        <div class="flex items-center space-x-3">
+          <div class="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+            📖
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-white">Panduan Penggunaan 9router Auto-Free</h2>
+            <p class="text-xs text-zinc-400">Semua hal yang perlu Anda ketahui: fungsi, cara kerja, dan tutorial integrasi ke IDE.</p>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/20 text-xs text-zinc-300 space-y-2 leading-relaxed">
+          <p class="font-semibold text-white">💡 Apa itu 9router Auto-Free?</p>
+          <p>
+            <strong>9router Auto-Free</strong> adalah sistem otomasi cerdas yang mengumpulkan ratusan <strong>model AI gratis</strong> dari berbagai provider terkemuka (OpenAgentic, Kilo.ai, OpenRouter, Google Gemini, Groq, Mistral, Cerebras, Ollama, dll.), menguji model-model tersebut secara langsung lewat <strong>Live Pre-Test</strong>, menyaring model rusak/berbayar/kuota habis, lalu mengurutkannya berdasarkan <strong>skor kapabilitas coding riil</strong> serta latensi tercepat.
+          </p>
+          <p>
+            Hasil akhirnya disuntikkan secara otomatis ke dalam <strong>Combo 9router</strong> (seperti <code class="text-emerald-400 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">my9model-free</code>), sehingga Anda cukup memakai satu nama model di IDE tanpa repot mencari atau menggonta-ganti API key gratisan.
+          </p>
+        </div>
+      </div>
+
+      <!-- Section: Cara Kerja 6 Tahap -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+        <h3 class="text-base font-bold text-white flex items-center space-x-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          <span>Bagaimana Cara Kerjanya? (6 Tahap Otomatis)</span>
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+            <div class="font-bold text-emerald-400 font-mono">1. Scrape & Kumpul Kandidat</div>
+            <p class="text-zinc-400">Mengambil daftar model gratis dari 15+ sumber provider terdaftar (OpenAgentic, Kilo, Gemini, OpenRouter, Groq, dll.).</p>
+          </div>
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+            <div class="font-bold text-yellow-400 font-mono">2. Filter Exclusions</div>
+            <p class="text-zinc-400">Menyaring dan membuang model non-coding (TTS, embed, video, model terlalu kecil/nano) dan provider yang di-blacklist.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+            <div class="font-bold text-cyan-400 font-mono">3. Live Pre-Test Paralel</div>
+            <p class="text-zinc-400">Setiap kandidat dites langsung melalui endpoint internal 9router untuk mengukur latensi dan status HTTP asli.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+            <div class="font-bold text-purple-400 font-mono">4. Vonis & Auto-Cooldown</div>
+            <p class="text-zinc-400">Model 200 diterima; model kuota habis (429) diparkirkan di <code>my9model-cooldown</code>; model berbayar/mati dibuang.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+            <div class="font-bold text-rose-400 font-mono">5. Coding Quality Ranking</div>
+            <p class="text-zinc-400">Model diurutkan berdasarkan skor benchmark coding empiris (EvalPlus, SWE-bench), dikurangi penalti error-rate, dan latensi.</p>
+          </div>
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+            <div class="font-bold text-indigo-400 font-mono">6. Injeksi Database 9router</div>
+            <p class="text-zinc-400">Daftar model langsung ditulis ke database SQLite 9router. IDE Anda langsung otomatis menikmati daftar model terbaru.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Combo Yang Tersedia -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+        <h3 class="text-base font-bold text-white flex items-center space-x-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          <span>Daftar Combos & Rekomendasi Penggunaan</span>
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/30 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-emerald-400 font-mono text-sm">my9model-free</span>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold text-[10px]">Super Combo Utama</span>
+            </div>
+            <p class="text-zinc-300">
+              Kombinasi seluruh model gratis aktif dari semua provider. Urutan teratas adalah model dengan kemampuan coding terbaik dan latensi tercepat.
+            </p>
+            <div class="text-zinc-500 italic">👉 Pilihan terbaik untuk penggunaan umum harian di IDE.</div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/60 border border-indigo-500/30 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-indigo-400 font-mono text-sm">my9model-smart</span>
+              <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold text-[10px]">Penalaran Tinggi / Reasoning</span>
+            </div>
+            <p class="text-zinc-300">
+              Khusus model thinking/reasoning (misal Claude 3.7 Sonnet Thinking, Qwen Coder, DeepSeek R1) atau model dengan benchmark coding tertinggi.
+            </p>
+            <div class="text-zinc-500 italic">👉 Cocok untuk tugas arsitektur rumit, refactor besar, dan debug bug sulit.</div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/60 border border-amber-500/30 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-amber-400 font-mono text-sm">my9model-fast</span>
+              <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold text-[10px]">Super Cepat / Low Latency</span>
+            </div>
+            <p class="text-zinc-300">
+              Model non-thinking berkecepatan kilat dengan latensi sangat rendah dari provider berkecepatan tinggi (Groq, Cerebras, Kilo, dll.).
+            </p>
+            <div class="text-zinc-500 italic">👉 Cocok untuk inline code completion, autocomplete, atau respons instan.</div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/60 border border-rose-500/30 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-rose-400 font-mono text-sm">my9model-cooldown</span>
+              <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold text-[10px]">Parkiran Rate-Limit (429)</span>
+            </div>
+            <p class="text-zinc-300">
+              Tempat isolasi sementara bagi model yang kuota hariannya habis (HTTP 429). Watchdog intra-hari akan otomatis memindahkannya kembali ke combo utama begitu kuota reset.
+            </p>
+            <div class="text-zinc-500 italic">👉 Mencegah IDE Anda error karena request terlempar ke model kuota-habis.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: Tutorial Integrasi IDE -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-5">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center space-x-2">
+            <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+            <span>Cara Menghubungkan ke IDE & AI Coding Tools</span>
+          </h3>
+          <p class="text-xs text-zinc-400 mt-1">9router menyediakan antarmuka standar <strong>OpenAI-Compatible</strong> di port <code>20128</code>.</p>
+        </div>
+
+        <!-- Global Connection Parameters -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-zinc-900/80 border border-dark-border text-xs">
+          <div>
+            <span class="text-zinc-500 uppercase text-[10px] font-bold block">OpenAI Base URL</span>
+            <code class="text-emerald-400 font-mono font-semibold">http://localhost:20128/v1</code>
+          </div>
+          <div>
+            <span class="text-zinc-500 uppercase text-[10px] font-bold block">API Key</span>
+            <code class="text-zinc-300 font-mono">API Key dari Dashboard 9router</code>
+          </div>
+          <div>
+            <span class="text-zinc-500 uppercase text-[10px] font-bold block">Pilihan Model ID</span>
+            <code class="text-yellow-400 font-mono">my9model-free</code>
+          </div>
+        </div>
+
+        <!-- Tool Setup Guides -->
+        <div class="space-y-3 text-xs">
+          
+          <!-- Cursor IDE -->
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+            <div class="font-bold text-white flex items-center space-x-2">
+              <span class="text-emerald-400">💻 Cursor IDE</span>
+            </div>
+            <ol class="list-decimal list-inside text-zinc-300 space-y-1 pl-1 leading-relaxed">
+              <li>Buka <strong>Cursor Settings</strong> (ikon gerigi) &rarr; pilih tab <strong>Models</strong>.</li>
+              <li>Klik <strong>Add model</strong> &rarr; tambahkan <code class="text-emerald-400 font-mono">my9model-free</code>, <code class="text-indigo-400 font-mono">my9model-smart</code>, dan <code class="text-amber-400 font-mono">my9model-fast</code>.</li>
+              <li>Gulir ke bawah ke bagian <strong>OpenAI API Key</strong>, aktifkan dan masukkan:
+                <div class="my-1.5 p-2 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-zinc-300">
+                  Base URL: http://localhost:20128/v1<br>
+                  API Key: &lt;api-key-9router-anda&gt;
+                </div>
+              </li>
+              <li>Pilih <code class="text-emerald-400 font-mono">my9model-free</code> di panel chat Cursor!</li>
+            </ol>
+          </div>
+
+          <!-- Claude Code CLI -->
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+            <div class="font-bold text-white flex items-center space-x-2">
+              <span class="text-emerald-400">⚡ Claude Code CLI</span>
+            </div>
+            <p class="text-zinc-300">Cukup set environment variables di terminal Anda:</p>
+            <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+export ANTHROPIC_BASE_URL="http://localhost:20128"
+export ANTHROPIC_API_KEY="your-9router-api-key"
+export ANTHROPIC_MODEL="my9model-free"
+
+# Jalankan Claude Code
+claude</pre>
+          </div>
+
+          <!-- VS Code Extensions -->
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+            <div class="font-bold text-white flex items-center space-x-2">
+              <span class="text-emerald-400">🧩 VS Code (Roo Code / Cline / Continue)</span>
+            </div>
+            <ol class="list-decimal list-inside text-zinc-300 space-y-1 pl-1 leading-relaxed">
+              <li>Di pengaturan extension, pilih Provider: <strong>OpenAI Compatible</strong>.</li>
+              <li>Masukkan Base URL: <code class="text-emerald-400 font-mono">http://localhost:20128/v1</code>.</li>
+              <li>Masukkan API Key 9router Anda.</li>
+              <li>Masukkan Model ID: <code class="text-emerald-400 font-mono">my9model-free</code>.</li>
+            </ol>
+          </div>
+
+          <!-- Aider / OpenCode / LibreChat -->
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+            <div class="font-bold text-white flex items-center space-x-2">
+              <span class="text-emerald-400">🤖 Aider / OpenCode / Terminal Chat</span>
+            </div>
+            <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+export OPENAI_API_BASE="http://localhost:20128/v1"
+export OPENAI_API_KEY="your-9router-api-key"
+
+aider --model openai/my9model-free</pre>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Section: Panduan Tab & Fitur Web -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+        <h3 class="text-base font-bold text-white flex items-center space-x-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          <span>Panduan Fitur Web Dashboard</span>
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <span class="font-bold text-white">📊 Overview</span>
+            <p class="text-zinc-400">Ringkasan status: total combos, provider terkoneksi, jumlah kandidat model, dan status scheduler aktif.</p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <span class="font-bold text-white">📦 Combos Inspector</span>
+            <p class="text-zinc-400">Tinjau daftar model aktif di dalam super-combos maupun combo spesifik per provider secara mendetail.</p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <span class="font-bold text-white">🔌 Providers Manager</span>
+            <p class="text-zinc-400">Lihat status provider di 9router dan tambahkan provider baru (OpenAI, Anthropic, DeepSeek, Groq, dll.) atau Custom Node dengan pencegahan duplikasi.</p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <span class="font-bold text-white">🚫 Exclusions (exclusions.json)</span>
+            <p class="text-zinc-400">Blokir provider atau nama model tertentu yang tidak ingin Anda sertakan saat sinkronisasi.</p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <span class="font-bold text-white">⭐ Priorities (priorities.json)</span>
+            <p class="text-zinc-400">Atur urutan model favorit Anda agar selalu diposisikan di ranking paling atas combo.</p>
+          </div>
+          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <span class="font-bold text-white">💻 CLI Console & Live Terminal</span>
+            <p class="text-zinc-400">Jalankan Full Sync, Dry Run, Watchdog Refresh, dan Update Benchmark secara manual dengan live streaming output log.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section: FAQ -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+        <h3 class="text-base font-bold text-white flex items-center space-x-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          <span>Pertanyaan Umum (FAQ)</span>
+        </h3>
+
+        <div class="space-y-3 text-xs">
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <div class="font-bold text-white">Q: Mengapa port web console ini 20129 padahal 9router di 20128?</div>
+            <p class="text-zinc-300 leading-relaxed">
+              Port <strong>20128</strong> digunakan oleh server Next.js & API endpoint utama 9router. Oleh karena itu, Web Console Auto-Free berjalan di port <strong>20129</strong> agar dapat berjalan berdampingan tanpa konflik port.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <div class="font-bold text-white">Q: Bagaimana jika kuota salah satu model gratis habis di tengah hari?</div>
+            <p class="text-zinc-300 leading-relaxed">
+              9router secara otomatis akan melakukan fallback (mengalihkan request) ke model urutan berikutnya di dalam combo. Selain itu, fitur <strong>Watchdog</strong> yang berjalan tiap jam akan mendeteksi HTTP 429 dan memindahkan model tersebut ke <code>my9model-cooldown</code> agar tidak dipanggil lagi sampai kuotanya reset.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <div class="font-bold text-white">Q: Apakah password dashboard ini aman?</div>
+            <p class="text-zinc-300 leading-relaxed">
+              Sangat aman. Dashboard ini memverifikasi password langsung menggunakan pencocokan hash bcrypt dari database SQLite 9router Anda sendiri. Tidak ada password atau kredensial yang dikirim ke server luar.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+            <div class="font-bold text-white">Q: Bagaimana jika lokasi instalasi 9router saya bukan default (Custom Dir / Docker / Windows)?</div>
+            <p class="text-zinc-300 leading-relaxed">
+              Aplikasi ini otomatis mendeteksi lokasi 9router di <strong>Linux/macOS (<code class="text-emerald-400">~/.9router</code>)</strong>, <strong>Windows (<code class="text-emerald-400">%APPDATA%/9router</code>)</strong>, dan <strong>Docker (<code class="text-emerald-400">/app/data</code>)</strong>. Jika Anda menggunakan lokasi kustom lain, Anda bisa menentukannya melalui:
+            </p>
+            <ul class="list-disc list-inside text-zinc-400 space-y-1 font-mono text-[11px] pl-1">
+              <li>Environment Variable: <code class="text-emerald-400">export NINEROUTER_DIR="/custom/path"</code></li>
+              <li>Database Path: <code class="text-emerald-400">export NINEROUTER_DB_PATH="/custom/path/db/data.sqlite"</code></li>
+              <li>URL / Port Custom: <code class="text-emerald-400">export NINEROUTER_URL="http://127.0.0.1:20128"</code></li>
+              <li>CLI Flag: <code class="text-emerald-400">node web.js --nine-router-dir="/custom/path"</code></li>
+            </ul>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+            <div class="font-bold text-white">Q: Apakah provider baru di luar list bawaan bisa langsung disinkronkan tanpa ubah kode?</div>
+            <p class="text-zinc-300 leading-relaxed">
+              <strong>Bisa langsung 100%!</strong> Sistem memiliki <em>Generic Dynamic Provider Engine</em>. Semua provider OpenAI-compatible baru (DeepSeek, SiliconFlow, Together AI, Fireworks, Ollama, Custom Node, dll.) yang Anda pasang di 9router akan otomatis ditarik daftar modelnya, diuji via live pre-test, dan diinjeksi ke combo super serta combo provider. Anda juga dapat mengatur tombol toggle <strong>Auto-Sync Free</strong> untuk mengaktifkan/menonaktifkan sync per provider secara instan.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+            <div class="font-bold text-white">Q: Bagaimana cara setup penjadwalan otomatis (scheduler) jika saya menginstall dari NPM?</div>
+            <p class="text-zinc-300 leading-relaxed">
+              Ada 2 cara yang sangat praktis:
+            </p>
+            <ul class="list-disc list-inside text-zinc-400 space-y-1 font-mono text-[11px] pl-1">
+              <li><strong>Via Web UI (1-Klik):</strong> Buka tab <span class="text-white font-sans font-semibold">💻 CLI Ops</span> lalu klik tombol <span class="text-emerald-400 font-sans font-semibold">Setup Scheduler</span>.</li>
+              <li><strong>Via NPX:</strong> Jalankan <code class="text-emerald-400">npx 9router-auto-free --setup-cron</code> di terminal.</li>
+              <li><strong>Via Global NPM:</strong> Jalankan <code class="text-emerald-400">9router-auto-free --setup-cron</code> di terminal.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ADD PROVIDER MODAL -->
+  <div id="addProviderModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-dark-card border border-dark-border w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-dark-border pb-3">
+        <h3 class="text-base font-bold text-white">Tambah Provider ke 9router</h3>
+        <button onclick="closeAddProviderModal()" class="text-zinc-400 hover:text-white">&times;</button>
+      </div>
+
+      <form onsubmit="handleAddProviderSubmit(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-zinc-300 mb-1">Pilih Provider</label>
+          <select id="modalProviderSelect" onchange="handleModalProviderChange()" required
+            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-zinc-300 mb-1">Connection Name</label>
+          <input id="modalConnName" type="text" required value="prod"
+            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-zinc-300 mb-1">API Key / Token</label>
+          <input id="modalApiKey" type="password" required placeholder="Masukkan API key..."
+            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div id="modalBaseUrlGroup">
+          <label class="block font-semibold text-zinc-300 mb-1">Base URL (Opsional / OpenAI Compatible)</label>
+          <input id="modalBaseUrl" type="text" placeholder="https://api.example.com/v1"
+            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div id="modalAccountIdGroup" class="hidden">
+          <label class="block font-semibold text-zinc-300 mb-1">Cloudflare Account ID</label>
+          <input id="modalAccountId" type="text" placeholder="Cloudflare Account ID..."
+            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div id="modalPrefixGroup" class="hidden">
+          <label class="block font-semibold text-zinc-300 mb-1">Custom Model Prefix</label>
+          <input id="modalCustomPrefix" type="text" placeholder="e.g. b-ai"
+            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+        </div>
+
+        <div id="modalError" class="hidden p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400"></div>
+
+        <div class="flex justify-end space-x-2 pt-2 border-t border-dark-border">
+          <button type="button" onclick="closeAddProviderModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">Batal</button>
+          <button type="submit" id="modalSubmitBtn" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold transition">Simpan ke 9router</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CLIENT SCRIPT -->
+  <script>
+    let globalProviders = [];
+    let activeSse = null;
+
+    // --- Auth Check ---
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/status');
+        const data = await res.json();
+        if (data.authenticated) {
+          document.getElementById('loginView').classList.add('hidden');
+          document.getElementById('appView').classList.remove('hidden');
+          document.getElementById('authNav').classList.remove('hidden');
+          loadDashboard();
+        } else {
+          document.getElementById('loginView').classList.remove('hidden');
+          document.getElementById('appView').classList.add('hidden');
+          document.getElementById('authNav').classList.add('hidden');
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const pwd = document.getElementById('passwordInput').value;
+      const errEl = document.getElementById('loginError');
+      const btn = document.getElementById('loginBtn');
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Memverifikasi...';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pwd })
+        });
+        const data = await res.json();
+        if (data.success) {
+          checkAuth();
+        } else {
+          errEl.textContent = data.error || 'Password salah';
+          errEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errEl.textContent = 'Network error: ' + err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Masuk ke Auto-Free Console';
+      }
+    }
+
+    async function logout() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      location.reload();
+    }
+
+    // --- Tabs Navigation ---
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => {
+        el.classList.remove('bg-emerald-500', 'text-zinc-950', 'shadow');
+        el.classList.add('text-zinc-400');
+      });
+
+      const activeView = document.getElementById('view-' + tabId);
+      const activeBtn = document.getElementById('tab-' + tabId);
+      if (activeView) activeView.classList.remove('hidden');
+      if (activeBtn) {
+        activeBtn.classList.remove('text-zinc-400');
+        activeBtn.classList.add('bg-emerald-500', 'text-zinc-950', 'shadow');
+      }
+
+      if (tabId === 'dashboard') loadDashboard();
+      if (tabId === 'combos') loadCombos();
+      if (tabId === 'providers') loadProviders();
+      if (tabId === 'exclusions') loadExclusions();
+      if (tabId === 'priorities') loadPriorities();
+    }
+
+    // --- Tab 1: Dashboard ---
+    async function loadDashboard() {
+      try {
+        const res = await fetch('/api/dashboard');
+        const data = await res.json();
+        if (!data.success) return;
+
+        const s = data.stats;
+        document.getElementById('statCombos').textContent = s.totalCombosCount;
+        document.getElementById('statProviders').textContent = s.activeConnectionsCount;
+        document.getElementById('statCandidates').textContent = s.candidatesCount;
+        document.getElementById('statCandidatesSync').textContent = s.candidatesLastSync ? 'Sync: ' + new Date(s.candidatesLastSync).toLocaleString('id-ID') : 'Belum sync';
+        document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd (Active)' : 'Cron (Active)') : 'Inactive';
+        document.getElementById('schedulerBadge').textContent = s.schedulerActive ? 'Scheduler: ' + s.schedulerType : 'Scheduler: Inactive';
+        if (s.nineRouterDir) document.getElementById('statNineRouterDir').textContent = s.nineRouterDir;
+        if (s.dbPath) document.getElementById('statDbPath').textContent = s.dbPath;
+        if (s.nineRouterUrl) document.getElementById('statNineRouterUrl').textContent = s.nineRouterUrl;
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // --- Tab 2: Combos ---
+    async function loadCombos() {
+      const container = document.getElementById('combosList');
+      container.innerHTML = '<div class="text-xs text-zinc-400 p-4">Memuat data combos...</div>';
+      try {
+        const res = await fetch('/api/combos');
+        const data = await res.json();
+        if (!data.success) return;
+
+        container.innerHTML = '';
+        data.combos.forEach(c => {
+          const isSuper = c.name.startsWith('my9model-');
+          const card = document.createElement('div');
+          card.className = 'bg-dark-card border ' + (isSuper ? 'border-emerald-500/40 shadow-lg shadow-emerald-950/20' : 'border-dark-border') + ' rounded-2xl p-5 space-y-3';
+          
+          let modelsHtml = '';
+          if (c.models && c.models.length > 0) {
+            modelsHtml = c.models.map((m, idx) => `
+              <div class="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-zinc-950/50 border border-zinc-800/60 font-mono">
+                <span class="text-zinc-300 truncate max-w-[80%]">${idx + 1}. ${m}</span>
+              </div>
+            `).join('');
+          } else {
+            modelsHtml = '<div class="text-xs text-zinc-500 italic p-2">Tidak ada model di combo ini.</div>';
+          }
+
+          card.innerHTML = `
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-sm text-white font-mono">${c.name}</span>
+                ${isSuper ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Super Combo</span>' : ''}
+              </div>
+              <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300">${c.models.length} models</span>
+            </div>
+            <div class="max-h-60 overflow-y-auto space-y-1 pr-1">
+              ${modelsHtml}
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {
+        container.innerHTML = '<div class="text-xs text-rose-400 p-4">Gagal memuat combos: ' + err.message + '</div>';
+      }
+    }
+
+    // --- Tab 3: Providers ---
+    let providerFilter = 'all';
+
+    async function loadProviders() {
+      const tbody = document.getElementById('providersTable');
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-zinc-500">Memuat katalog provider...</td></tr>';
+      try {
+        const res = await fetch('/api/providers');
+        const data = await res.json();
+        if (!data.success) return;
+
+        globalProviders = data.providers;
+        renderProvidersTable();
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-rose-400">Gagal: ' + err.message + '</td></tr>';
+      }
+    }
+
+    function setProviderFilter(f) {
+      providerFilter = f;
+      document.querySelectorAll('.pfilter-btn').forEach(btn => {
+        btn.classList.remove('bg-zinc-800', 'text-white');
+        btn.classList.add('text-zinc-400');
+      });
+      const activeBtn = document.getElementById('pfilter-' + f);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-zinc-400');
+        activeBtn.classList.add('bg-zinc-800', 'text-white');
+      }
+      renderProvidersTable();
+    }
+
+    function renderProvidersTable() {
+      const tbody = document.getElementById('providersTable');
+      const search = (document.getElementById('providerSearchInput')?.value || '').toLowerCase().trim();
+
+      let list = globalProviders.filter(p => {
+        if (providerFilter === 'installed' && !p.isInstalled) return false;
+        if (providerFilter === 'available' && p.isInstalled) return false;
+        if (search) {
+          const matchLabel = (p.label || '').toLowerCase().includes(search);
+          const matchKey = (p.key || '').toLowerCase().includes(search);
+          const matchPrefix = (p.prefixes || []).some(pref => String(pref).toLowerCase().includes(search));
+          const matchUrl = (p.defaultBaseUrl || '').toLowerCase().includes(search);
+          if (!matchLabel && !matchKey && !matchPrefix && !matchUrl) return false;
+        }
+        return true;
+      });
+
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-zinc-500">Tidak ada provider yang cocok dengan filter / pencarian.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      list.forEach(p => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-zinc-900/40 transition border-b border-dark-border/40';
+
+        const statusBadge = p.isInstalled
+          ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢 Terpasang</span>'
+          : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">⚪ Belum Terpasang</span>';
+
+        const actionBtn = p.isInstalled
+          ? '<button disabled title="Provider sudah aktif di 9router" class="text-xs px-3 py-1 rounded-lg bg-zinc-800/80 text-zinc-500 cursor-not-allowed font-medium border border-zinc-700/50">Sudah Ada</button>'
+          : `<button onclick="openAddSpecificProvider('${p.key}')" class="text-xs px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold transition shadow-sm flex items-center space-x-1 ml-auto"><span>+ Pasang</span></button>`;
+
+        let catColor = 'bg-zinc-800 text-zinc-300';
+        if (p.category === 'Free AI') catColor = 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20';
+        else if (p.category === 'Major LLM') catColor = 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20';
+        else if (p.category === 'Aggregator') catColor = 'bg-purple-500/10 text-purple-300 border border-purple-500/20';
+        else if (p.category === 'Fast Inference') catColor = 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
+        else if (p.category === 'Custom Node') catColor = 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20';
+
+        const autoSyncBadge = p.isInstalled
+          ? (p.autoSyncEnabled !== false
+              ? `<button onclick="toggleProviderSync('${p.connectionId || p.key}', false)" title="Klik untuk menonaktifkan auto-sync untuk provider ini" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 transition flex items-center space-x-1 mx-auto"><span>⚡ Aktif</span></button>`
+              : `<button onclick="toggleProviderSync('${p.connectionId || p.key}', true)" title="Klik untuk mengaktifkan auto-sync untuk provider ini" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-emerald-500/20 hover:text-emerald-300 transition flex items-center space-x-1 mx-auto"><span>⚪ Non-Aktif</span></button>`)
+          : '<span class="text-zinc-600 font-mono text-[11px]">-</span>';
+
+        row.innerHTML = `
+          <td class="px-5 py-3.5 font-bold text-white">${p.label}</td>
+          <td class="px-5 py-3.5"><span class="px-2 py-0.5 rounded-md text-[10px] font-semibold ${catColor}">${p.category || 'Standard'}</span></td>
+          <td class="px-5 py-3.5 font-mono text-zinc-300">${(p.prefixes || []).join(', ')}</td>
+          <td class="px-5 py-3.5 font-mono text-zinc-400 truncate max-w-[200px]" title="${p.defaultBaseUrl || '-'}">${p.defaultBaseUrl || '<span class="text-zinc-600">Default 9router</span>'}</td>
+          <td class="px-5 py-3.5">${statusBadge}</td>
+          <td class="px-5 py-3.5 text-center">${autoSyncBadge}</td>
+          <td class="px-5 py-3.5 text-right">${actionBtn}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function toggleProviderSync(idOrKey, enable) {
+      try {
+        const res = await fetch('/api/providers/toggle-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: idOrKey, enabled: enable })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadProviders();
+        } else {
+          alert('Gagal mengubah status sync: ' + (data.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Gagal: ' + err.message);
+      }
+    }
+
+    function openAddProviderModal() {
+      const select = document.getElementById('modalProviderSelect');
+      select.innerHTML = '';
+
+      // Group providers by category
+      const categories = {};
+      globalProviders.forEach(p => {
+        const cat = p.category || 'Other';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(p);
+      });
+
+      for (const [catName, provs] of Object.entries(categories)) {
+        const grp = document.createElement('optgroup');
+        grp.label = catName;
+        provs.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.key;
+          opt.textContent = p.label + (p.isInstalled ? ' (Sudah Terpasang)' : '');
+          opt.disabled = p.isInstalled;
+          grp.appendChild(opt);
+        });
+        select.appendChild(grp);
+      }
+
+      const firstAvailable = globalProviders.find(p => !p.isInstalled);
+      if (firstAvailable) select.value = firstAvailable.key;
+
+      handleModalProviderChange();
+      document.getElementById('modalError').classList.add('hidden');
+      document.getElementById('addProviderModal').classList.remove('hidden');
+    }
+
+    function openAddSpecificProvider(key) {
+      openAddProviderModal();
+      document.getElementById('modalProviderSelect').value = key;
+      handleModalProviderChange();
+    }
+
+    function closeAddProviderModal() {
+      document.getElementById('addProviderModal').classList.add('hidden');
+    }
+
+    function handleModalProviderChange() {
+      const key = document.getElementById('modalProviderSelect').value;
+      const prov = globalProviders.find(p => p.key === key) || {};
+
+      const cfGroup = document.getElementById('modalAccountIdGroup');
+      const prefixGroup = document.getElementById('modalPrefixGroup');
+      const baseUrlInput = document.getElementById('modalBaseUrl');
+      const prefixInput = document.getElementById('modalCustomPrefix');
+      const nameInput = document.getElementById('modalConnName');
+
+      if (prov.needsAccountId || key === 'cloudflare') {
+        cfGroup.classList.remove('hidden');
+      } else {
+        cfGroup.classList.add('hidden');
+      }
+
+      if (prov.isCustom || key === 'openai-compatible') {
+        prefixGroup.classList.remove('hidden');
+      } else {
+        prefixGroup.classList.remove('hidden'); // allow prefix customization
+      }
+
+      baseUrlInput.value = prov.defaultBaseUrl || '';
+      prefixInput.value = prov.defaultPrefix || (prov.prefixes && prov.prefixes[0]) || '';
+      nameInput.value = 'prod';
+    }
+
+    async function handleAddProviderSubmit(e) {
+      e.preventDefault();
+      const key = document.getElementById('modalProviderSelect').value;
+      const name = document.getElementById('modalConnName').value;
+      const apiKey = document.getElementById('modalApiKey').value;
+      const baseUrl = document.getElementById('modalBaseUrl').value;
+      const accountId = document.getElementById('modalAccountId').value;
+      const customPrefix = document.getElementById('modalCustomPrefix').value;
+      const errEl = document.getElementById('modalError');
+      const btn = document.getElementById('modalSubmitBtn');
+
+      errEl.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      try {
+        const res = await fetch('/api/providers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: key,
+            name,
+            apiKey,
+            baseUrl: baseUrl || undefined,
+            accountId: accountId || undefined,
+            customPrefix: customPrefix || undefined
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeAddProviderModal();
+          loadProviders();
+          loadDashboard();
+        } else {
+          errEl.textContent = data.error || 'Gagal menambahkan provider';
+          errEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errEl.textContent = 'Network error: ' + err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Simpan ke 9router';
+      }
+    }
+
+    // --- Tab 4: Exclusions ---
+    let currentExclusions = [];
+
+    async function loadExclusions() {
+      try {
+        const res = await fetch('/api/exclusions');
+        const data = await res.json();
+        if (!data.success) return;
+
+        currentExclusions = data.exclusions;
+        document.getElementById('exclusionsJsonEditor').value = JSON.stringify(currentExclusions, null, 2);
+        renderExclusionTags();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderExclusionTags() {
+      const container = document.getElementById('exclusionTags');
+      container.innerHTML = '';
+
+      let list = [];
+      if (Array.isArray(currentExclusions)) {
+        list = currentExclusions;
+      } else if (typeof currentExclusions === 'object') {
+        const models = (currentExclusions.excludedModels || []).map(m => String(m));
+        const provs = (currentExclusions.excludedProviders || []).map(p => 'provider:' + p);
+        list = [...models, ...provs];
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = '<span class="text-xs text-zinc-500 italic">Belum ada exclusion rules.</span>';
+        return;
+      }
+
+      list.forEach((item, idx) => {
+        const isProv = String(item).startsWith('provider:');
+        const tag = document.createElement('div');
+        tag.className = 'flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-mono ' + 
+          (isProv ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20' : 'bg-rose-500/10 text-rose-300 border border-rose-500/20');
+        tag.innerHTML = `
+          <span>${item}</span>
+          <button onclick="removeExclusionTag(${idx})" class="hover:text-white font-bold ml-1">&times;</button>
+        `;
+        container.appendChild(tag);
+      });
+    }
+
+    function addExclusionTag() {
+      const input = document.getElementById('newExclusionInput');
+      const val = input.value.trim();
+      if (!val) return;
+
+      if (Array.isArray(currentExclusions)) {
+        if (!currentExclusions.includes(val)) currentExclusions.push(val);
+      } else {
+        currentExclusions = [val];
+      }
+
+      input.value = '';
+      document.getElementById('exclusionsJsonEditor').value = JSON.stringify(currentExclusions, null, 2);
+      renderExclusionTags();
+    }
+
+    function removeExclusionTag(idx) {
+      if (Array.isArray(currentExclusions)) {
+        currentExclusions.splice(idx, 1);
+      }
+      document.getElementById('exclusionsJsonEditor').value = JSON.stringify(currentExclusions, null, 2);
+      renderExclusionTags();
+    }
+
+    function formatExclusionsJson() {
+      try {
+        const parsed = JSON.parse(document.getElementById('exclusionsJsonEditor').value);
+        currentExclusions = parsed;
+        document.getElementById('exclusionsJsonEditor').value = JSON.stringify(parsed, null, 2);
+        renderExclusionTags();
+      } catch (err) {
+        alert('Invalid JSON: ' + err.message);
+      }
+    }
+
+    async function saveExclusions() {
+      try {
+        const raw = document.getElementById('exclusionsJsonEditor').value;
+        const parsed = JSON.parse(raw);
+        const res = await fetch('/api/exclusions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(parsed)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Exclusions berhasil disimpan!');
+          loadExclusions();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    // --- Tab 5: Priorities ---
+    let currentPriorities = [];
+
+    async function loadPriorities() {
+      try {
+        const res = await fetch('/api/priorities');
+        const data = await res.json();
+        if (!data.success) return;
+
+        currentPriorities = data.priorities;
+        document.getElementById('prioritiesJsonEditor').value = JSON.stringify(currentPriorities, null, 2);
+        renderPriorityList();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderPriorityList() {
+      const container = document.getElementById('priorityList');
+      container.innerHTML = '';
+
+      if (!Array.isArray(currentPriorities) || currentPriorities.length === 0) {
+        container.innerHTML = '<span class="text-xs text-zinc-500 italic">Belum ada prioritas kustom.</span>';
+        return;
+      }
+
+      currentPriorities.forEach((item, idx) => {
+        const el = document.createElement('div');
+        el.className = 'flex items-center justify-between p-2 rounded-xl bg-zinc-950/60 border border-zinc-800 text-xs font-mono';
+        el.innerHTML = `
+          <div class="flex items-center space-x-2 truncate">
+            <span class="text-emerald-400 font-bold">#${idx + 1}</span>
+            <span class="text-zinc-200 truncate">${item}</span>
+          </div>
+          <div class="flex items-center space-x-1">
+            <button onclick="movePriority(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-30"' : ''} class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">↑</button>
+            <button onclick="movePriority(${idx}, 1)" ${idx === currentPriorities.length - 1 ? 'disabled class="opacity-30"' : ''} class="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300">↓</button>
+            <button onclick="removePriorityItem(${idx})" class="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 ml-1">&times;</button>
+          </div>
+        `;
+        container.appendChild(el);
+      });
+    }
+
+    function addPriorityTag() {
+      const input = document.getElementById('newPriorityInput');
+      const val = input.value.trim();
+      if (!val) return;
+
+      if (!Array.isArray(currentPriorities)) currentPriorities = [];
+      if (!currentPriorities.includes(val)) currentPriorities.push(val);
+
+      input.value = '';
+      document.getElementById('prioritiesJsonEditor').value = JSON.stringify(currentPriorities, null, 2);
+      renderPriorityList();
+    }
+
+    function movePriority(idx, dir) {
+      const target = idx + dir;
+      if (target < 0 || target >= currentPriorities.length) return;
+      const temp = currentPriorities[idx];
+      currentPriorities[idx] = currentPriorities[target];
+      currentPriorities[target] = temp;
+      document.getElementById('prioritiesJsonEditor').value = JSON.stringify(currentPriorities, null, 2);
+      renderPriorityList();
+    }
+
+    function removePriorityItem(idx) {
+      currentPriorities.splice(idx, 1);
+      document.getElementById('prioritiesJsonEditor').value = JSON.stringify(currentPriorities, null, 2);
+      renderPriorityList();
+    }
+
+    function formatPrioritiesJson() {
+      try {
+        const parsed = JSON.parse(document.getElementById('prioritiesJsonEditor').value);
+        currentPriorities = parsed;
+        document.getElementById('prioritiesJsonEditor').value = JSON.stringify(parsed, null, 2);
+        renderPriorityList();
+      } catch (err) {
+        alert('Invalid JSON: ' + err.message);
+      }
+    }
+
+    async function savePriorities() {
+      try {
+        const raw = document.getElementById('prioritiesJsonEditor').value;
+        const parsed = JSON.parse(raw);
+        const res = await fetch('/api/priorities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(parsed)
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Priorities berhasil disimpan!');
+          loadPriorities();
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    // --- Tab 6: CLI & Terminal Stream ---
+    function triggerCliAction(action) {
+      switchTab('cli');
+      if (activeSse) {
+        alert('Ada proses yang sedang berjalan. Tunggu hingga selesai.');
+        return;
+      }
+
+      const term = document.getElementById('terminalOutput');
+      const title = document.getElementById('terminalTitle');
+      const status = document.getElementById('terminalStatus');
+
+      term.textContent = '';
+      title.textContent = action;
+      status.textContent = 'RUNNING';
+      status.className = 'font-mono text-[11px] text-yellow-400 animate-pulse';
+
+      const sse = new EventSource('/api/actions/stream?action=' + action);
+      activeSse = sse;
+
+      sse.addEventListener('start', e => {
+        const d = JSON.parse(e.data);
+        term.textContent += `[*] Menjalankan: ${d.command}\n------------------------------------------------------------\n`;
+      });
+
+      sse.addEventListener('log', e => {
+        const d = JSON.parse(e.data);
+        term.textContent += d.text;
+        term.scrollTop = term.scrollHeight;
+      });
+
+      sse.addEventListener('done', e => {
+        const d = JSON.parse(e.data);
+        term.textContent += `\n------------------------------------------------------------\n[✓] Selesai dengan status exit: ${d.code}\n`;
+        status.textContent = d.success ? 'SUCCESS' : 'FAILED (code ' + d.code + ')';
+        status.className = d.success ? 'font-mono text-[11px] text-emerald-400' : 'font-mono text-[11px] text-rose-400';
+        sse.close();
+        activeSse = null;
+        loadDashboard();
+      });
+
+      sse.addEventListener('error', e => {
+        try {
+          const d = JSON.parse(e.data);
+          term.textContent += `\n[X] Error: ${d.error}\n`;
+        } catch {}
+        status.textContent = 'ERROR';
+        status.className = 'font-mono text-[11px] text-rose-400';
+        sse.close();
+        activeSse = null;
+      });
+    }
+
+    function clearConsole() {
+      document.getElementById('terminalOutput').textContent = '';
+      document.getElementById('terminalStatus').textContent = 'READY';
+      document.getElementById('terminalStatus').className = 'font-mono text-[11px] text-zinc-500';
+    }
+
+    async function loadLatestLogs() {
+      switchTab('cli');
+      try {
+        const res = await fetch('/api/logs');
+        const data = await res.json();
+        document.getElementById('terminalTitle').textContent = 'sync.log';
+        document.getElementById('terminalOutput').textContent = data.logs;
+      } catch (err) {
+        alert('Gagal memuat log: ' + err.message);
+      }
+    }
+
+    // Init
+    checkAuth();
+  </script>
+</body>
+</html>

@@ -89,6 +89,14 @@ Threshold dapat diubah lewat konstanta `AGENTIC_MIN_CONTEXT` di `sync.js`.
 | 14 | API.airforce | API `api.airforce/v1/models` via koneksi `api-airforce` | Model berlabel `tier: "free"` | `api-airforce/llama-3.3-70b-instruct-fp8-fast` |
 | 15 | B.ai | API `api.b.ai/v1/models` — koneksi *openai-compatible* di 9router dengan baseUrl `https://api.b.ai/v1` (fallback koneksi native `b.ai`) | Free-tier (filter live pre-test); non-coding di-skip | `b-ai/hy3` |
 
+### 🌐 Dynamic Provider Auto-Discovery (Semua Provider Lainnya)
+
+Selain 15 sumber bawaan di atas, sistem **otomatis mendeteksi provider OpenAI-compatible baru** yang Anda tambahkan di 9router (seperti *DeepSeek, SiliconFlow, Together AI, Fireworks, Chutes, Novita, Nebius, Qwen, Ollama, LMStudio, vLLM*, atau *Custom Node*):
+- Model ditarik secara dinamis dari endpoint `/models` / `/v1/models`.
+- Langsung diuji lewat *Live Pre-Test* dan diinjeksi ke combo super serta combo provider (`<provider>-free`).
+- Partisipasi sync dapat diaktifkan/dinonaktifkan secara instan via tombol toggle **Auto-Sync Free** di Web Dashboard.
+
+
 Delapan provider dinonaktifkan secara default melalui [`exclusions.json`](exclusions.json): **API.airforce** (rate limit ketat 1 req/detik di plan gratis), **Cloudflare** (plan gratis hanya menyisakan sedikit model LoRA lama), **Mistral** (mayoritas katalog sudah berbayar), **NVIDIA NIM**, **Groq**, **Bazaarlink**, **Cerebras**, dan **B.ai**. Hapus entri mereka di `excludedProviders` bila ingin mengaktifkan kembali.
 
 > Catatan: integrasi GitHub Models **tidak ditambahkan** karena layanan ini sudah di-retire GitHub per 30 Juli 2026 (endpoint `models.github.ai` mengembalikan HTTP 410 permanen).
@@ -229,7 +237,30 @@ Ketika dua atau lebih model memiliki skor atau prioritas setara, sistem mengukur
 
 ---
 
-## Perintah & Penggunaan
+## Instalasi & Penggunaan via NPM / NPX
+
+Jika Anda menginstall dari **NPM Registry**, Anda dapat menjalankannya langsung:
+
+```bash
+# 1. Jalankan langsung via NPX (Zero-Install):
+npx 9router-auto-free                 # Full sync harian
+npx 9router-auto-free --web           # Web Console Dashboard (port 20129)
+npx 9router-auto-free --setup-cron    # Pasang scheduler otomatis (systemd/cron)
+
+# 2. ATAU install secara Global:
+npm install -g 9router-auto-free
+
+# Gunakan command kapan saja di terminal:
+9router-auto-free                     # Full sync harian
+9router-auto-free-web                 # Jalankan Web Console
+9router-auto-free --setup-cron        # Pasang scheduler otomatis
+```
+
+---
+
+## Perintah & Penggunaan (Clone Repository Lokal)
+
+Jika Anda clone repository git ini:
 
 ```bash
 # Sinkronisasi harian: scrape + live pre-test + ranking + injeksi combo
@@ -248,6 +279,9 @@ npm run update-benchmarks
 # Sinkronisasi harian sekaligus update benchmark live
 node sync.js --live-benchmarks
 
+# Jalankan Web Console Dashboard (port 20129)
+npm run web
+
 # Pasang scheduler otomatis (systemd user timers, fallback crontab)
 npm run setup-cron
 
@@ -259,17 +293,63 @@ Flag tambahan pada `sync.js`:
 
 | Flag | Fungsi |
 |---|---|
+| `--web` / `--ui` | Jalankan Web Console Dashboard (`node sync.js --web`) |
 | `--refresh` / `--watchdog` | Mode watchdog intra-hari (tanpa discovery model baru) |
 | `--dry-run` | Simulasi penuh, tanpa tulis database |
 | `--live-benchmarks` / `--update-benchmarks` | Update benchmark sebelum sync |
 | `--setup-cron` / `--setup-scheduler` | Install scheduler |
 | `--exclude-provider=a,b` | Skip provider tertentu hanya untuk sesi ini |
+| `--nine-router-dir=<path>` | Tentukan lokasi folder data 9router kustom |
+| `--db-path=<path>` | Tentukan file database SQLite 9router kustom |
+| `--router-url=<url>` | Tentukan endpoint 9router kustom (default: `http://127.0.0.1:20128`) |
+
+### Lokasi 9router Non-Default (Docker / Windows / Custom Path)
+
+Aplikasi otomatis mendeteksi folder 9router di:
+- **Linux / macOS**: `~/.9router`
+- **Windows**: `%APPDATA%/9router` atau `~/.9router`
+- **Docker**: `/app/data`
+
+Jika Anda menggunakan lokasi kustom, tentukan lewat Environment Variable atau CLI flag:
+
+```bash
+# Set folder 9router kustom
+export NINEROUTER_DIR="/custom/path/to/9router"
+
+# Atau set langsung lokasi file database SQLite
+export NINEROUTER_DB_PATH="/custom/path/db/data.sqlite"
+
+# Set URL / Port endpoint 9router jika berbeda
+export NINEROUTER_URL="http://127.0.0.1:20128"
+```
+
+
+---
+
+## Web Console & Dashboard
+
+Antarmuka web interaktif mandiri yang matching dengan tema clean dark 9router:
+
+```bash
+npm run web
+# atau
+node web.js --port=20129
+```
+
+Fitur Web Console:
+- **Autentikasi 9router**: Login dengan password yang sama dengan dashboard 9router Anda (diverifikasi langsung via bcrypt hash SQLite `settings`).
+- **Combos Inspector**: Tinjau super-combos (`my9model-free`, `-smart`, `-fast`, `-cooldown`) dan combo provider beserta model di dalamnya.
+- **Dynamic Provider Engine & Auto-Sync Toggle**: Otomatis menemukan model dari provider OpenAI-compatible baru di 9router tanpa hardcode, lengkap dengan tombol on/off Auto-Sync per provider di UI.
+- **Provider Management**: Tambah koneksi provider baru ke 9router dengan pencegahan duplikasi (provider yang sudah terpasang/aktif otomatis disabled).
+- **Exclusions & Priorities Manager**: Visual tag manager + raw JSON editor untuk mengedit `exclusions.json` dan `priorities.json`.
+- **Live Terminal & CLI Runner**: Jalankan *Full Sync*, *Dry Run*, *Watchdog Refresh*, *Update Benchmarks*, dan *Setup Scheduler* dengan live streaming logs stdout/stderr via Server-Sent Events (SSE).
+
 
 ---
 
 ## Penjadwalan Otomatis
 
-`npm run setup-cron` memasang tiga job dengan preferensi **systemd user timers** (Persistent=true, catch-up otomatis setelah boot) dan **crontab** sebagai fallback:
+Jalankan `npx 9router-auto-free --setup-cron` (atau `9router-auto-free --setup-cron`, atau klik tombol **Setup Scheduler** di tab *CLI Ops* Web Dashboard). Perintah ini otomatis memasang tiga job dengan preferensi **systemd user timers** (Persistent=true, catch-up otomatis setelah boot) dan **crontab** sebagai fallback:
 
 | Jadwal | Job |
 |---|---|

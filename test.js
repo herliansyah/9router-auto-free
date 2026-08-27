@@ -165,17 +165,18 @@ async function runTests() {
   const priorities = getPrioritiesList();
   assert.ok(Array.isArray(priorities) && priorities.length > 0, 'Priorities list must not be empty');
 
-  assert.strictEqual(getModelPriorityRank('openagentic/0x-alpha-pro', priorities), 0, '0x-alpha should be rank 0');
-  assert.strictEqual(getModelPriorityRank('openagentic/ox-alpha', priorities), 1, 'ox-alpha should be rank 1');
-  assert.strictEqual(getModelPriorityRank('poolside/poolside/laguna-s-2.1', priorities), 3, 'Laguna should be rank 3');
-  assert.strictEqual(getModelPriorityRank('ollama/minimax-m3', priorities), Infinity, 'Minimax M3 has no custom rank');
+  const testPriorities = ['0x-alpha', 'ox-alpha', 'hy3', 'laguna'];
+  assert.strictEqual(getModelPriorityRank('openagentic/0x-alpha-pro', testPriorities), 0, '0x-alpha should be rank 0');
+  assert.strictEqual(getModelPriorityRank('openagentic/ox-alpha', testPriorities), 1, 'ox-alpha should be rank 1');
+  assert.strictEqual(getModelPriorityRank('poolside/poolside/laguna-s-2.1', testPriorities), 3, 'Laguna should be rank 3');
+  assert.strictEqual(getModelPriorityRank('ollama/minimax-m3', testPriorities), Infinity, 'Minimax M3 has no custom rank');
 
   const similarCandidates = [
     { id: 'openagentic/hy3-large', latencyMs: 2200 },
     { id: 'ollama/hy3-small', latencyMs: 450 },
     { id: 'openagentic/ox-alpha', latencyMs: 1500 }
   ];
-  const sortedSimilar = sortModelsByCodingQuality(similarCandidates, null, priorities);
+  const sortedSimilar = sortModelsByCodingQuality(similarCandidates, null, testPriorities);
   assert.strictEqual(sortedSimilar[0].id, 'openagentic/ox-alpha', 'Higher rank (ox-alpha) must come first');
   assert.strictEqual(sortedSimilar[1].id, 'ollama/hy3-small', 'Between two hy3 models, lower latency (450ms) must come first');
   assert.strictEqual(sortedSimilar[2].id, 'openagentic/hy3-large', 'Higher latency hy3 (2200ms) comes after');
@@ -470,10 +471,134 @@ async function runTests() {
     assert.ok(typeof scheduler.installScheduler === 'function', 'scheduler.installScheduler is a function');
   }
 
+  // 27. Web Console & Auth test checks
+  {
+    console.log('[-] Testing Web Console auth & session tokens...');
+    // 1) Session creation and validation
+    const token = storage.createSessionToken();
+    assert.ok(token && typeof token === 'string', 'Session token must be created');
+    assert.ok(storage.verifySessionToken(token), 'Session token must verify successfully');
+    assert.strictEqual(storage.verifySessionToken('invalid.token'), false, 'Invalid token must fail verification');
+
+    // 2) Password verification against 9router
+    const invalidPwdCheck = storage.verify9routerPassword('definitely-wrong-password-12345');
+    assert.strictEqual(invalidPwdCheck, false, 'Wrong password must fail verification');
+
+    // 3) Duplicate provider prevention guard
+    console.log('[-] Testing duplicate provider guard...');
+    let threwDuplicate = false;
+    try {
+      // Groq is already active in 9router sqlite
+      storage.addProviderConnection({ provider: 'groq', name: 'prod', apiKey: 'gsk_test' });
+    } catch (err) {
+      threwDuplicate = true;
+      assert.ok(err.message.includes('sudah terpasang'), 'Error message should indicate provider already exists');
+    }
+    assert.ok(threwDuplicate, 'Adding existing active provider must throw duplicate error');
+
+    // 4) Scheduler status check
+    const schedStatus = scheduler.getSchedulerStatus();
+    assert.ok(typeof schedStatus.active === 'boolean', 'Scheduler status active must be boolean');
+
+    // 5) HTTP Server endpoint checks
+    console.log('[-] Testing Web Server HTTP routes & auth guard...');
+    const http = require('node:http');
+    const { server } = require('./web.js');
+    const testPort = 20198;
+
+    await new Promise((resolve, reject) => {
+      server.listen(testPort, '127.0.0.1', async () => {
+        try {
+          // Check static index.html
+          const htmlRes = await new Promise(res => {
+            http.get(`http://127.0.0.1:${testPort}/`, r => {
+              let d = '';
+              r.on('data', c => d += c);
+              r.on('end', () => res({ status: r.statusCode, body: d }));
+            });
+          });
+          assert.strictEqual(htmlRes.status, 200, 'GET / should return 200');
+          assert.ok(htmlRes.body.includes('9Router Auto-Free Console'), 'GET / should return console HTML');
+
+          // Check unauthenticated /api/dashboard returns 401
+          const unauthRes = await new Promise(res => {
+            http.get(`http://127.0.0.1:${testPort}/api/dashboard`, r => {
+              res({ status: r.statusCode });
+            });
+          });
+          assert.strictEqual(unauthRes.status, 401, 'Unauthenticated /api/dashboard should return 401');
+
+          // Check login with valid session creation
+          const loginRes = await new Promise(res => {
+            const req = http.request(`http://127.0.0.1:${testPort}/api/auth/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            }, r => {
+              let d = '';
+              r.on('data', c => d += c);
+              r.on('end', () => res({ status: r.statusCode, cookie: r.headers['set-cookie'], data: JSON.parse(d) }));
+            });
+            req.write(JSON.stringify({ password: '123456' }));
+            req.end();
+          });
+          assert.strictEqual(loginRes.status, 200, 'Login with correct password must return 200');
+          assert.ok(loginRes.cookie && loginRes.cookie.length > 0, 'Login must set session cookie');
+
+          const cookie = loginRes.cookie[0].split(';')[0];
+
+          // Check authenticated /api/dashboard returns 200
+          const authDashRes = await new Promise(res => {
+            http.get(`http://127.0.0.1:${testPort}/api/dashboard`, { headers: { Cookie: cookie } }, r => {
+              let d = '';
+              r.on('data', c => d += c);
+              r.on('end', () => res({ status: r.statusCode, data: JSON.parse(d) }));
+            });
+          });
+          assert.strictEqual(authDashRes.status, 200, 'Authenticated dashboard must return 200');
+          assert.strictEqual(authDashRes.data.success, true, 'Authenticated dashboard success must be true');
+
+          // Check /api/providers/toggle-sync endpoint
+          const toggleRes = await new Promise(res => {
+            const req = http.request(`http://127.0.0.1:${testPort}/api/providers/toggle-sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Cookie: cookie }
+            }, r => {
+              let d = '';
+              r.on('data', c => d += c);
+              r.on('end', () => res({ status: r.statusCode, data: JSON.parse(d) }));
+            });
+            req.write(JSON.stringify({ id: 'test-dynamic-node', enabled: false }));
+            req.end();
+          });
+          assert.strictEqual(toggleRes.status, 200, 'toggle-sync must return 200');
+          assert.strictEqual(toggleRes.data.success, true, 'toggle-sync success must be true');
+
+          server.close(() => resolve());
+        } catch (err) {
+          server.close(() => reject(err));
+        }
+      });
+    });
+
+    // 6) Dynamic Provider discovery & config test
+    console.log('[-] Testing dynamic provider discovery engine...');
+    const dynProviders = storage.getDynamicProviders();
+    assert.ok(Array.isArray(dynProviders), 'getDynamicProviders must return an array');
+
+    // Test writing and reading custom providers file
+    const origCustom = storage.readCustomProvidersFile();
+    storage.writeCustomProvidersFile({ 'mock-test': { enabled: true, prefix: 'mock' } });
+    const readCustom = storage.readCustomProvidersFile();
+    assert.strictEqual(readCustom['mock-test']?.prefix, 'mock', 'Custom provider config must persist');
+    storage.writeCustomProvidersFile(origCustom); // restore
+  }
+
   console.log('[✓] All tests passed successfully!');
+
 }
 
 runTests().catch(err => {
   console.error('[X] Test failed:', err);
   process.exit(1);
 });
+

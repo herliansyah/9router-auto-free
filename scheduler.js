@@ -36,13 +36,14 @@ function installScheduler(options = {}) {
   const home = os.homedir();
   const unitsDir = path.join(home, '.config', 'systemd', 'user');
 
+  const nodeBin = process.execPath || '/usr/bin/node';
   const serviceUnit = `[Unit]
 Description=9router free models daily full sync
 
 [Service]
 Type=oneshot
 WorkingDirectory=${path.dirname(scriptPath)}
-ExecStart=/usr/bin/node ${scriptPath}
+ExecStart=${nodeBin} ${scriptPath}
 `;
 
   const serviceTimer = `[Unit]
@@ -63,7 +64,7 @@ Description=9router free combo watchdog (intra-day quota re-check)
 [Service]
 Type=oneshot
 WorkingDirectory=${path.dirname(scriptPath)}
-ExecStart=/usr/bin/node ${scriptPath} --refresh
+ExecStart=${nodeBin} ${scriptPath} --refresh
 `;
 
   const watchdogTimer = `[Unit]
@@ -84,7 +85,7 @@ Description=Weekly live coding-benchmark database update
 [Service]
 Type=oneshot
 WorkingDirectory=${path.dirname(scriptPath)}
-ExecStart=/usr/bin/node ${benchPath}
+ExecStart=${nodeBin} ${benchPath}
 `;
 
   const benchTimer = `[Unit]
@@ -136,9 +137,9 @@ WantedBy=timers.target
   try {
     const lines = [
       '# Free Models Sync for 9router (installed by sync.js)',
-      `5 0 * * * /usr/bin/node ${scriptPath} >> ${logPath} 2>&1`,
-      `35 * * * * /usr/bin/node ${scriptPath} --refresh >> ${logPath} 2>&1`,
-      `17 4 * * 1 /usr/bin/node ${benchPath} >> ${logPath} 2>&1`
+      `5 0 * * * ${nodeBin} ${scriptPath} >> ${logPath} 2>&1`,
+      `35 * * * * ${nodeBin} ${scriptPath} --refresh >> ${logPath} 2>&1`,
+      `17 4 * * 1 ${nodeBin} ${benchPath} >> ${logPath} 2>&1`
     ];
 
     let currentCrontab = '';
@@ -163,4 +164,47 @@ WantedBy=timers.target
   }
 }
 
-module.exports = { installScheduler, writeSystemdUnit, removeLegacyCronLines };
+function getSchedulerStatus() {
+  const status = {
+    type: 'none',
+    active: false,
+    timers: []
+  };
+
+  // Check systemd user timers
+  try {
+    const out = execSync('systemctl --user is-active 9router-auto-free.timer 9router-free-watchdog.timer 9router-bench-update.timer 2>/dev/null', { encoding: 'utf8' });
+    const lines = out.trim().split('\n');
+    const isActive = lines.some(l => l.trim() === 'active');
+    if (isActive) {
+      status.type = 'systemd';
+      status.active = true;
+      status.timers = [
+        { name: '9router-auto-free.timer', schedule: 'Daily 00:05', status: lines[0] || 'unknown' },
+        { name: '9router-free-watchdog.timer', schedule: 'Hourly :35', status: lines[1] || 'unknown' },
+        { name: '9router-bench-update.timer', schedule: 'Mon 04:17', status: lines[2] || 'unknown' }
+      ];
+      return status;
+    }
+  } catch {}
+
+  // Check crontab
+  try {
+    const crontab = execSync('crontab -l 2>/dev/null', { encoding: 'utf8' });
+    if (crontab.includes('9router-auto-free') || crontab.includes('sync.js')) {
+      status.type = 'cron';
+      status.active = true;
+      status.timers = [
+        { name: 'Full Sync', schedule: '5 0 * * *', status: 'crontab' },
+        { name: 'Watchdog Refresh', schedule: '35 * * * *', status: 'crontab' },
+        { name: 'Benchmark Update', schedule: '17 4 * * 1', status: 'crontab' }
+      ];
+      return status;
+    }
+  } catch {}
+
+  return status;
+}
+
+module.exports = { installScheduler, getSchedulerStatus, writeSystemdUnit, removeLegacyCronLines };
+
