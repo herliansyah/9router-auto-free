@@ -8,6 +8,10 @@ Automated intelligent system that aggregates **100+ free AI coding models** from
 
 > **Security Note**: This script reads provider credentials from **connections already configured in your 9router SQLite database**. No API keys are stored in or transmitted by this repository.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/herliansyah/9router-auto-free/master/assets/dashboard.png" alt="9router Auto-Free Web Console Dashboard" width="850" />
+</p>
+
 ---
 
 ## 🌐 Modern Interactive Web Management Console

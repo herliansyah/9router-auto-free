@@ -8,6 +8,10 @@ Otomasi cerdas untuk mengumpulkan **100+ model AI coding gratis** dari berbagai 
 
 > **Catatan Keamanan**: Script ini membaca kredensial provider dari **koneksi yang sudah dikonfigurasi di SQLite 9router Anda**. Tidak ada API key yang disimpan atau dikirim ke luar.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/herliansyah/9router-auto-free/master/assets/dashboard.png" alt="9router Auto-Free Web Console Dashboard" width="850" />
+</p>
+
 ---
 
 ## 🌐 Web Console & Dashboard Interaktif
