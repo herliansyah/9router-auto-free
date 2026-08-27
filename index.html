@@ -57,14 +57,28 @@
         </div>
       </div>
 
-      <div id="authNav" class="hidden flex items-center space-x-4">
-        <div class="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-zinc-900/80 border border-dark-border text-xs text-zinc-300">
-          <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="schedulerBadge">Checking scheduler...</span>
+      <div class="flex items-center space-x-3">
+        <!-- Language Switcher Toggle -->
+        <div class="flex items-center bg-dark-card border border-dark-border p-0.5 rounded-xl text-xs font-semibold">
+          <button onclick="setLanguage('id')" id="langBtn-id" class="px-2.5 py-1 rounded-lg transition bg-emerald-500 text-zinc-950 font-bold shadow flex items-center space-x-1">
+            <span>🇮🇩</span>
+            <span>ID</span>
+          </button>
+          <button onclick="setLanguage('en')" id="langBtn-en" class="px-2.5 py-1 rounded-lg transition text-zinc-400 hover:text-white flex items-center space-x-1">
+            <span>🇬🇧</span>
+            <span>EN</span>
+          </button>
         </div>
-        <button onclick="logout()" class="text-xs px-3 py-1.5 rounded-lg border border-dark-border hover:bg-zinc-800 text-zinc-300 hover:text-white transition">
-          Logout
-        </button>
+
+        <div id="authNav" class="hidden flex items-center space-x-3">
+          <div class="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-zinc-900/80 border border-dark-border text-xs text-zinc-300">
+            <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="schedulerBadge">Checking scheduler...</span>
+          </div>
+          <button onclick="logout()" class="text-xs px-3 py-1.5 rounded-lg border border-dark-border hover:bg-zinc-800 text-zinc-300 hover:text-white transition" data-i18n="logout">
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -101,13 +115,13 @@
     <!-- NAVIGATION TABS -->
     <div class="flex items-center justify-between border-b border-dark-border pb-3 flex-wrap gap-3">
       <nav class="flex space-x-1 sm:space-x-2 bg-dark-card p-1 rounded-xl border border-dark-border">
-        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-emerald-500 text-zinc-950 shadow">Overview</button>
-        <button onclick="switchTab('combos')" id="tab-combos" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">Combos</button>
-        <button onclick="switchTab('providers')" id="tab-providers" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">Providers</button>
-        <button onclick="switchTab('exclusions')" id="tab-exclusions" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">Exclusions</button>
-        <button onclick="switchTab('priorities')" id="tab-priorities" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">Priorities</button>
-        <button onclick="switchTab('cli')" id="tab-cli" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition">CLI Console</button>
-        <button onclick="switchTab('docs')" id="tab-docs" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition flex items-center space-x-1"><span>📖 Panduan</span></button>
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold transition bg-emerald-500 text-zinc-950 shadow" data-i18n="nav_overview">Overview</button>
+        <button onclick="switchTab('combos')" id="tab-combos" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition" data-i18n="nav_combos">Combos</button>
+        <button onclick="switchTab('providers')" id="tab-providers" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition" data-i18n="nav_providers">Providers</button>
+        <button onclick="switchTab('exclusions')" id="tab-exclusions" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition" data-i18n="nav_exclusions">Exclusions</button>
+        <button onclick="switchTab('priorities')" id="tab-priorities" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition" data-i18n="nav_priorities">Priorities</button>
+        <button onclick="switchTab('cli')" id="tab-cli" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-zinc-200 transition" data-i18n="nav_cli">CLI Console</button>
+        <button onclick="switchTab('docs')" id="tab-docs" class="tab-btn px-4 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition flex items-center space-x-1"><span data-i18n="nav_docs">📖 Panduan</span></button>
       </nav>
 
       <div class="flex items-center space-x-2">
@@ -133,10 +147,10 @@
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span class="text-sm font-bold text-white tracking-wide">9router Auto-Free Active</span>
-            <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Auto-Free Engine</span>
+            <span class="text-sm font-bold text-white tracking-wide" data-i18n="banner_title">9router Auto-Free Active</span>
+            <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30" data-i18n="banner_tag">Auto-Free Engine</span>
           </div>
-          <p class="text-xs text-zinc-300 leading-relaxed">
+          <p class="text-xs text-zinc-300 leading-relaxed" data-i18n="banner_desc">
             Sistem otomatis mengumpulkan model AI gratis dari seluruh provider, memvalidasi via <em>live pre-test</em>, menyortir berdasarkan benchmark coding & latensi, lalu menginjeksinya ke combo 9router siap pakai di Cursor, Claude Code, dan IDE Anda.
           </p>
         </div>
@@ -145,7 +159,7 @@
         <div class="flex items-center space-x-2.5 bg-zinc-950/80 border border-dark-border/80 px-4 py-2.5 rounded-xl text-xs">
           <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
           <div class="space-y-0.5">
-            <div class="font-bold text-white text-[11px]">Sistem Terhubung</div>
+            <div class="font-bold text-white text-[11px]" data-i18n="system_connected">Sistem Terhubung</div>
             <div class="text-[10px] text-zinc-400 font-mono" id="bannerLastSyncText">Sync: Memeriksa...</div>
           </div>
         </div>
@@ -155,7 +169,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="bg-dark-card border border-dark-border rounded-xl p-5 relative overflow-hidden">
           <div class="flex items-center justify-between">
-            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Super Combos</span>
+            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider" data-i18n="stat_super_combos">Super Combos</span>
             <span class="text-emerald-400 text-xs font-bold">4 Managed</span>
           </div>
           <div class="text-2xl font-bold text-white mt-2" id="statCombos">4</div>
@@ -169,25 +183,25 @@
 
         <div class="bg-dark-card border border-dark-border rounded-xl p-5">
           <div class="flex items-center justify-between">
-            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Connected Providers</span>
+            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider" data-i18n="stat_connected_prov">Connected Providers</span>
             <span class="text-emerald-400 text-xs font-bold" id="statProvidersAutoSync">Auto-Sync ON</span>
           </div>
           <div class="text-2xl font-bold text-white mt-2" id="statProviders">0</div>
-          <span class="text-xs text-zinc-400 mt-1 block">Terkoneksi di SQLite 9router</span>
+          <span class="text-xs text-zinc-400 mt-1 block" data-i18n="stat_sqlite_connected">Terkoneksi di SQLite 9router</span>
         </div>
 
         <div class="bg-dark-card border border-dark-border rounded-xl p-5">
           <div class="flex items-center justify-between">
-            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Candidate Pool</span>
+            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider" data-i18n="stat_candidate_pool">Candidate Pool</span>
             <span class="text-zinc-500 text-[10px]" id="statCandidatesSync">Sync: -</span>
           </div>
           <div class="text-2xl font-bold text-white mt-2" id="statCandidates">0</div>
-          <span class="text-xs text-zinc-400 mt-1 block">Model gratis tervalidasi</span>
+          <span class="text-xs text-zinc-400 mt-1 block" data-i18n="stat_models_validated">Model gratis tervalidasi</span>
         </div>
 
         <div class="bg-dark-card border border-dark-border rounded-xl p-5">
           <div class="flex items-center justify-between">
-            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Automated Scheduler</span>
+            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider" data-i18n="stat_scheduler_title">Automated Scheduler</span>
             <span class="relative flex h-2 w-2">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -202,8 +216,8 @@
       <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-3">
         <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
           <div class="flex items-center space-x-2">
-            <span class="font-bold text-white">Distribusi Kesehatan Model</span>
-            <span class="text-zinc-500 text-[11px]">(Status live pre-test terakhir)</span>
+            <span class="font-bold text-white" data-i18n="dist_title">Distribusi Kesehatan Model</span>
+            <span class="text-zinc-500 text-[11px]" data-i18n="dist_sub">(Status live pre-test terakhir)</span>
           </div>
           <div class="flex items-center space-x-3 text-[11px] font-medium">
             <span class="flex items-center space-x-1.5"><span class="h-2 w-2 rounded-full bg-emerald-400"></span><span class="text-zinc-300" id="distActiveLabel">Active: 0</span></span>
@@ -227,10 +241,10 @@
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
               <span class="text-amber-400 text-base">🏆</span>
-              <h3 class="text-sm font-bold text-white">Top 5 Free Coding Models</h3>
+              <h3 class="text-sm font-bold text-white" data-i18n="top5_title">Top 5 Free Coding Models</h3>
               <span class="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">my9model-free</span>
             </div>
-            <button onclick="switchTab('combos')" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium">Lihat Semua &rarr;</button>
+            <button onclick="switchTab('combos')" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium" data-i18n="top5_view_all">Lihat Semua &rarr;</button>
           </div>
 
           <div id="topModelsLeaderboard" class="space-y-2.5">
@@ -247,7 +261,7 @@
             <div class="flex items-center justify-between">
               <h3 class="text-sm font-bold text-white flex items-center space-x-1.5">
                 <span>⚡</span>
-                <span>Gunakan di IDE Anda</span>
+                <span data-i18n="ide_title">Gunakan di IDE Anda</span>
               </h3>
               <span class="text-[10px] text-zinc-400 font-mono">Port 20128</span>
             </div>
@@ -273,9 +287,9 @@
             <div class="flex items-center justify-between">
               <h3 class="text-sm font-bold text-white flex items-center space-x-1.5">
                 <span>🔌</span>
-                <span>Active Provider Pool</span>
+                <span data-i18n="prov_pool_title">Active Provider Pool</span>
               </h3>
-              <button onclick="switchTab('providers')" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium">Kelola &rarr;</button>
+              <button onclick="switchTab('providers')" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium" data-i18n="prov_pool_manage">Kelola &rarr;</button>
             </div>
 
             <div id="activeProvidersMiniList" class="flex flex-wrap gap-1.5">
@@ -291,37 +305,37 @@
       <!-- Quick Actions Grid -->
       <div class="bg-dark-card border border-dark-border rounded-2xl p-6">
         <h3 class="text-base font-bold text-white mb-4 flex items-center justify-between">
-          <span>Aksi Cepat CLI</span>
-          <span class="text-xs font-normal text-zinc-400">Jalankan langsung dengan live streaming log</span>
+          <span data-i18n="cli_quick_title">Aksi Cepat CLI</span>
+          <span class="text-xs font-normal text-zinc-400" data-i18n="cli_quick_sub">Jalankan langsung dengan live streaming log</span>
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <button onclick="triggerCliAction('sync')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
             <div class="font-bold text-sm text-white group-hover:text-emerald-400 flex items-center space-x-1.5">
               <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              <span>Full Daily Sync</span>
+              <span data-i18n="action_sync_title">Full Daily Sync</span>
             </div>
-            <div class="text-xs text-zinc-400 mt-1">Scrape, live pre-test & inject model ke semua combo 9router.</div>
+            <div class="text-xs text-zinc-400 mt-1" data-i18n="action_sync_desc">Scrape, live pre-test & inject model ke semua combo 9router.</div>
           </button>
           <button onclick="triggerCliAction('dry-run')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
             <div class="font-bold text-sm text-white group-hover:text-yellow-400 flex items-center space-x-1.5">
               <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-              <span>Dry Run Sync</span>
+              <span data-i18n="action_dry_title">Dry Run Sync</span>
             </div>
-            <div class="text-xs text-zinc-400 mt-1">Simulasi live pre-test tanpa mengubah database SQLite.</div>
+            <div class="text-xs text-zinc-400 mt-1" data-i18n="action_dry_desc">Simulasi live pre-test tanpa mengubah database SQLite.</div>
           </button>
           <button onclick="triggerCliAction('refresh')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
             <div class="font-bold text-sm text-white group-hover:text-cyan-400 flex items-center space-x-1.5">
               <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              <span>Watchdog Refresh</span>
+              <span data-i18n="action_refresh_title">Watchdog Refresh</span>
             </div>
-            <div class="text-xs text-zinc-400 mt-1">Cek ulang status kuota model (429) & parkir ke cooldown.</div>
+            <div class="text-xs text-zinc-400 mt-1" data-i18n="action_refresh_desc">Cek ulang status kuota model (429) & parkir ke cooldown.</div>
           </button>
           <button onclick="triggerCliAction('benchmarks')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
             <div class="font-bold text-sm text-white group-hover:text-purple-400 flex items-center space-x-1.5">
               <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-              <span>Update Benchmarks</span>
+              <span data-i18n="action_bench_title">Update Benchmarks</span>
             </div>
-            <div class="text-xs text-zinc-400 mt-1">Perbarui database skor coding benchmark dari sumber live.</div>
+            <div class="text-xs text-zinc-400 mt-1" data-i18n="action_bench_desc">Perbarui database skor coding benchmark dari sumber live.</div>
           </button>
         </div>
       </div>
@@ -348,10 +362,10 @@
     <div id="view-combos" class="tab-view hidden space-y-4">
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-bold text-white">Daftar Combos di 9router</h2>
-          <p class="text-xs text-zinc-400">Combos yang dikelola oleh 9router-auto-free dan provider-specific combos.</p>
+          <h2 class="text-lg font-bold text-white" data-i18n="combos_title">Daftar Combos di 9router</h2>
+          <p class="text-xs text-zinc-400" data-i18n="combos_desc">Combos yang dikelola oleh 9router-auto-free dan provider-specific combos.</p>
         </div>
-        <button onclick="loadCombos()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition">
+        <button onclick="loadCombos()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition" data-i18n="combos_refresh">
           Refresh Data
         </button>
       </div>
@@ -500,8 +514,8 @@
     <div id="view-cli" class="tab-view hidden space-y-4">
       <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 class="text-lg font-bold text-white">CLI Execution & Log Stream</h2>
-          <p class="text-xs text-zinc-400">Output real-time stdout/stderr dari eksekusi sync, refresh, dan benchmarks.</p>
+          <h2 class="text-lg font-bold text-white" data-i18n="cli_title">CLI Execution & Log Stream</h2>
+          <p class="text-xs text-zinc-400" data-i18n="cli_desc">Output real-time stdout/stderr dari eksekusi sync, refresh, dan benchmarks.</p>
         </div>
         <div class="flex items-center space-x-2">
           <button onclick="clearConsole()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition">
@@ -920,6 +934,563 @@ aider --model openai/my9model-free</pre>
 
   <!-- CLIENT SCRIPT -->
   <script>
+    
+    // --- MULTI-LANGUAGE (i18n) ENGINE ---
+    const TRANSLATIONS = {
+      id: {
+        logout: "Logout",
+        login_title: "Login Dashboard 9router",
+        login_desc: "Masukkan password yang sama dengan dashboard 9router Anda.",
+        login_pwd_label: "Password 9router",
+        login_pwd_ph: "Default: 123456",
+        login_btn: "Masuk ke Auto-Free Console",
+        login_verifying: "Memverifikasi...",
+        login_error: "Password salah",
+        nav_overview: "Overview",
+        nav_combos: "Combos",
+        nav_providers: "Providers",
+        nav_exclusions: "Exclusions",
+        nav_priorities: "Priorities",
+        nav_cli: "CLI Console",
+        nav_docs: "📖 Panduan",
+        btn_dry_run: "Dry Run",
+        btn_full_sync: "Full Sync",
+        banner_title: "9router Auto-Free Active",
+        banner_tag: "Auto-Free Engine",
+        banner_desc: "Sistem otomatis mengumpulkan model AI gratis dari seluruh provider, memvalidasi via live pre-test, menyortir berdasarkan benchmark coding & latensi, lalu menginjeksinya ke combo 9router siap pakai di Cursor, Claude Code, dan IDE Anda.",
+        system_connected: "Sistem Terhubung",
+        sync_checking: "Sync: Memeriksa...",
+        sync_none: "Sync: Belum ada",
+        stat_super_combos: "Super Combos",
+        stat_managed: "4 Managed",
+        stat_connected_prov: "Connected Providers",
+        stat_auto_sync_on: "Auto-Sync ON",
+        stat_sqlite_connected: "Terkoneksi di SQLite 9router",
+        stat_candidate_pool: "Candidate Pool",
+        stat_models_validated: "Model gratis tervalidasi",
+        stat_scheduler_title: "Automated Scheduler",
+        stat_scheduler_sub: "Daily & Hourly watchdog",
+        scheduler_active_sub: "Aktif (00:05 & :35)",
+        scheduler_inactive_sub: "Non-Aktif",
+        dist_title: "Distribusi Kesehatan Model",
+        dist_sub: "(Status live pre-test terakhir)",
+        top5_title: "Top 5 Free Coding Models",
+        top5_view_all: "Lihat Semua →",
+        top5_loading: "Memuat leaderboard model gratis...",
+        top5_empty: "Belum ada model yang disinkronkan. Klik Full Sync di atas!",
+        ide_title: "Gunakan di IDE Anda",
+        copied: "✓ Copied!",
+        prov_pool_title: "Active Provider Pool",
+        prov_pool_manage: "Kelola →",
+        prov_pool_loading: "Memuat provider pool...",
+        prov_pool_empty: "Belum ada provider yang terhubung di 9router.",
+        cli_quick_title: "Aksi Cepat CLI",
+        cli_quick_sub: "Jalankan langsung dengan live streaming log",
+        action_sync_title: "Full Daily Sync",
+        action_sync_desc: "Scrape, live pre-test & inject model ke semua combo 9router.",
+        action_dry_title: "Dry Run Sync",
+        action_dry_desc: "Simulasi live pre-test tanpa mengubah database SQLite.",
+        action_refresh_title: "Watchdog Refresh",
+        action_refresh_desc: "Cek ulang status kuota model (429) & parkir ke cooldown.",
+        action_bench_title: "Update Benchmarks",
+        action_bench_desc: "Perbarui database skor coding benchmark dari sumber live.",
+        diag_dir: "9router Dir:",
+        diag_db: "SQLite DB:",
+        diag_api: "API:",
+        combos_title: "Daftar Combos di 9router",
+        combos_desc: "Combos yang dikelola oleh 9router-auto-free dan provider-specific combos.",
+        combos_refresh: "Refresh Data",
+        combos_loading: "Memuat data combos...",
+        combos_empty: "Tidak ada model di combo ini.",
+        prov_title: "Provider Catalog & Koneksi",
+        prov_desc: "Daftar provider 9router yang didukung untuk scraping model AI gratis. Tambahkan koneksi baru dengan aman tanpa duplikasi.",
+        prov_add_btn: "+ Tambah Provider Baru",
+        prov_refresh_btn: "Refresh List",
+        prov_th_logo: "Provider",
+        prov_th_conn: "Connection & Prefix",
+        prov_th_cat: "Kategori",
+        prov_th_models: "Model Gratis",
+        prov_th_sync: "Auto-Sync Free",
+        prov_th_actions: "Status",
+        prov_status_active: "Terkoneksi",
+        prov_status_inactive: "Belum Ada",
+        prov_btn_connect: "+ Hubungkan",
+        prov_toggle_on: "⚡ Aktif",
+        prov_toggle_off: "⚪ Non-Aktif",
+        excl_title: "Manajer Exclusions (exclusions.json)",
+        excl_desc: "Kelola daftar hitam (blacklist) model non-coding atau provider yang ingin dilewati saat sinkronisasi.",
+        excl_models_title: "Model Terkecualikan (Excluded Models)",
+        excl_prov_title: "Provider Terkecualikan (Excluded Providers)",
+        excl_json_title: "Raw JSON Editor",
+        excl_add_model_ph: "Tambah model (mis: tts-1, embed)...",
+        excl_add_prov_ph: "Tambah provider (mis: api-airforce)...",
+        excl_add_btn: "Tambah",
+        excl_save_btn: "Simpan Exclusions",
+        prio_title: "Manajer Prioritas Model (priorities.json)",
+        prio_desc: "Tentukan urutan model favorit Anda di combo my9model-free. Model yang cocok ditempatkan paling atas.",
+        prio_list_title: "Daftar Prioritas Urutan Model",
+        prio_json_title: "Raw JSON Editor",
+        prio_add_ph: "Tambah pola model (mis: 0x-alpha, hy3, laguna)...",
+        prio_add_btn: "Tambah ke Prioritas",
+        prio_save_btn: "Simpan Priorities",
+        cli_title: "CLI Execution & Log Stream",
+        cli_desc: "Output real-time stdout/stderr dari eksekusi sync, refresh, dan benchmarks.",
+        cli_ready: "READY",
+        cli_running: "RUNNING",
+        cli_idle: "idle",
+        cli_term_ph: "9router-auto-free console siap. Pilih aksi di atas untuk menjalankan.",
+        modal_title: "Tambah Provider ke 9router",
+        modal_select_label: "Pilih Provider",
+        modal_conn_name_label: "Connection Name",
+        modal_api_key_label: "API Key / Token",
+        modal_api_key_ph: "Masukkan API key...",
+        modal_base_url_label: "Base URL (Opsional / OpenAI Compatible)",
+        modal_cancel_btn: "Batal",
+        modal_submit_btn: "Simpan ke 9router"
+      },
+      en: {
+        logout: "Logout",
+        login_title: "Login to 9router Dashboard",
+        login_desc: "Enter the same password as your 9router dashboard.",
+        login_pwd_label: "9router Password",
+        login_pwd_ph: "Default: 123456",
+        login_btn: "Sign in to Auto-Free Console",
+        login_verifying: "Verifying...",
+        login_error: "Invalid password",
+        nav_overview: "Overview",
+        nav_combos: "Combos",
+        nav_providers: "Providers",
+        nav_exclusions: "Exclusions",
+        nav_priorities: "Priorities",
+        nav_cli: "CLI Console",
+        nav_docs: "📖 User Guide",
+        btn_dry_run: "Dry Run",
+        btn_full_sync: "Full Sync",
+        banner_title: "9router Auto-Free Active",
+        banner_tag: "Auto-Free Engine",
+        banner_desc: "Automated system that aggregates free AI models from all providers, validates them via live pre-tests, sorts them by real coding benchmarks & latency, and injects them into ready-to-use 9router combos for Cursor, Claude Code, and your IDEs.",
+        system_connected: "System Connected",
+        sync_checking: "Sync: Checking...",
+        sync_none: "Sync: No sync yet",
+        stat_super_combos: "Super Combos",
+        stat_managed: "4 Managed",
+        stat_connected_prov: "Connected Providers",
+        stat_auto_sync_on: "Auto-Sync ON",
+        stat_sqlite_connected: "Connected in 9router SQLite",
+        stat_candidate_pool: "Candidate Pool",
+        stat_models_validated: "Validated free models",
+        stat_scheduler_title: "Automated Scheduler",
+        stat_scheduler_sub: "Daily & Hourly watchdog",
+        scheduler_active_sub: "Active (00:05 & :35)",
+        scheduler_inactive_sub: "Inactive",
+        dist_title: "Model Health Distribution",
+        dist_sub: "(Latest live pre-test status)",
+        top5_title: "Top 5 Free Coding Models",
+        top5_view_all: "View All →",
+        top5_loading: "Loading free models leaderboard...",
+        top5_empty: "No models synced yet. Click Full Sync above!",
+        ide_title: "Use in Your IDE",
+        copied: "✓ Copied!",
+        prov_pool_title: "Active Provider Pool",
+        prov_pool_manage: "Manage →",
+        prov_pool_loading: "Loading provider pool...",
+        prov_pool_empty: "No active providers connected in 9router yet.",
+        cli_quick_title: "Quick CLI Actions",
+        cli_quick_sub: "Execute directly with real-time log streaming",
+        action_sync_title: "Full Daily Sync",
+        action_sync_desc: "Scrape, live pre-test & inject models into all 9router combos.",
+        action_dry_title: "Dry Run Sync",
+        action_dry_desc: "Simulate live pre-test without altering SQLite database.",
+        action_refresh_title: "Watchdog Refresh",
+        action_refresh_desc: "Re-check model quota status (429) & park in cooldown.",
+        action_bench_title: "Update Benchmarks",
+        action_bench_desc: "Update coding benchmark database from live sources.",
+        diag_dir: "9router Dir:",
+        diag_db: "SQLite DB:",
+        diag_api: "API:",
+        combos_title: "9router Combos List",
+        combos_desc: "Combos managed by 9router-auto-free and provider-specific combos.",
+        combos_refresh: "Refresh Data",
+        combos_loading: "Loading combos data...",
+        combos_empty: "No models in this combo.",
+        prov_title: "Provider Catalog & Connections",
+        prov_desc: "9router supported providers for automated free model discovery. Add new connections safely without duplicates.",
+        prov_add_btn: "+ Add New Provider",
+        prov_refresh_btn: "Refresh List",
+        prov_th_logo: "Provider",
+        prov_th_conn: "Connection & Prefix",
+        prov_th_cat: "Category",
+        prov_th_models: "Free Models",
+        prov_th_sync: "Auto-Sync Free",
+        prov_th_actions: "Status",
+        prov_status_active: "Connected",
+        prov_status_inactive: "Not Connected",
+        prov_btn_connect: "+ Connect",
+        prov_toggle_on: "⚡ Active",
+        prov_toggle_off: "⚪ Inactive",
+        excl_title: "Exclusions Manager (exclusions.json)",
+        excl_desc: "Manage blacklists for non-coding models or providers to exclude during synchronization.",
+        excl_models_title: "Excluded Models",
+        excl_prov_title: "Excluded Providers",
+        excl_json_title: "Raw JSON Editor",
+        excl_add_model_ph: "Add model (e.g. tts-1, embed)...",
+        excl_add_prov_ph: "Add provider (e.g. api-airforce)...",
+        excl_add_btn: "Add",
+        excl_save_btn: "Save Exclusions",
+        prio_title: "Model Priorities Manager (priorities.json)",
+        prio_desc: "Customize preferred model ordering in my9model-free combo. Matches are ranked at the top.",
+        prio_list_title: "Priority Model Sequence",
+        prio_json_title: "Raw JSON Editor",
+        prio_add_ph: "Add model pattern (e.g. 0x-alpha, hy3, laguna)...",
+        prio_add_btn: "Add to Priorities",
+        prio_save_btn: "Save Priorities",
+        cli_title: "CLI Execution & Log Stream",
+        cli_desc: "Real-time stdout/stderr output from sync, refresh, and benchmark runs.",
+        cli_ready: "READY",
+        cli_running: "RUNNING",
+        cli_idle: "idle",
+        cli_term_ph: "9router-auto-free console ready. Select an action above to execute.",
+        modal_title: "Add Provider to 9router",
+        modal_select_label: "Select Provider",
+        modal_conn_name_label: "Connection Name",
+        modal_api_key_label: "API Key / Token",
+        modal_api_key_ph: "Enter API key...",
+        modal_base_url_label: "Base URL (Optional / OpenAI Compatible)",
+        modal_cancel_btn: "Cancel",
+        modal_submit_btn: "Save to 9router"
+      }
+    };
+
+    let currentLang = localStorage.getItem('9router_lang') || 'id';
+
+    function t(key) {
+      const dict = TRANSLATIONS[currentLang] || TRANSLATIONS.id;
+      return dict[key] || key;
+    }
+
+    
+    function renderDocsTab(lang) {
+      const container = document.getElementById('view-docs');
+      if (!container) return;
+
+      if (lang === 'en') {
+        container.innerHTML = `
+          <!-- Hero Intro -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 sm:p-8 space-y-4">
+            <div class="flex items-center space-x-3">
+              <div class="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+                📖
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-white">9router Auto-Free User Guide</h2>
+                <p class="text-xs text-zinc-400">Everything you need to know: core features, internal engine, and IDE integration tutorials.</p>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/20 text-xs text-zinc-300 space-y-2 leading-relaxed">
+              <p class="font-semibold text-white">💡 What is 9router Auto-Free?</p>
+              <p>
+                <strong>9router Auto-Free</strong> is an intelligent automation system that collects hundreds of <strong>free AI models</strong> from top providers (OpenAgentic, Kilo.ai, OpenRouter, Google Gemini, Groq, Mistral, Cerebras, Ollama, etc.), verifies them in real time via <strong>Live Pre-Tests</strong>, filters out dead/broken/rate-limited models, and ranks them by <strong>empirical coding benchmarks</strong> and lowest latency.
+              </p>
+              <p>
+                The resulting curated models are automatically injected into <strong>9router Combos</strong> (such as <code class="text-emerald-400 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">my9model-free</code>), allowing you to point Cursor, Claude Code, Cline, or VS Code to a single model name without managing dozens of free API keys.
+              </p>
+            </div>
+          </div>
+
+          <!-- Section: 6-Stage Workflow -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>How It Works (6-Stage Automated Pipeline)</span>
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-emerald-400 font-mono">1. Scrape & Discover</div>
+                <p class="text-zinc-400">Fetches live candidate free model lists across 15+ built-in providers and active SQLite connections.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-yellow-400 font-mono">2. Exclusions Filter</div>
+                <p class="text-zinc-400">Discards non-coding models (TTS, embeddings, vision-only, nano models) and blacklisted providers.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-cyan-400 font-mono">3. Parallel Live Pre-Test</div>
+                <p class="text-zinc-400">Tests each model candidate through 9router's internal endpoints to measure real HTTP status and latency.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-purple-400 font-mono">4. Verdict & Auto-Cooldown</div>
+                <p class="text-zinc-400">HTTP 200 models pass; rate-limited (429) models are parked in <code>my9model-cooldown</code>; dead models are pruned.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-rose-400 font-mono">5. Coding Quality Ranking</div>
+                <p class="text-zinc-400">Ranks models by empirical benchmarks (EvalPlus, SWE-bench), adjusted by usage reliability penalties and latency.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-indigo-400 font-mono">6. SQLite Injection</div>
+                <p class="text-zinc-400">Writes the ranked model lists directly to 9router SQLite database. Your IDE immediately benefits from fresh models.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Available Combos -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Managed Combos & Usage Recommendations</span>
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-emerald-400 font-mono text-sm">my9model-free</span>
+                  <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold text-[10px]">Main Super Combo</span>
+                </div>
+                <p class="text-zinc-300">
+                  Comprehensive pool of all active free models across all providers, ranked with top coding capability and lowest latency first.
+                </p>
+                <div class="text-zinc-500 italic">👉 Best choice for general daily programming in your IDE.</div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-indigo-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-indigo-400 font-mono text-sm">my9model-smart</span>
+                  <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold text-[10px]">High Reasoning Tier</span>
+                </div>
+                <p class="text-zinc-300">
+                  Dedicated to thinking/reasoning models (e.g. Claude 3.7 Sonnet Thinking, Qwen Coder, DeepSeek R1) or models with the highest coding benchmarks.
+                </p>
+                <div class="text-zinc-500 italic">👉 Ideal for complex architectural tasks, large refactoring, and tough debugging.</div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-amber-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-amber-400 font-mono text-sm">my9model-fast</span>
+                  <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold text-[10px]">Ultra Low Latency</span>
+                </div>
+                <p class="text-zinc-300">
+                  Lightning-fast non-thinking models with sub-second response times from high-speed inference engines (Groq, Cerebras, Kilo, etc.).
+                </p>
+                <div class="text-zinc-500 italic">👉 Perfect for inline code completion, autocomplete, or instant chat replies.</div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-rose-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-rose-400 font-mono text-sm">my9model-cooldown</span>
+                  <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold text-[10px]">Rate-Limit Quarantine (429)</span>
+                </div>
+                <p class="text-zinc-300">
+                  Temporary holding area for models whose daily quota is exhausted (HTTP 429). The hourly watchdog automatically moves them back once quota resets.
+                </p>
+                <div class="text-zinc-500 italic">👉 Prevents IDE errors by steering requests away from exhausted quotas.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: IDE Setup -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-5">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                <span>Connecting to IDEs & AI Coding Tools</span>
+              </h3>
+              <p class="text-xs text-zinc-400 mt-1">9router exposes a standard <strong>OpenAI-Compatible</strong> endpoint on port <code>20128</code>.</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-zinc-900/80 border border-dark-border text-xs">
+              <div>
+                <span class="text-zinc-500 uppercase text-[10px] font-bold block">OpenAI Base URL</span>
+                <code class="text-emerald-400 font-mono font-semibold">http://localhost:20128/v1</code>
+              </div>
+              <div>
+                <span class="text-zinc-500 uppercase text-[10px] font-bold block">API Key</span>
+                <code class="text-zinc-300 font-mono">API Key from 9router Dashboard</code>
+              </div>
+              <div>
+                <span class="text-zinc-500 uppercase text-[10px] font-bold block">Model ID</span>
+                <code class="text-yellow-400 font-mono">my9model-free</code>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <!-- Hero Intro -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 sm:p-8 space-y-4">
+            <div class="flex items-center space-x-3">
+              <div class="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
+                📖
+              </div>
+              <div>
+                <h2 class="text-xl font-bold text-white">Panduan Penggunaan 9router Auto-Free</h2>
+                <p class="text-xs text-zinc-400">Semua hal yang perlu Anda ketahui: fungsi, cara kerja, dan tutorial integrasi ke IDE.</p>
+              </div>
+            </div>
+
+            <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/20 text-xs text-zinc-300 space-y-2 leading-relaxed">
+              <p class="font-semibold text-white">💡 Apa itu 9router Auto-Free?</p>
+              <p>
+                <strong>9router Auto-Free</strong> adalah sistem otomasi cerdas yang mengumpulkan ratusan <strong>model AI gratis</strong> dari berbagai provider terkemuka (OpenAgentic, Kilo.ai, OpenRouter, Google Gemini, Groq, Mistral, Cerebras, Ollama, dll.), menguji model-model tersebut secara langsung lewat <strong>Live Pre-Test</strong>, menyaring model rusak/berbayar/kuota habis, lalu mengurutkannya berdasarkan <strong>skor kapabilitas coding riil</strong> serta latensi tercepat.
+              </p>
+              <p>
+                Hasil akhirnya disuntikkan secara otomatis ke dalam <strong>Combo 9router</strong> (seperti <code class="text-emerald-400 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">my9model-free</code>), sehingga Anda cukup memakai satu nama model di IDE tanpa repot mencari atau menggonta-ganti API key gratisan.
+              </p>
+            </div>
+          </div>
+
+          <!-- Section: Cara Kerja 6 Tahap -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Bagaimana Cara Kerjanya? (6 Tahap Otomatis)</span>
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-emerald-400 font-mono">1. Scrape & Kumpul Kandidat</div>
+                <p class="text-zinc-400">Mengambil daftar model gratis dari 15+ sumber provider terdaftar (OpenAgentic, Kilo, Gemini, OpenRouter, Groq, dll.).</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-yellow-400 font-mono">2. Filter Exclusions</div>
+                <p class="text-zinc-400">Menyaring dan membuang model non-coding (TTS, embed, video, model terlalu kecil/nano) dan provider yang di-blacklist.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-cyan-400 font-mono">3. Live Pre-Test Paralel</div>
+                <p class="text-zinc-400">Setiap kandidat dites langsung melalui endpoint internal 9router untuk mengukur latensi dan status HTTP asli.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-purple-400 font-mono">4. Vonis & Auto-Cooldown</div>
+                <p class="text-zinc-400">Model 200 diterima; model kuota habis (429) diparkirkan di <code>my9model-cooldown</code>; model berbayar/mati dibuang.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-rose-400 font-mono">5. Coding Quality Ranking</div>
+                <p class="text-zinc-400">Model diurutkan berdasarkan skor benchmark coding empiris (EvalPlus, SWE-bench), dikurangi penalti error-rate, dan latensi.</p>
+              </div>
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-indigo-400 font-mono">6. Injeksi Database 9router</div>
+                <p class="text-zinc-400">Daftar model langsung ditulis ke database SQLite 9router. IDE Anda langsung otomatis menikmati daftar model terbaru.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Combo Yang Tersedia -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Daftar Combos & Rekomendasi Penggunaan</span>
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-emerald-400 font-mono text-sm">my9model-free</span>
+                  <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold text-[10px]">Super Combo Utama</span>
+                </div>
+                <p class="text-zinc-300">
+                  Kombinasi seluruh model gratis aktif dari semua provider. Urutan teratas adalah model dengan kemampuan coding terbaik dan latensi tercepat.
+                </p>
+                <div class="text-zinc-500 italic">👉 Pilihan terbaik untuk penggunaan umum harian di IDE.</div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-indigo-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-indigo-400 font-mono text-sm">my9model-smart</span>
+                  <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold text-[10px]">Penalaran Tinggi / Reasoning</span>
+                </div>
+                <p class="text-zinc-300">
+                  Khusus model thinking/reasoning (misal Claude 3.7 Sonnet Thinking, Qwen Coder, DeepSeek R1) atau model dengan benchmark coding tertinggi.
+                </p>
+                <div class="text-zinc-500 italic">👉 Cocok untuk tugas arsitektur rumit, refactor besar, dan debug bug sulit.</div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-amber-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-amber-400 font-mono text-sm">my9model-fast</span>
+                  <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold text-[10px]">Super Cepat / Low Latency</span>
+                </div>
+                <p class="text-zinc-300">
+                  Model non-thinking berkecepatan kilat dengan latensi sangat rendah dari provider berkecepatan tinggi (Groq, Cerebras, Kilo, dll.).
+                </p>
+                <div class="text-zinc-500 italic">👉 Cocok untuk inline code completion, autocomplete, atau respons instan.</div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-rose-500/30 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-rose-400 font-mono text-sm">my9model-cooldown</span>
+                  <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold text-[10px]">Parkiran Rate-Limit (429)</span>
+                </div>
+                <p class="text-zinc-300">
+                  Tempat isolasi sementara bagi model yang kuota hariannya habis (HTTP 429). Watchdog intra-hari akan otomatis memindahkannya kembali ke combo utama begitu kuota reset.
+                </p>
+                <div class="text-zinc-500 italic">👉 Mencegah IDE Anda error karena request terlempar ke model kuota-habis.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Tutorial Integrasi IDE -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-5">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                <span>Cara Menghubungkan ke IDE & AI Coding Tools</span>
+              </h3>
+              <p class="text-xs text-zinc-400 mt-1">9router menyediakan antarmuka standar <strong>OpenAI-Compatible</strong> di port <code>20128</code>.</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-zinc-900/80 border border-dark-border text-xs">
+              <div>
+                <span class="text-zinc-500 uppercase text-[10px] font-bold block">OpenAI Base URL</span>
+                <code class="text-emerald-400 font-mono font-semibold">http://localhost:20128/v1</code>
+              </div>
+              <div>
+                <span class="text-zinc-500 uppercase text-[10px] font-bold block">API Key</span>
+                <code class="text-zinc-300 font-mono">API Key dari Dashboard 9router</code>
+              </div>
+              <div>
+                <span class="text-zinc-500 uppercase text-[10px] font-bold block">Pilihan Model ID</span>
+                <code class="text-yellow-400 font-mono">my9model-free</code>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('9router_lang', lang);
+
+      // Update switcher buttons
+      const btnId = document.getElementById('langBtn-id');
+      const btnEn = document.getElementById('langBtn-en');
+      if (btnId && btnEn) {
+        if (lang === 'id') {
+          btnId.className = 'px-2.5 py-1 rounded-lg transition bg-emerald-500 text-zinc-950 font-bold shadow flex items-center space-x-1';
+          btnEn.className = 'px-2.5 py-1 rounded-lg transition text-zinc-400 hover:text-white flex items-center space-x-1';
+        } else {
+          btnEn.className = 'px-2.5 py-1 rounded-lg transition bg-emerald-500 text-zinc-950 font-bold shadow flex items-center space-x-1';
+          btnId.className = 'px-2.5 py-1 rounded-lg transition text-zinc-400 hover:text-white flex items-center space-x-1';
+        }
+      }
+
+      // Apply static translations
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const k = el.getAttribute('data-i18n');
+        if (k) el.textContent = t(k);
+      });
+
+      document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+        const k = el.getAttribute('data-i18n-ph');
+        if (k) el.placeholder = t(k);
+      });
+
+      // Re-render active tab content & docs
+      renderDocsTab(currentLang);
+      loadDashboard();
+      if (!document.getElementById('view-combos').classList.contains('hidden')) loadCombos();
+      if (!document.getElementById('view-providers').classList.contains('hidden')) loadProviders();
+    }
+
     let globalProviders = [];
     let activeSse = null;
 
@@ -960,7 +1531,8 @@ aider --model openai/my9model-free</pre>
         });
         const data = await res.json();
         if (data.success) {
-          checkAuth();
+          setLanguage(currentLang);
+      checkAuth();
         } else {
           errEl.textContent = data.error || 'Password salah';
           errEl.classList.remove('hidden');
