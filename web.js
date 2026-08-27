@@ -137,6 +137,49 @@ async function handleApi(req, res, url) {
     const candidates = storage.readCandidatesStateFile();
     const schedulerStatus = scheduler.getSchedulerStatus();
 
+    const freeCombo = combos.find(c => c.name === 'my9model-free');
+    const smartCombo = combos.find(c => c.name === 'my9model-smart');
+    const fastCombo = combos.find(c => c.name === 'my9model-fast');
+    const cooldownCombo = combos.find(c => c.name === 'my9model-cooldown');
+
+    const syncModule = require('./sync.js');
+    const freeModelsList = freeCombo?.models || [];
+    const topModels = freeModelsList.slice(0, 5).map((fullId, idx) => {
+      const parts = String(fullId).split('/');
+      const prefix = parts[0];
+      const rawModelId = parts.slice(1).join('/');
+      const score = syncModule.getCodingScore ? syncModule.getCodingScore(rawModelId) : 0;
+      const isSmart = syncModule.isSmartTierModel ? syncModule.isSmartTierModel(rawModelId) : false;
+      const isThinking = syncModule.isThinkingVariant ? syncModule.isThinkingVariant(rawModelId) : false;
+      return {
+        rank: idx + 1,
+        fullId,
+        prefix,
+        rawModelId,
+        score,
+        tier: isSmart ? 'smart' : 'fast',
+        isThinking
+      };
+    });
+
+    const activeProvKeys = new Set(rawConnections.filter(c => c.isActive).map(c => String(c.provider || '').toLowerCase()));
+    const customConfig = storage.readCustomProvidersFile ? storage.readCustomProvidersFile() : {};
+    const catalog = storage.getUnifiedProviderCatalog();
+
+    const providerStats = catalog
+      .filter(p => activeProvKeys.has(String(p.key).toLowerCase()) || activeProvKeys.has(String(p.providerKey).toLowerCase()))
+      .map(p => {
+        const pCombo = combos.find(c => c.name === p.combo || (p.prefixes && p.prefixes.some(pref => c.name === `${pref}-free`)));
+        const modelCount = pCombo?.models?.length || 0;
+        return {
+          label: p.label,
+          key: p.key,
+          category: p.category,
+          modelCount,
+          autoSyncEnabled: (customConfig[p.key] || customConfig[p.providerKey] || {}).enabled !== false
+        };
+      });
+
     return sendJson(res, 200, {
       success: true,
       stats: {
@@ -151,7 +194,15 @@ async function handleApi(req, res, url) {
         nineRouterDir: storage.NINE_ROUTER_DIR,
         dbPath: storage.DB_PATH,
         nineRouterUrl: storage.resolveNineRouterUrl()
-      }
+      },
+      distribution: {
+        activeCount: freeModelsList.length,
+        smartCount: smartCombo?.models?.length || 0,
+        fastCount: fastCombo?.models?.length || 0,
+        cooldownCount: cooldownCombo?.models?.length || 0
+      },
+      topModels,
+      activeProviders: providerStats
     });
   }
 

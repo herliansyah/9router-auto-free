@@ -125,66 +125,199 @@
     <!-- TAB 1: OVERVIEW -->
     <div id="view-dashboard" class="tab-view space-y-6">
 
-      <!-- Welcome Banner -->
+      <!-- Welcome Banner with Live System Status -->
       <div class="bg-gradient-to-r from-emerald-950/40 via-dark-card to-zinc-900/60 border border-emerald-500/20 rounded-2xl p-5 flex items-center justify-between flex-wrap gap-4 shadow-lg shadow-black/40">
-        <div class="space-y-1">
-          <div class="flex items-center space-x-2">
-            <span class="text-sm font-bold text-white">Apa itu 9router Auto-Free?</span>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Otomasi Model AI Gratis</span>
+        <div class="space-y-1.5">
+          <div class="flex items-center space-x-2.5">
+            <span class="relative flex h-2.5 w-2.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span class="text-sm font-bold text-white tracking-wide">9router Auto-Free Active</span>
+            <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Auto-Free Engine</span>
           </div>
           <p class="text-xs text-zinc-300 max-w-3xl leading-relaxed">
-            Sistem otomatis yang mengumpulkan model AI gratis dari berbagai provider, memvalidasinya dengan <em>live pre-test</em>, menyortir berdasarkan benchmark coding & latensi, lalu menyuntikkannya ke combo 9router agar siap digunakan langsung di Cursor, Claude Code, VS Code, dan IDE favorit Anda.
+            Sistem otomatis mengumpulkan model AI gratis dari seluruh provider, memvalidasi via <em>live pre-test</em>, menyortir berdasarkan benchmark coding & latensi, lalu menginjeksinya ke combo 9router siap pakai di Cursor, Claude Code, dan IDE Anda.
           </p>
         </div>
-        <button onclick="switchTab('docs')" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5">
-          <span>Baca Panduan Lengkap</span>
-          <span>&rarr;</span>
-        </button>
+        <div class="flex items-center space-x-2">
+          <button onclick="triggerCliAction('sync')" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition shadow-lg shadow-emerald-500/20 flex items-center space-x-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span>Sync Sekarang</span>
+          </button>
+        </div>
       </div>
+
+      <!-- Stat Cards -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-dark-card border border-dark-border rounded-xl p-5">
-          <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Super Combos</span>
-          <div class="text-2xl font-bold text-white mt-2" id="statCombos">0</div>
-          <span class="text-xs text-emerald-400 mt-1 block">my9model-free / smart / fast</span>
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Super Combos</span>
+            <span class="text-emerald-400 text-xs font-bold">4 Managed</span>
+          </div>
+          <div class="text-2xl font-bold text-white mt-2" id="statCombos">4</div>
+          <div class="flex items-center space-x-1 text-[11px] text-zinc-400 mt-2">
+            <span class="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono text-[10px]">free</span>
+            <span class="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-mono text-[10px]">smart</span>
+            <span class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono text-[10px]">fast</span>
+            <span class="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono text-[10px]">cooldown</span>
+          </div>
         </div>
+
         <div class="bg-dark-card border border-dark-border rounded-xl p-5">
-          <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Active Providers</span>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Connected Providers</span>
+            <span class="text-emerald-400 text-xs font-bold" id="statProvidersAutoSync">Auto-Sync ON</span>
+          </div>
           <div class="text-2xl font-bold text-white mt-2" id="statProviders">0</div>
-          <span class="text-xs text-zinc-400 mt-1 block">Terkoneksi di 9router SQLite</span>
+          <span class="text-xs text-zinc-400 mt-1 block">Terkoneksi di SQLite 9router</span>
         </div>
+
         <div class="bg-dark-card border border-dark-border rounded-xl p-5">
-          <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Candidate Models</span>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Candidate Pool</span>
+            <span class="text-zinc-500 text-[10px]" id="statCandidatesSync">Sync: -</span>
+          </div>
           <div class="text-2xl font-bold text-white mt-2" id="statCandidates">0</div>
-          <span class="text-xs text-zinc-400 mt-1 block" id="statCandidatesSync">Pool model tersimpan</span>
+          <span class="text-xs text-zinc-400 mt-1 block">Model gratis tervalidasi</span>
         </div>
+
         <div class="bg-dark-card border border-dark-border rounded-xl p-5">
-          <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Scheduler</span>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Automated Scheduler</span>
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </div>
           <div class="text-2xl font-bold text-white mt-2" id="statScheduler">-</div>
           <span class="text-xs text-zinc-400 mt-1 block" id="statSchedulerDetail">Daily & Hourly watchdog</span>
         </div>
+      </div>
+
+      <!-- Model Distribution Health Bar -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-3">
+        <div class="flex items-center justify-between flex-wrap gap-2 text-xs">
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-white">Distribusi Kesehatan Model</span>
+            <span class="text-zinc-500 text-[11px]">(Status live pre-test terakhir)</span>
+          </div>
+          <div class="flex items-center space-x-3 text-[11px] font-medium">
+            <span class="flex items-center space-x-1.5"><span class="h-2 w-2 rounded-full bg-emerald-400"></span><span class="text-zinc-300" id="distActiveLabel">Active: 0</span></span>
+            <span class="flex items-center space-x-1.5"><span class="h-2 w-2 rounded-full bg-indigo-400"></span><span class="text-zinc-300" id="distSmartLabel">Smart: 0</span></span>
+            <span class="flex items-center space-x-1.5"><span class="h-2 w-2 rounded-full bg-amber-400"></span><span class="text-zinc-300" id="distFastLabel">Fast: 0</span></span>
+            <span class="flex items-center space-x-1.5"><span class="h-2 w-2 rounded-full bg-zinc-600"></span><span class="text-zinc-400" id="distCooldownLabel">Cooldown: 0</span></span>
+          </div>
+        </div>
+        <div class="w-full h-3 bg-zinc-900 rounded-full overflow-hidden flex border border-dark-border/50">
+          <div id="distSmartBar" class="bg-indigo-500 transition-all duration-500" style="width: 50%" title="Smart Tier"></div>
+          <div id="distFastBar" class="bg-amber-500 transition-all duration-500" style="width: 40%" title="Fast Tier"></div>
+          <div id="distCooldownBar" class="bg-zinc-700 transition-all duration-500" style="width: 10%" title="Cooldown / Quota"></div>
+        </div>
+      </div>
+
+      <!-- 2-Column Section: Leaderboard + Quick Setup -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Top 5 Free Coding Models (7 cols) -->
+        <div class="lg:col-span-7 bg-dark-card border border-dark-border rounded-2xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="text-amber-400 text-base">🏆</span>
+              <h3 class="text-sm font-bold text-white">Top 5 Free Coding Models</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">my9model-free</span>
+            </div>
+            <button onclick="switchTab('combos')" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium">Lihat Semua &rarr;</button>
+          </div>
+
+          <div id="topModelsLeaderboard" class="space-y-2.5">
+            <!-- Populated via JS -->
+            <div class="text-xs text-zinc-500 p-4 text-center">Memuat leaderboard model gratis...</div>
+          </div>
+        </div>
+
+        <!-- Right Column: Quick IDE Setup & Connected Providers (5 cols) -->
+        <div class="lg:col-span-5 space-y-4">
+
+          <!-- Quick Copy IDE Setup Card -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center space-x-1.5">
+                <span>⚡</span>
+                <span>Gunakan di IDE Anda</span>
+              </h3>
+              <span class="text-[10px] text-zinc-400 font-mono">Port 20128</span>
+            </div>
+
+            <!-- IDE Selector Tabs -->
+            <div class="flex space-x-1 bg-zinc-900 p-1 rounded-xl border border-dark-border text-[11px]">
+              <button onclick="setIdeSnippet('claude')" id="ide-claude" class="ide-tab-btn flex-1 py-1 rounded-lg font-semibold bg-zinc-800 text-white">Claude Code</button>
+              <button onclick="setIdeSnippet('cursor')" id="ide-cursor" class="ide-tab-btn flex-1 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Cursor</button>
+              <button onclick="setIdeSnippet('cline')" id="ide-cline" class="ide-tab-btn flex-1 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Roo / Cline</button>
+              <button onclick="setIdeSnippet('aider')" id="ide-aider" class="ide-tab-btn flex-1 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Aider</button>
+            </div>
+
+            <div class="relative bg-zinc-950 p-3 rounded-xl border border-dark-border font-mono text-[11px] text-zinc-300 flex items-center justify-between group">
+              <span id="ideSnippetText" class="truncate pr-2 select-all">claude --model openai/my9model-free</span>
+              <button onclick="copyIdeSnippet()" id="copySnippetBtn" class="shrink-0 px-2 py-1 rounded-lg bg-zinc-800 hover:bg-emerald-500 hover:text-zinc-950 text-zinc-300 text-[10px] font-bold transition flex items-center space-x-1">
+                <span>📋 Copy</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Active Providers Grid -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center space-x-1.5">
+                <span>🔌</span>
+                <span>Active Provider Pool</span>
+              </h3>
+              <button onclick="switchTab('providers')" class="text-xs text-emerald-400 hover:text-emerald-300 font-medium">Kelola &rarr;</button>
+            </div>
+
+            <div id="activeProvidersMiniList" class="flex flex-wrap gap-1.5">
+              <!-- Populated via JS -->
+              <span class="text-xs text-zinc-500 p-2">Memuat provider pool...</span>
+            </div>
+          </div>
+
+        </div>
+
       </div>
 
       <!-- Quick Actions Grid -->
       <div class="bg-dark-card border border-dark-border rounded-2xl p-6">
         <h3 class="text-base font-bold text-white mb-4 flex items-center justify-between">
           <span>Aksi Cepat CLI</span>
-          <span class="text-xs font-normal text-zinc-400">Jalankan langsung dengan streaming log</span>
+          <span class="text-xs font-normal text-zinc-400">Jalankan langsung dengan live streaming log</span>
         </h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <button onclick="triggerCliAction('sync')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
-            <div class="font-bold text-sm text-white group-hover:text-emerald-400">Full Daily Sync</div>
+            <div class="font-bold text-sm text-white group-hover:text-emerald-400 flex items-center space-x-1.5">
+              <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              <span>Full Daily Sync</span>
+            </div>
             <div class="text-xs text-zinc-400 mt-1">Scrape, live pre-test & inject model ke semua combo 9router.</div>
           </button>
           <button onclick="triggerCliAction('dry-run')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
-            <div class="font-bold text-sm text-white group-hover:text-yellow-400">Dry Run Sync</div>
+            <div class="font-bold text-sm text-white group-hover:text-yellow-400 flex items-center space-x-1.5">
+              <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              <span>Dry Run Sync</span>
+            </div>
             <div class="text-xs text-zinc-400 mt-1">Simulasi live pre-test tanpa mengubah database SQLite.</div>
           </button>
           <button onclick="triggerCliAction('refresh')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
-            <div class="font-bold text-sm text-white group-hover:text-cyan-400">Watchdog Refresh</div>
+            <div class="font-bold text-sm text-white group-hover:text-cyan-400 flex items-center space-x-1.5">
+              <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              <span>Watchdog Refresh</span>
+            </div>
             <div class="text-xs text-zinc-400 mt-1">Cek ulang status kuota model (429) & parkir ke cooldown.</div>
           </button>
           <button onclick="triggerCliAction('benchmarks')" class="p-4 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-dark-border text-left transition group">
-            <div class="font-bold text-sm text-white group-hover:text-purple-400">Update Benchmarks</div>
+            <div class="font-bold text-sm text-white group-hover:text-purple-400 flex items-center space-x-1.5">
+              <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+              <span>Update Benchmarks</span>
+            </div>
             <div class="text-xs text-zinc-400 mt-1">Perbarui database skor coding benchmark dari sumber live.</div>
           </button>
         </div>
@@ -849,6 +982,56 @@ aider --model openai/my9model-free</pre>
       if (tabId === 'priorities') loadPriorities();
     }
 
+    let currentIdeSnippet = 'claude';
+
+    function setIdeSnippet(ide) {
+      currentIdeSnippet = ide;
+      document.querySelectorAll('.ide-tab-btn').forEach(btn => {
+        btn.classList.remove('bg-zinc-800', 'text-white');
+        btn.classList.add('text-zinc-400');
+      });
+      const activeBtn = document.getElementById('ide-' + ide);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-zinc-400');
+        activeBtn.classList.add('bg-zinc-800', 'text-white');
+      }
+
+      const textEl = document.getElementById('ideSnippetText');
+      if (ide === 'claude') {
+        textEl.textContent = 'claude --model openai/my9model-free';
+      } else if (ide === 'cursor') {
+        textEl.textContent = 'Base URL: http://127.0.0.1:20128/v1 | Model: my9model-free';
+      } else if (ide === 'cline') {
+        textEl.textContent = 'OpenAI Compatible -> Base: http://127.0.0.1:20128/v1 -> Model: my9model-free';
+      } else if (ide === 'aider') {
+        textEl.textContent = 'export OPENAI_API_BASE=http://127.0.0.1:20128/v1 && aider --model openai/my9model-free';
+      }
+    }
+
+    function copyIdeSnippet() {
+      const text = document.getElementById('ideSnippetText').textContent;
+      navigator.clipboard.writeText(text);
+      const btn = document.getElementById('copySnippetBtn');
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<span>✓ Copied!</span>';
+      btn.classList.add('bg-emerald-500', 'text-zinc-950');
+      setTimeout(() => {
+        btn.innerHTML = orig;
+        btn.classList.remove('bg-emerald-500', 'text-zinc-950');
+      }, 2000);
+    }
+
+    function copyModelId(id, btnEl) {
+      navigator.clipboard.writeText(id);
+      const orig = btnEl.innerHTML;
+      btnEl.innerHTML = '✓';
+      btnEl.classList.add('text-emerald-400');
+      setTimeout(() => {
+        btnEl.innerHTML = orig;
+        btnEl.classList.remove('text-emerald-400');
+      }, 1500);
+    }
+
     // --- Tab 1: Dashboard ---
     async function loadDashboard() {
       try {
@@ -860,12 +1043,84 @@ aider --model openai/my9model-free</pre>
         document.getElementById('statCombos').textContent = s.totalCombosCount;
         document.getElementById('statProviders').textContent = s.activeConnectionsCount;
         document.getElementById('statCandidates').textContent = s.candidatesCount;
-        document.getElementById('statCandidatesSync').textContent = s.candidatesLastSync ? 'Sync: ' + new Date(s.candidatesLastSync).toLocaleString('id-ID') : 'Belum sync';
-        document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd (Active)' : 'Cron (Active)') : 'Inactive';
+        document.getElementById('statCandidatesSync').textContent = s.candidatesLastSync ? 'Sync: ' + new Date(s.candidatesLastSync).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'Belum sync';
+        document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd' : 'Cron') : 'Inactive';
+        document.getElementById('statSchedulerDetail').textContent = s.schedulerActive ? 'Active (00:05 & :35)' : 'Inactive';
         document.getElementById('schedulerBadge').textContent = s.schedulerActive ? 'Scheduler: ' + s.schedulerType : 'Scheduler: Inactive';
         if (s.nineRouterDir) document.getElementById('statNineRouterDir').textContent = s.nineRouterDir;
         if (s.dbPath) document.getElementById('statDbPath').textContent = s.dbPath;
         if (s.nineRouterUrl) document.getElementById('statNineRouterUrl').textContent = s.nineRouterUrl;
+
+        // Render Distribution Health Bar
+        const dist = data.distribution || {};
+        const active = dist.activeCount || 0;
+        const smart = dist.smartCount || 0;
+        const fast = dist.fastCount || 0;
+        const cooldown = dist.cooldownCount || 0;
+
+        document.getElementById('distActiveLabel').textContent = `Active: ${active}`;
+        document.getElementById('distSmartLabel').textContent = `Smart: ${smart}`;
+        document.getElementById('distFastLabel').textContent = `Fast: ${fast}`;
+        document.getElementById('distCooldownLabel').textContent = `Cooldown: ${cooldown}`;
+
+        const total = (smart + fast + cooldown) || 1;
+        document.getElementById('distSmartBar').style.width = ((smart / total) * 100) + '%';
+        document.getElementById('distFastBar').style.width = ((fast / total) * 100) + '%';
+        document.getElementById('distCooldownBar').style.width = ((cooldown / total) * 100) + '%';
+
+        // Render Top Models Leaderboard
+        const topEl = document.getElementById('topModelsLeaderboard');
+        if (data.topModels && data.topModels.length > 0) {
+          topEl.innerHTML = data.topModels.map(m => {
+            let rankBadge = `<span class="h-6 w-6 rounded-lg bg-zinc-800 text-zinc-400 text-xs font-bold flex items-center justify-center font-mono">#${m.rank}</span>`;
+            if (m.rank === 1) rankBadge = `<span class="h-6 w-6 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center font-mono shadow-sm">🥇</span>`;
+            else if (m.rank === 2) rankBadge = `<span class="h-6 w-6 rounded-lg bg-zinc-300/20 text-zinc-200 border border-zinc-400/40 text-xs font-bold flex items-center justify-center font-mono shadow-sm">🥈</span>`;
+            else if (m.rank === 3) rankBadge = `<span class="h-6 w-6 rounded-lg bg-amber-700/20 text-amber-500 border border-amber-600/40 text-xs font-bold flex items-center justify-center font-mono shadow-sm">🥉</span>`;
+
+            const tierBadge = m.tier === 'smart'
+              ? '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center space-x-1"><span>🧠</span><span>Smart</span></span>'
+              : '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center space-x-1"><span>⚡</span><span>Fast</span></span>';
+
+            const scoreDisplay = m.score > 0
+              ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Score: ${m.score}</span>`
+              : `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono text-zinc-500 bg-zinc-800">Score: Standard</span>`;
+
+            return `
+              <div class="flex items-center justify-between p-3 rounded-xl bg-zinc-900/50 hover:bg-zinc-800/60 border border-dark-border/70 transition group">
+                <div class="flex items-center space-x-3 truncate">
+                  ${rankBadge}
+                  <div class="truncate">
+                    <div class="flex items-center space-x-2">
+                      <span class="font-bold text-xs text-white font-mono truncate">${m.fullId}</span>
+                      <button onclick="copyModelId('${m.fullId}', this)" title="Copy Model ID" class="text-zinc-500 hover:text-white transition text-xs opacity-0 group-hover:opacity-100 font-mono">📋</button>
+                    </div>
+                    <div class="text-[11px] text-zinc-400 font-mono truncate">${m.rawModelId}</div>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-2 shrink-0 ml-3">
+                  ${scoreDisplay}
+                  ${tierBadge}
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          topEl.innerHTML = '<div class="text-xs text-zinc-500 p-4 text-center">Belum ada model yang disinkronkan. Klik <strong>Sync Sekarang</strong> di atas!</div>';
+        }
+
+        // Render Active Providers Pool Mini List
+        const provEl = document.getElementById('activeProvidersMiniList');
+        if (data.activeProviders && data.activeProviders.length > 0) {
+          provEl.innerHTML = data.activeProviders.map(p => `
+            <div class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900/60 border border-dark-border text-xs">
+              <span class="h-1.5 w-1.5 rounded-full ${p.autoSyncEnabled ? 'bg-emerald-400' : 'bg-zinc-500'}"></span>
+              <span class="font-bold text-white text-[11px]">${p.label}</span>
+              ${p.modelCount > 0 ? `<span class="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 font-mono">${p.modelCount}</span>` : ''}
+            </div>
+          `).join('');
+        } else {
+          provEl.innerHTML = '<span class="text-xs text-zinc-500 italic p-1">Belum ada provider yang terhubung di 9router.</span>';
+        }
       } catch (err) {
         console.error(err);
       }
