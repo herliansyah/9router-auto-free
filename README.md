@@ -403,6 +403,8 @@ lalu pilih nama combo sebagai model (mis. `my9model-free`). Lihat daftar lengkap
 
 ---
 
-## Lisensi
+## Lisensi & Pembuat
 
-MIT — lihat field `license` di [`package.json`](package.json).
+Dibuat oleh [Herliansyah](https://github.com/herliansyah).
+
+Dirilis di bawah lisensi [MIT License](LICENSE).

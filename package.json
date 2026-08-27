@@ -44,8 +44,16 @@
     "cursor",
     "sync"
   ],
-  "author": "herliansyah@gmail.com",
+  "author": "Herliansyah <herliansyah@gmail.com> (https://github.com/herliansyah)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/herliansyah/9router-auto-free.git"
+  },
+  "bugs": {
+    "url": "https://github.com/herliansyah/9router-auto-free/issues"
+  },
+  "homepage": "https://github.com/herliansyah/9router-auto-free#readme",
   "dependencies": {
     "bcryptjs": "^3.0.3"
   }
