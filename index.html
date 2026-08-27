@@ -160,7 +160,7 @@
           <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
           <div class="space-y-0.5">
             <div class="font-bold text-white text-[11px]" data-i18n="system_connected">Sistem Terhubung</div>
-            <div class="text-[10px] text-zinc-400 font-mono" id="bannerLastSyncText">Sync: Memeriksa...</div>
+            <div class="text-[10px] text-zinc-400 font-mono" id="bannerLastSyncText">Last Sync: Memeriksa...</div>
           </div>
         </div>
       </div>
@@ -193,7 +193,7 @@
         <div class="bg-dark-card border border-dark-border rounded-xl p-5">
           <div class="flex items-center justify-between">
             <span class="text-xs text-zinc-400 font-semibold uppercase tracking-wider" data-i18n="stat_candidate_pool">Candidate Pool</span>
-            <span class="text-zinc-500 text-[10px]" id="statCandidatesSync">Sync: -</span>
+            <span class="text-zinc-500 text-[10px]" id="statCandidatesSync">Last Sync: -</span>
           </div>
           <div class="text-2xl font-bold text-white mt-2" id="statCandidates">0</div>
           <span class="text-xs text-zinc-400 mt-1 block" data-i18n="stat_models_validated">Model gratis tervalidasi</span>
@@ -1642,9 +1642,11 @@ aider --model openai/my9model-free</pre>
           ? syncDate.toLocaleTimeString(currentLang === 'id' ? 'id-ID' : 'en-US', { hour: '2-digit', minute: '2-digit' })
           : null;
 
-        document.getElementById('statCandidatesSync').textContent = timeStr ? `Sync: ${timeStr}` : (currentLang === 'id' ? 'Belum sync' : 'No sync yet');
+        const syncDisplayText = timeStr ? `Last Sync: ${timeStr}` : 'Last Sync: -';
+
+        document.getElementById('statCandidatesSync').textContent = syncDisplayText;
         if (document.getElementById('bannerLastSyncText')) {
-          document.getElementById('bannerLastSyncText').textContent = timeStr ? `Sync: ${timeStr}` : t('sync_none');
+          document.getElementById('bannerLastSyncText').textContent = syncDisplayText;
         }
         document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd' : 'Cron') : 'Inactive';
         document.getElementById('statSchedulerDetail').textContent = s.schedulerActive ? 'Active (00:05 & :35)' : 'Inactive';
