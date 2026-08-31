@@ -11,13 +11,20 @@ const crypto = require('node:crypto');
 
 const HOME = os.homedir();
 
+function sanitizePathArg(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.includes('\0')) {
+    throw new Error('Invalid path argument');
+  }
+  return path.resolve(value);
+}
+
 function resolveNineRouterDir() {
   const arg = process.argv.find(a => a.startsWith('--nine-router-dir=') || a.startsWith('--router-dir=') || a.startsWith('--data-dir='));
-  if (arg) return path.resolve(arg.split('=')[1]);
+  if (arg) return sanitizePathArg(arg.split('=')[1]);
 
-  if (process.env.NINEROUTER_DIR) return path.resolve(process.env.NINEROUTER_DIR);
-  if (process.env.NINE_ROUTER_DIR) return path.resolve(process.env.NINE_ROUTER_DIR);
-  if (process.env.DATA_DIR) return path.resolve(process.env.DATA_DIR);
+  if (process.env.NINEROUTER_DIR) return sanitizePathArg(process.env.NINEROUTER_DIR);
+  if (process.env.NINE_ROUTER_DIR) return sanitizePathArg(process.env.NINE_ROUTER_DIR);
+  if (process.env.DATA_DIR) return sanitizePathArg(process.env.DATA_DIR);
 
   if (fs.existsSync('/app/data/db/data.sqlite')) return '/app/data';
 
@@ -32,10 +39,10 @@ function resolveNineRouterDir() {
 
 function resolveDbPath() {
   const dbArg = process.argv.find(a => a.startsWith('--db-path='));
-  if (dbArg) return path.resolve(dbArg.split('=')[1]);
+  if (dbArg) return sanitizePathArg(dbArg.split('=')[1]);
 
-  if (process.env.NINEROUTER_DB_PATH) return path.resolve(process.env.NINEROUTER_DB_PATH);
-  if (process.env.NINE_ROUTER_DB_PATH) return path.resolve(process.env.NINE_ROUTER_DB_PATH);
+  if (process.env.NINEROUTER_DB_PATH) return sanitizePathArg(process.env.NINEROUTER_DB_PATH);
+  if (process.env.NINE_ROUTER_DB_PATH) return sanitizePathArg(process.env.NINE_ROUTER_DB_PATH);
 
   const dir = resolveNineRouterDir();
   return path.join(dir, 'db', 'data.sqlite');
