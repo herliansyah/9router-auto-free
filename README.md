@@ -4,6 +4,13 @@
 
 # 9router-auto-free
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/9router-auto-free"><img src="https://img.shields.io/npm/v/9router-auto-free.svg?style=flat-square&color=cb3837&logo=npm" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/9router-auto-free"><img src="https://img.shields.io/npm/dt/9router-auto-free.svg?style=flat-square&color=blue" alt="npm total downloads" /></a>
+  <a href="https://www.npmjs.com/package/9router-auto-free"><img src="https://img.shields.io/npm/dm/9router-auto-free.svg?style=flat-square&color=brightgreen" alt="npm monthly downloads" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="license" /></a>
+</p>
+
 Automated intelligent system that aggregates **100+ free AI coding models** from top providers, validates them via **live pre-tests** directly through 9router, ranks them by empirical coding benchmarks & latency, and injects them into ready-to-use 9router combos (`my9model-free`, `my9model-smart`, `my9model-fast`, `openagentic-free`, `kilo-free`, etc.) — allowing Cursor, Claude Code, Cline, and your IDEs to always use active, high-quality, and lowest-latency free AI models without key management headaches.
 
 > **Security Note**: This script reads provider credentials from **connections already configured in your 9router SQLite database**. No API keys are stored in or transmitted by this repository.

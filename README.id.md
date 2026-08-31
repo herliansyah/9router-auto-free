@@ -4,6 +4,13 @@
 
 # 9router-auto-free
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/9router-auto-free"><img src="https://img.shields.io/npm/v/9router-auto-free.svg?style=flat-square&color=cb3837&logo=npm" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/9router-auto-free"><img src="https://img.shields.io/npm/dt/9router-auto-free.svg?style=flat-square&color=blue" alt="npm total downloads" /></a>
+  <a href="https://www.npmjs.com/package/9router-auto-free"><img src="https://img.shields.io/npm/dm/9router-auto-free.svg?style=flat-square&color=brightgreen" alt="npm monthly downloads" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="license" /></a>
+</p>
+
 Otomasi cerdas untuk mengumpulkan **100+ model AI coding gratis** dari berbagai provider terkemuka, memvalidasinya dengan **live pre-test** langsung melalui 9router, menyortirnya berdasarkan skor benchmark coding empiris & latensi terendah, lalu menyuntikkannya ke dalam combo 9router (`my9model-free`, `my9model-smart`, `my9model-fast`, `openagentic-free`, `kilo-free`, dll.) — sehingga IDE favorit Anda (Cursor, Claude Code, Cline, VS Code) selalu siap pakai tanpa repot mencari atau menggonta-ganti API key.
 
 > **Catatan Keamanan**: Script ini membaca kredensial provider dari **koneksi yang sudah dikonfigurasi di SQLite 9router Anda**. Tidak ada API key yang disimpan atau dikirim ke luar.
