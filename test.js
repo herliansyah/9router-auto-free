@@ -573,6 +573,21 @@ async function runTests() {
           assert.strictEqual(toggleRes.status, 200, 'toggle-sync must return 200');
           assert.strictEqual(toggleRes.data.success, true, 'toggle-sync success must be true');
 
+          // Check /api/test-model endpoint auth & validation
+          const testModelRes = await new Promise(res => {
+            const req = http.request(`http://127.0.0.1:${testPort}/api/test-model`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Cookie: cookie }
+            }, r => {
+              let d = '';
+              r.on('data', c => d += c);
+              r.on('end', () => res({ status: r.statusCode, data: JSON.parse(d) }));
+            });
+            req.write(JSON.stringify({})); // Missing model param -> 400 expected
+            req.end();
+          });
+          assert.strictEqual(testModelRes.status, 400, 'test-model without model param must return 400');
+
           server.close(() => resolve());
         } catch (err) {
           server.close(() => reject(err));

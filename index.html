@@ -1748,8 +1748,13 @@ aider --model openai/my9model-free</pre>
           let modelsHtml = '';
           if (c.models && c.models.length > 0) {
             modelsHtml = c.models.map((m, idx) => `
-              <div class="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-zinc-950/50 border border-zinc-800/60 font-mono">
-                <span class="text-zinc-300 truncate max-w-[80%]">${idx + 1}. ${m}</span>
+              <div class="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-zinc-950/50 border border-zinc-800/60 font-mono group hover:border-zinc-700">
+                <span class="text-zinc-300 truncate max-w-[70%]">${idx + 1}. ${m}</span>
+                <div class="flex items-center space-x-1">
+                  <button onclick="testSingleModel('${m}', this)" class="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-emerald-600 hover:text-zinc-950 text-zinc-300 transition font-sans flex items-center space-x-1">
+                    <span>⚡ Test</span>
+                  </button>
+                </div>
               </div>
             `).join('');
           } else {
@@ -1772,6 +1777,33 @@ aider --model openai/my9model-free</pre>
         });
       } catch (err) {
         container.innerHTML = '<div class="text-xs text-rose-400 p-4">Gagal memuat combos: ' + err.message + '</div>';
+      }
+    }
+
+    async function testSingleModel(modelId, btn) {
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="animate-spin text-zinc-400">⏳</span> <span>...</span>';
+      try {
+        const res = await fetch('/api/test-model', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: modelId })
+        });
+        const data = await res.json();
+        if (data.success && data.ok) {
+          btn.innerHTML = `<span class="text-emerald-400 font-bold">✓ ${data.latencyMs}ms</span>`;
+        } else {
+          const errReason = data.response?.error || data.error || `HTTP ${data.status || 'Err'}`;
+          btn.innerHTML = `<span class="text-rose-400 font-bold" title="${errReason}">✗ ${data.latencyMs ? data.latencyMs + 'ms' : 'Fail'}</span>`;
+        }
+      } catch (err) {
+        btn.innerHTML = `<span class="text-rose-400 font-bold">✗ Err</span>`;
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = origText;
+        }, 5000);
       }
     }
 

@@ -204,6 +204,16 @@ function getCodingScore(modelIdentifier, customBenchmarks = null) {
     }
   }
 
+  const paramMatch = id.match(/(?:^|[^\w])(\d+)b(?:[^\w]|$)/);
+  if (paramMatch) {
+    const size = parseInt(paramMatch[1], 10);
+    if (size >= 100) baseScore += 1000;
+    else if (size >= 65) baseScore += 800;
+    else if (size >= 30) baseScore += 500;
+    else if (size >= 14) baseScore += 200;
+    else if (size <= 8) baseScore -= 300;
+  }
+
   if (id.includes('embed') || id.includes('image') || id.includes('vision') || id.includes('audio') || id.includes('tts') || id.includes('whisper') || id.includes('flux') || id.includes('diffusion')) {
     baseScore = -10000;
   }
@@ -555,15 +565,52 @@ function computeComboDelta(oldList, newList) {
   };
 }
 
-function saveCandidateState(defs, prefixedByProvider) {
+function getCooldownDelayMs(failCount) {
+  if (failCount <= 1) return 15 * 60 * 1000;
+  if (failCount <= 3) return 60 * 60 * 1000;
+  return 6 * 60 * 60 * 1000;
+}
+
+function loadFullCandidateState() {
   try {
+    if (!fs.existsSync(CANDIDATES_STATE_PATH)) return { providers: {}, cooldowns: {} };
+    const data = JSON.parse(fs.readFileSync(CANDIDATES_STATE_PATH, 'utf8'));
+    return {
+      updatedAt: data.updatedAt,
+      providers: data.providers || {},
+      cooldowns: data.cooldowns || {}
+    };
+  } catch (err) {
+    return { providers: {}, cooldowns: {} };
+  }
+}
+
+function saveFullCandidateState(state) {
+  try {
+    fs.writeFileSync(CANDIDATES_STATE_PATH, JSON.stringify({
+      updatedAt: new Date().toISOString(),
+      providers: state.providers || {},
+      cooldowns: state.cooldowns || {}
+    }, null, 2));
+  } catch (err) {
+    console.warn(`[!] Warning: Could not save candidates-state.json: ${err.message}`);
+  }
+}
+
+function saveCandidateState(defs, prefixedByProvider, cooldownUpdates = null) {
+  try {
+    const currentState = loadFullCandidateState();
     const providers = {};
     for (const [key, data] of defs) {
       const ids = prefixedByProvider[key];
       if (!Array.isArray(ids) || ids.length === 0) continue;
       providers[key] = { prefix: data.prefix, ids };
     }
-    fs.writeFileSync(CANDIDATES_STATE_PATH, JSON.stringify({ updatedAt: new Date().toISOString(), providers }, null, 2));
+    currentState.providers = providers;
+    if (cooldownUpdates) {
+      currentState.cooldowns = cooldownUpdates;
+    }
+    saveFullCandidateState(currentState);
   } catch (err) {
     console.warn(`[!] Warning: Could not save candidates-state.json: ${err.message}`);
   }
@@ -571,10 +618,9 @@ function saveCandidateState(defs, prefixedByProvider) {
 
 function loadCandidatePool() {
   try {
-    if (!fs.existsSync(CANDIDATES_STATE_PATH)) return new Map();
-    const data = JSON.parse(fs.readFileSync(CANDIDATES_STATE_PATH, 'utf8'));
+    const state = loadFullCandidateState();
     const pool = new Map();
-    for (const entry of Object.values(data.providers || {})) {
+    for (const entry of Object.values(state.providers || {})) {
       if (!entry || !entry.prefix) continue;
       const set = pool.get(entry.prefix) || new Set();
       for (const id of entry.ids || []) set.add(String(id));
@@ -649,13 +695,27 @@ async function refreshCombos() {
     return;
   }
 
+  const fullState = loadFullCandidateState();
+  const cooldowns = fullState.cooldowns || {};
+  const now = Date.now();
+
   const activeSet = new Set();
   const quotaSet = new Set();
   const latencyRefresh = new Map();
-  const queue = [...allIds];
-  const CONCURRENCY = 8;
+  const queue = [];
 
-  console.log(`[*] Re-testing ${queue.length} unique combo members...`);
+  for (const id of allIds) {
+    const entry = cooldowns[id];
+    if (entry && entry.nextRetryAt && now < new Date(entry.nextRetryAt).getTime()) {
+      console.log(`    [⏳ Backoff] ${id} in cooldown until ${entry.nextRetryAt} (tier ${entry.failCount})`);
+      quotaSet.add(id);
+    } else {
+      queue.push(id);
+    }
+  }
+
+  const CONCURRENCY = 8;
+  console.log(`[*] Re-testing ${queue.length} unique combo members (${quotaSet.size} in backoff)...`);
 
   async function worker() {
     while (queue.length > 0) {
@@ -669,15 +729,27 @@ async function refreshCombos() {
       if (verdict === 'active') {
         latencyRefresh.set(fullId, result.latencyMs);
         activeSet.add(fullId);
+        if (cooldowns[fullId]) delete cooldowns[fullId];
       } else if (verdict === 'quota') {
         console.log(`    [⏳ Quota] ${fullId} demoted to bottom (${result.reason})`);
         quotaSet.add(fullId);
+        const prevCount = cooldowns[fullId]?.failCount || 0;
+        const newCount = prevCount + 1;
+        const delayMs = getCooldownDelayMs(newCount);
+        cooldowns[fullId] = {
+          failCount: newCount,
+          lastFailedAt: new Date().toISOString(),
+          nextRetryAt: new Date(now + delayMs).toISOString(),
+          reason: result.reason
+        };
       } else {
         console.log(`    [✗ Removed] ${fullId} -> ${result.reason}${result.retried ? ' (after retry)' : ''}`);
+        if (cooldowns[fullId]) delete cooldowns[fullId];
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, allIds.length) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, () => worker()));
+  saveFullCandidateState({ ...fullState, cooldowns });
 
   const rankedActive = sortModelsByCodingQuality(Array.from(activeSet), latencyRefresh);
   const rankedQuota = sortModelsByCodingQuality(Array.from(quotaSet), latencyRefresh);

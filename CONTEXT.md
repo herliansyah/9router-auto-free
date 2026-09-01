@@ -63,5 +63,10 @@ saat istilah baru dinamai atau makna lama berubah.
 - **Dynamic Provider Auto-Discovery**: Kemampuan menemukan dan menarik kandidat model dari koneksi provider OpenAI-compatible aktif manapun di SQLite 9router tanpa modifikasi kode, dengan fallback endpoint `/models` & `/v1/models`.
 - **Auto-Sync Toggle**: Konfigurasi granular (`custom-providers.json` & Web UI) untuk mengaktifkan atau menonaktifkan partisipasi provider dinamis dalam injeksi combo super dan pembuatan combo per-provider.
 
+## Adaptive Cooldown & Heuristic Scoring
+- **Adaptive Cooldown State**: Mekanisme retry bertingkat (Tier 1: 15m, Tier 2: 1h, Tier 3: 6h) untuk model dengan verdict `quota` tersimpan di `candidates-state.json`, mencegah pengujian ulang boros sebelum jendela cooldown usai.
+- **Heuristic Parameter Scoring**: Penyesuaian skor otomatis untuk kandidat baru di luar `benchmarks.json` berbasis ekstraksi ukuran parameter (`70b`, `32b`, `8b`, dll).
+- **Live Test Runner**: Endpoint `/api/test-model` dan tombol interaktif di Web Dashboard untuk menguji respons dan latensi satu model secara langsung.
+
 
 

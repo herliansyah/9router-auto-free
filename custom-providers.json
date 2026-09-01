@@ -1,1 +1,8 @@
-{}
+{
+  "0a77db8d-7dd7-420e-add6-a97b77441302": {
+    "enabled": true
+  },
+  "test-dynamic-node": {
+    "enabled": false
+  }
+}

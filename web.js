@@ -377,6 +377,48 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { success: true, candidates });
   }
 
+  // 8b. Live Test Single Model via 9router
+  if (pathname === '/api/test-model' && method === 'POST') {
+    try {
+      const body = await readBody(req);
+      const modelId = body.model || body.modelId;
+      if (!modelId) {
+        return sendJson(res, 400, { success: false, error: 'Parameter model/modelId diperlukan.' });
+      }
+
+      const token = storage.get9routerCliToken();
+      if (!token) {
+        return sendJson(res, 503, { success: false, error: '9router CLI token tidak ditemukan atau server 9router offline.' });
+      }
+
+      const routerUrl = storage.resolveNineRouterUrl ? storage.resolveNineRouterUrl() : (process.env.NINEROUTER_URL || 'http://127.0.0.1:20128');
+      const startTime = Date.now();
+      const testRes = await fetch(`${routerUrl}/api/models/test`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-9r-cli-token': token
+        },
+        body: JSON.stringify({ model: modelId, kind: 'llm' }),
+        signal: AbortSignal.timeout(20000)
+      });
+
+      const latencyMs = Date.now() - startTime;
+      const data = await testRes.json().catch(() => ({}));
+
+      return sendJson(res, 200, {
+        success: true,
+        model: modelId,
+        ok: Boolean(data.ok),
+        status: testRes.status,
+        latencyMs,
+        response: data
+      });
+    } catch (err) {
+      return sendJson(res, 500, { success: false, error: err.message });
+    }
+  }
+
   // 9. Scheduler
   if (pathname === '/api/scheduler' && method === 'GET') {
     const status = scheduler.getSchedulerStatus();
