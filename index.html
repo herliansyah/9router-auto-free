@@ -2089,6 +2089,21 @@ aider --model openai/my9model-free</pre>
 
       if (Array.isArray(currentExclusions)) {
         if (!currentExclusions.includes(val)) currentExclusions.push(val);
+      } else if (typeof currentExclusions === 'object' && currentExclusions !== null) {
+        // dynamic check of the values or structure
+        const isProv = val.startsWith('provider:');
+        if (isProv) {
+          const provName = val.replace(/^provider:/, '');
+          if (!currentExclusions.excludedProviders) currentExclusions.excludedProviders = [];
+          if (!currentExclusions.excludedProviders.includes(provName)) {
+            currentExclusions.excludedProviders.push(provName);
+          }
+        } else {
+          if (!currentExclusions.excludedModels) currentExclusions.excludedModels = [];
+          if (!currentExclusions.excludedModels.includes(val)) {
+            currentExclusions.excludedModels.push(val);
+          }
+        }
       } else {
         currentExclusions = [val];
       }
@@ -2101,6 +2116,17 @@ aider --model openai/my9model-free</pre>
     function removeExclusionTag(idx) {
       if (Array.isArray(currentExclusions)) {
         currentExclusions.splice(idx, 1);
+      } else if (typeof currentExclusions === 'object' && currentExclusions !== null) {
+        // Since we combined them in renderExclusionTags:
+        // const models = (currentExclusions.excludedModels || []).map(m => String(m));
+        // const provs = (currentExclusions.excludedProviders || []).map(p => 'provider:' + p);
+        // list = [...models, ...provs];
+        const modelsCount = (currentExclusions.excludedModels || []).length;
+        if (idx < modelsCount) {
+          currentExclusions.excludedModels.splice(idx, 1);
+        } else {
+          (currentExclusions.excludedProviders || []).splice(idx - modelsCount, 1);
+        }
       }
       document.getElementById('exclusionsJsonEditor').value = JSON.stringify(currentExclusions, null, 2);
       renderExclusionTags();
