@@ -24,7 +24,8 @@ function removeLegacyCronLines(scriptPath) {
       execSync('crontab -r 2>/dev/null');
       return;
     }
-    execSync(`echo "${filtered.join('\n').replace(/"/g, '\"')}" | crontab -`);
+    // ponytail: stream raw crontab directly to stdin, avoiding shell interpolation and command injection
+    execSync('crontab -', { input: filtered.join('\n') + '\n', encoding: 'utf8' });
   } catch {}
 }
 
@@ -117,7 +118,8 @@ WantedBy=timers.target
 
       let lingerNote = '';
       try {
-        execSync(`loginctl enable-linger ${os.userInfo().username}`, { stdio: 'ignore' });
+        const { execFileSync } = require('node:child_process');
+        execFileSync('loginctl', ['enable-linger', os.userInfo().username], { stdio: 'ignore' });
       } catch {
         lingerNote = '\n    Note: could not enable linger; timers run while you are logged in.\n    Run `sudo loginctl enable-linger ' + os.userInfo().username + '` for boot-level persistence.';
       }
@@ -151,7 +153,8 @@ WantedBy=timers.target
 
     filtered.push(...lines);
     const newCrontab = filtered.join('\n') + '\n';
-    execSync(`echo "${newCrontab.replace(/"/g, '\"')}" | crontab -`);
+    // ponytail: stream raw crontab directly to stdin, avoiding shell interpolation and command injection
+    execSync('crontab -', { input: newCrontab, encoding: 'utf8' });
 
     console.log('[✓] Cron fallback installed:');
     console.log('    - daily 00:05 full sync');

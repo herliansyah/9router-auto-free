@@ -229,7 +229,13 @@ const CUSTOM_PROVIDERS_PATH = path.join(__dirname, 'custom-providers.json');
 function readCustomProvidersFile() {
   try {
     if (fs.existsSync(CUSTOM_PROVIDERS_PATH)) {
-      return JSON.parse(fs.readFileSync(CUSTOM_PROVIDERS_PATH, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(CUSTOM_PROVIDERS_PATH, 'utf8'));
+      if (data && typeof data === 'object') {
+        delete data.__proto__;
+        delete data.constructor;
+        delete data.prototype;
+        return data;
+      }
     }
   } catch {}
   return {};
@@ -298,6 +304,9 @@ function getDynamicProviders() {
   return dynamicProviders;
 }
 
+// ponytail: avoid static fallback secret; use 9router secret files, persist a local random secret, or keep in memory
+let inMemoryAuthSecret = null;
+
 function getAuthSecret() {
   try {
     const jwtSecretPath = path.join(NINE_ROUTER_DIR, 'jwt-secret');
@@ -313,7 +322,20 @@ function getAuthSecret() {
       if (s) return s;
     }
   } catch {}
-  return '9router-auto-free-secret-fallback';
+  try {
+    const localSecretPath = path.join(NINE_ROUTER_DIR, '.session-secret');
+    if (fs.existsSync(localSecretPath)) {
+      const s = fs.readFileSync(localSecretPath, 'utf8').trim();
+      if (s) return s;
+    }
+    const generated = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(localSecretPath, generated, { mode: 0o600 });
+    return generated;
+  } catch {}
+  if (!inMemoryAuthSecret) {
+    inMemoryAuthSecret = crypto.randomBytes(32).toString('hex');
+  }
+  return inMemoryAuthSecret;
 }
 
 function verify9routerPassword(inputPassword) {
@@ -341,10 +363,12 @@ function createSessionToken() {
     const row = db.prepare("SELECT data FROM settings LIMIT 1").get();
     db.close();
     const settings = row && row.data ? JSON.parse(row.data) : {};
-    const pwdHash = settings.password || 'default';
+    if (!settings.password || typeof settings.password !== 'string') {
+      return null;
+    }
     const payload = {
       exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
-      ph: crypto.createHash('sha256').update(pwdHash).digest('hex').substring(0, 16)
+      ph: crypto.createHash('sha256').update(settings.password).digest('hex').substring(0, 16)
     };
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const sig = crypto.createHmac('sha256', getAuthSecret()).update(body).digest('base64url');
@@ -358,17 +382,23 @@ function verifySessionToken(token) {
   if (!token || typeof token !== 'string' || !token.includes('.')) return false;
   try {
     const [body, sig] = token.split('.');
+    if (!body || !sig) return false;
     const expectedSig = crypto.createHmac('sha256', getAuthSecret()).update(body).digest('base64url');
-    if (sig !== expectedSig) return false;
+    const sigBuf = Buffer.from(sig, 'utf8');
+    const expBuf = Buffer.from(expectedSig, 'utf8');
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return false;
+
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
-    if (!payload.exp || Date.now() > payload.exp) return false;
+    if (!payload.exp || typeof payload.exp !== 'number' || Date.now() > payload.exp) return false;
 
     const Database = getDbClass();
     const db = new Database(DB_PATH, { readonly: true });
     const row = db.prepare("SELECT data FROM settings LIMIT 1").get();
     db.close();
     const settings = row && row.data ? JSON.parse(row.data) : {};
-    const currentPh = crypto.createHash('sha256').update(settings.password || 'default').digest('hex').substring(0, 16);
+    if (!settings.password || typeof settings.password !== 'string') return false;
+
+    const currentPh = crypto.createHash('sha256').update(settings.password).digest('hex').substring(0, 16);
     return payload.ph === currentPh;
   } catch {
     return false;
@@ -464,6 +494,17 @@ function readAllConnectionsRaw() {
 function addProviderConnection(payload) {
   const { provider, name, apiKey, baseUrl, accountId, customPrefix } = payload;
   if (!provider) throw new Error('Provider identifier is required');
+  if (baseUrl) {
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(baseUrl);
+    } catch {
+      throw new Error(`Invalid Base URL: '${baseUrl}'`);
+    }
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      throw new Error(`Invalid Base URL protocol: '${parsedUrl.protocol}'. Only http: and https: are allowed.`);
+    }
+  }
 
   const Database = getDbClass();
   const db = new Database(DB_PATH);

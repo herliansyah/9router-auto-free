@@ -20,10 +20,12 @@ const storage = require('./storage.js');
 const scheduler = require('./scheduler.js');
 const { PROVIDERS } = require('./providers.js');
 
-// Parse CLI port or default to 20129 (to avoid conflict with 9router on 20128)
+// Parse CLI port/host or default to 127.0.0.1:20129 (localhost-only for security)
 const args = process.argv.slice(2);
 const portArg = args.find(a => a.startsWith('--port='));
+const hostArg = args.find(a => a.startsWith('--host='));
 const PORT = process.env.PORT || (portArg ? parseInt(portArg.split('=')[1], 10) : 20129);
+const HOST = process.env.HOST || (hostArg ? hostArg.split('=')[1] : '127.0.0.1');
 
 // Active running processes lock
 let currentProcess = null;
@@ -35,7 +37,13 @@ function parseCookies(req) {
   if (rc) {
     rc.split(';').forEach(cookie => {
       const parts = cookie.split('=');
-      list[parts.shift().trim()] = decodeURI(parts.join('='));
+      const key = parts.shift().trim();
+      const val = parts.join('=');
+      try {
+        list[key] = decodeURIComponent(val);
+      } catch {
+        list[key] = val;
+      }
     });
   }
   return list;
@@ -300,7 +308,10 @@ async function handleApi(req, res, url) {
       const { id, providerKey, enabled } = body;
       const customConfig = storage.readCustomProvidersFile();
       const targetKey = id || providerKey;
-      if (!targetKey) throw new Error('Provider ID or Key is required');
+      if (!targetKey || typeof targetKey !== 'string') throw new Error('Provider ID or Key is required');
+      if (['__proto__', 'constructor', 'prototype'].includes(targetKey.toLowerCase())) {
+        throw new Error('Invalid provider key identifier');
+      }
       if (!customConfig[targetKey]) customConfig[targetKey] = {};
       customConfig[targetKey].enabled = !!enabled;
       storage.writeCustomProvidersFile(customConfig);
@@ -317,7 +328,10 @@ async function handleApi(req, res, url) {
       const { id, providerKey, prefix, freePattern, modelsEndpoint } = body;
       const customConfig = storage.readCustomProvidersFile();
       const targetKey = id || providerKey;
-      if (!targetKey) throw new Error('Provider ID or Key is required');
+      if (!targetKey || typeof targetKey !== 'string') throw new Error('Provider ID or Key is required');
+      if (['__proto__', 'constructor', 'prototype'].includes(targetKey.toLowerCase())) {
+        throw new Error('Invalid provider key identifier');
+      }
       if (!customConfig[targetKey]) customConfig[targetKey] = {};
       if (prefix) customConfig[targetKey].prefix = prefix;
       if (freePattern !== undefined) customConfig[targetKey].freePattern = freePattern;
@@ -551,11 +565,11 @@ const server = http.createServer(async (req, res) => {
   res.end('404 Not Found');
 });
 
-function startServer(port = PORT, host = '0.0.0.0') {
+function startServer(port = PORT, host = HOST) {
   return server.listen(port, host, () => {
     console.log(`\n====================================================`);
     console.log(`  9router Auto-Free Web Console`);
-    console.log(`  URL: http://localhost:${port}`);
+    console.log(`  URL: http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`);
     console.log(`  Auth: Synchronized with 9router SQLite password`);
     console.log(`====================================================\n`);
   });
@@ -565,4 +579,4 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { server, PORT, startServer };
+module.exports = { server, PORT, HOST, startServer };

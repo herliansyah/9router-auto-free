@@ -3,3 +3,4 @@ node_modules/
 .env
 .DS_Store
 candidates-state.json
+.session-secret*
