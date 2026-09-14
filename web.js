@@ -22,10 +22,18 @@ const { PROVIDERS } = require('./providers.js');
 
 // Parse CLI port/host or default to 127.0.0.1:20129 (localhost-only for security)
 const args = process.argv.slice(2);
-const portArg = args.find(a => a.startsWith('--port='));
-const hostArg = args.find(a => a.startsWith('--host='));
-const PORT = process.env.PORT || (portArg ? parseInt(portArg.split('=')[1], 10) : 20129);
-const HOST = process.env.HOST || (hostArg ? hostArg.split('=')[1] : '127.0.0.1');
+function getArg(name) {
+  const eq = args.find(a => a.startsWith(`--${name}=`));
+  if (eq) return eq.split('=')[1];
+  const idx = args.indexOf(`--${name}`);
+  if (idx !== -1 && idx + 1 < args.length && !args[idx + 1].startsWith('--')) return args[idx + 1];
+  return null;
+}
+const isLan = args.includes('--lan');
+const portVal = getArg('port');
+const hostVal = getArg('host');
+const PORT = process.env.PORT || (portVal ? parseInt(portVal, 10) : 20129);
+const HOST = process.env.HOST || (hostVal || (isLan ? '0.0.0.0' : '127.0.0.1'));
 
 // Active running processes lock
 let currentProcess = null;
