@@ -7,7 +7,9 @@
     "groq",
     "bazaarlink",
     "cerebras",
-    "b.ai"
+    "b.ai",
+    "OpenAgentic.id",
+    "OpenAgentic"
   ],
   "excludedModels": [
     "nano",

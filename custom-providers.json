@@ -1,8 +1,50 @@
 {
   "0a77db8d-7dd7-420e-add6-a97b77441302": {
-    "enabled": true
+    "enabled": false
   },
   "test-dynamic-node": {
+    "enabled": false
+  },
+  "1e6ff9a0-c4c4-4585-b75f-050384fed924": {
+    "enabled": false
+  },
+  "28369156-f39a-45d0-959e-844c36de1286": {
+    "enabled": false
+  },
+  "13e19899-a4f3-4a28-ab96-e18cacf909cc": {
+    "enabled": false
+  },
+  "1c5d6f6c-03a8-4066-96e4-fdff386ba25c": {
+    "enabled": false
+  },
+  "0da46e53-de6c-4951-9e37-d79c8c7fcd3c": {
+    "enabled": false
+  },
+  "758c5021-bb0f-43f4-b0fe-785055e4b1f6": {
+    "enabled": false
+  },
+  "6fdc5d7d-1999-44e6-98b2-50a9a9fb1bc8": {
+    "enabled": false
+  },
+  "26ce9e2c-9bc0-437e-92a4-f2d218278fc9": {
+    "enabled": false
+  },
+  "b6aa49e3-21e1-4b01-883c-ff665bba56bc": {
+    "enabled": false
+  },
+  "1d489b17-cc22-472b-97ce-d7d7fdd2a0b8": {
+    "enabled": false
+  },
+  "6eccd4fb-b6ab-42a3-8bfc-b4c89055c439": {
+    "enabled": false
+  },
+  "da4517ee-51ec-4b66-a017-0ac7adcb2dbb": {
+    "enabled": false
+  },
+  "d51a8b64-6b60-4d97-a8f9-1966db0e5125": {
+    "enabled": false
+  },
+  "02f95889-0fca-44fc-99db-43b25f02e75d": {
     "enabled": false
   }
 }
