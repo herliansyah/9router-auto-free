@@ -57,8 +57,14 @@ const DB_PATH = resolveDbPath();
 const BETTER_SQLITE_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', 'better-sqlite3');
 const CLIENT_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', '9router', 'src', 'cli', 'api', 'client.js');
 
-// ponytail: shared better-sqlite3 loader helper
+// ponytail: shared better-sqlite3 loader helper (checks package dep first, then 9router runtime, then global paths)
 function getDbClass() {
+  try {
+    return require('better-sqlite3');
+  } catch {}
+  try {
+    return require(path.join(NINE_ROUTER_DIR, 'runtime', 'node_modules', 'better-sqlite3'));
+  } catch {}
   try {
     return require(BETTER_SQLITE_PATH);
   } catch {
@@ -162,7 +168,12 @@ async function persistCombos(comboMap) {
 
   // 1. Try updating via 9router API client if server is running
   try {
-    const client = require(CLIENT_PATH);
+    let client;
+    try {
+      client = require('9router/src/cli/api/client.js');
+    } catch {
+      client = require(CLIENT_PATH);
+    }
     if (client && typeof client.getCombos === 'function') {
       const res = await client.getCombos();
       if (res.success && res.data && res.data.combos) {
