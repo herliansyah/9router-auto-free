@@ -70,5 +70,5 @@ saat istilah baru dinamai atau makna lama berubah.
 - **Heuristic Parameter Scoring**: Penyesuaian skor otomatis untuk kandidat baru di luar `benchmarks.json` berbasis ekstraksi ukuran parameter (`70b`, `32b`, `8b`, dll).
 - **Live Test Runner**: Endpoint `/api/test-model` dan tombol interaktif di Web Dashboard untuk menguji respons dan latensi satu model secara langsung.
 
-
-
+## CLI Diagnostics & Verbose Logging
+- **Unified Verbose Flag**: Dukungan flag `--verbose` / `-v` dan environment variable `VERBOSE=1` / `DEBUG=1` lintas runtime (`sync.js`, `web.js`). Menampilkan HTTP access logging dengan pewarnaan status dan latensi, detail stack trace error API (4xx/5xx), mirroring output live stream child-process CLI ke terminal konsol, serta guarded scheduler check di platform Windows (`win32`).

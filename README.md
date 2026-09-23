@@ -35,7 +35,11 @@ Automated intelligent system that aggregates **100+ free AI coding models** from
 ```bash
 # Start the Web Console
 npx 9router-auto-free --web
-# Or locally: npm run web
+# Or with verbose logging for terminal debugging
+npx 9router-auto-free --web --verbose
+# Or locally:
+npm run web
+# node web.js --verbose
 ```
 Access in your browser: `http://localhost:20129`
 

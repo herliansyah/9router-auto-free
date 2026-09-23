@@ -25,6 +25,9 @@ const args = process.argv.slice(2);
 const portArg = args.find(a => a.startsWith('--port='));
 const PORT = process.env.PORT || (portArg ? parseInt(portArg.split('=')[1], 10) : 20129);
 
+// ponytail: verbose logging flag - stdlib only, no external logger required
+const isVerbose = args.includes('--verbose') || args.includes('-v') || process.env.VERBOSE === '1' || process.env.DEBUG === '1';
+
 // Active running processes lock
 let currentProcess = null;
 
@@ -47,6 +50,9 @@ function isAuthenticated(req) {
 }
 
 function sendJson(res, statusCode, data) {
+  if (isVerbose && statusCode >= 400) {
+    console.error(`[API Error ${statusCode}]`, data?.error || data);
+  }
   res.writeHead(statusCode, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
@@ -491,6 +497,10 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { success: false, error: 'Aksi tidak dikenali' });
     }
 
+    if (isVerbose) {
+      cliArgs.push('--verbose');
+    }
+
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -511,20 +521,26 @@ async function handleApi(req, res, url) {
     currentProcess = proc;
 
     proc.stdout.on('data', chunk => {
-      sendEvent('log', { text: chunk.toString() });
+      const text = chunk.toString();
+      if (isVerbose) process.stdout.write(`[PROC] ${text}`);
+      sendEvent('log', { text });
     });
 
     proc.stderr.on('data', chunk => {
-      sendEvent('log', { text: chunk.toString(), isError: true });
+      const text = chunk.toString();
+      if (isVerbose) process.stderr.write(`[PROC stderr] ${text}`);
+      sendEvent('log', { text, isError: true });
     });
 
     proc.on('close', code => {
+      if (isVerbose) console.log(`[PROC] Process exited with code ${code}`);
       currentProcess = null;
       sendEvent('done', { code, success: code === 0 });
       res.end();
     });
 
     proc.on('error', err => {
+      console.error(`[PROC ERROR] ${err.message}`);
       currentProcess = null;
       sendEvent('error', { error: err.message });
       res.end();
@@ -545,7 +561,17 @@ async function handleApi(req, res, url) {
 // ----------------------------------------------------------------------------
 
 const server = http.createServer(async (req, res) => {
+  const startTime = Date.now();
   const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+
+  res.on('finish', () => {
+    const elapsed = Date.now() - startTime;
+    const status = res.statusCode;
+    const color = status >= 500 ? '\x1b[31m' : status >= 400 ? '\x1b[33m' : '\x1b[32m';
+    const reset = '\x1b[0m';
+    const query = isVerbose && parsedUrl.search ? ` ${parsedUrl.search}` : '';
+    console.log(`[HTTP] ${req.method} ${parsedUrl.pathname}${query} ${color}${status}${reset} (${elapsed}ms)`);
+  });
 
   // CORS & Security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -575,6 +601,7 @@ function startServer(port = PORT, host = '0.0.0.0') {
     console.log(`  9router Auto-Free Web Console`);
     console.log(`  URL: http://localhost:${port}`);
     console.log(`  Auth: Synchronized with 9router SQLite password`);
+    console.log(`  Mode: ${isVerbose ? 'Verbose (detailed logs enabled)' : 'Standard (use --verbose or -v for debug logs)'}`);
     console.log(`====================================================\n`);
   });
 }
@@ -583,4 +610,4 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { server, PORT, startServer };
+module.exports = { server, PORT, startServer, isVerbose };
