@@ -30,7 +30,7 @@ Otomasi cerdas untuk mengumpulkan **100+ model AI coding gratis** dari berbagai 
 - **Provider Monitoring & Auto-Sync Switch**: Pantau koneksi provider yang aktif di 9router (OAuth & API Key) dan kelola sakelar Auto-Sync per provider. Seluruh kredensial dikelola terpusat di 9router.
 - **Visual Exclusions & Priorities**: Kelola `exclusions.json` dan `priorities.json` via antarmuka visual atau raw JSON editor.
 - **Streaming Terminal CLI**: Jalankan *Sync*, *Dry Run*, *Watchdog Refresh*, dan *Scheduler Setup* dengan live log streaming (SSE).
-- **Dukungan Multi-Bahasa**: Switch instan antara **Bahasa Indonesia 🇮🇩** dan **English 🇬🇧**.
+- **Dukungan Multi-Bahasa & Panduan Interaktif**: Switch instan antara **Bahasa Indonesia 🇮🇩** dan **English 🇬🇧** dengan dokumentasi 1:1, tutorial IDE, dan FAQ lengkap langsung di dalam konsol.
 
 ```bash
 # Menjalankan Web Console

@@ -30,7 +30,7 @@ Automated intelligent system that aggregates **100+ free AI coding models** from
 - **Provider Monitoring & Auto-Sync Switch**: Monitor active provider connections from 9router (OAuth & API Key) and toggle Auto-Sync per provider. All credentials remain securely managed inside 9router.
 - **Visual Exclusions & Priorities**: Manage `exclusions.json` and `priorities.json` with tag-based UI or raw JSON editor.
 - **Real-Time Streaming CLI Console**: Execute *Sync*, *Dry Run*, *Watchdog Refresh*, and *Scheduler Setup* with live SSE log streaming.
-- **Full Bilingual Support**: Instant toggle between **English 🇬🇧** and **Bahasa Indonesia 🇮🇩**.
+- **Full Bilingual Support & In-App User Guide**: Instant toggle between **English 🇬🇧** and **Bahasa Indonesia 🇮🇩** with complete 1:1 documentation, IDE tutorials, and FAQ built directly into the console.
 
 ```bash
 # Start the Web Console
