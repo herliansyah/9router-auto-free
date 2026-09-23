@@ -475,13 +475,39 @@ async function runTests() {
 
     // Verify better-sqlite3 package dependency and storage loader
     const pkg = require('./package.json');
-    assert.ok(pkg.dependencies && pkg.dependencies['better-sqlite3'], 'better-sqlite3 must be declared in package.json dependencies');
+    const hasSqliteDep = Boolean((pkg.dependencies && pkg.dependencies['better-sqlite3']) ||
+                                 (pkg.optionalDependencies && pkg.optionalDependencies['better-sqlite3']));
+    assert.ok(hasSqliteDep, 'better-sqlite3 must be declared in dependencies or optionalDependencies');
     assert.ok(typeof storage.getDbClass === 'function', 'storage.getDbClass is a function');
     const Database = storage.getDbClass();
     assert.ok(typeof Database === 'function', 'storage.getDbClass returns a valid Database constructor');
     const memDb = new Database(':memory:');
     assert.ok(memDb, 'Database instance must be instantiable');
     memDb.close();
+
+    // Regression check: verify fallback when better-sqlite3 bindings are unavailable (e.g. Node 24 on Windows)
+    {
+      const Module = require('node:module');
+      const origRequire = Module.prototype.require;
+      let mocked = false;
+      try {
+        Module.prototype.require = function(id) {
+          if (typeof id === 'string' && id.includes('better-sqlite3')) {
+            throw new Error('Could not locate the bindings file. Tried: .../better_sqlite3.node');
+          }
+          return origRequire.apply(this, arguments);
+        };
+        mocked = true;
+        const FallbackDb = storage.getDbClass();
+        assert.ok(typeof FallbackDb === 'function', 'storage.getDbClass must fallback gracefully when better-sqlite3 bindings fail');
+        const testDb = new FallbackDb(':memory:');
+        testDb.close();
+      } finally {
+        if (mocked) {
+          Module.prototype.require = origRequire;
+        }
+      }
+    }
   }
 
   // 27. Web Console & Auth test checks
