@@ -48,20 +48,22 @@ saat istilah baru dinamai atau makna lama berubah.
 ## Web Dashboard & Auth
 - **Web Dashboard**: Antarmuka web mandiri (`web.js`, port default 20129) yang
   menyajikan visualisasi combo, kontrol CLI (sync, dry-run, refresh, benchmark),
-  manajemen exclusions, dan priorities.
+  manajemen exclusions, priorities, dan sakelar Auto-Sync provider.
 - **9router Auth Session**: Autentikasi berbasis password yang dicocokkan langsung
   dengan hash bcrypt di SQLite 9router (`settings.password`), mengeluarkan signed
   HttpOnly session cookie.
-- **Provider Connection Guard**: Proteksi pada penambahan provider agar provider
-  yang sudah terpasang dan aktif di 9router (`providerConnections`) tidak dapat
-  didaftarkan ganda.
+- **Provider Credential Authority**: Seluruh siklus hidup kredensial provider (CRUD,
+  OAuth handshake, token refresh, API keys, endpoints, dan penghapusan) dimiliki
+  sepenuhnya oleh **9router Core** (`~/.9router/db/data.sqlite`). `9router-auto-free`
+  murni bertindak sebagai *read-only consumer* dari koneksi aktif
+  (`providerConnections WHERE isActive = 1`) ditambah sumber publik tanpa akun.
 
 ## Storage & Path Resolution
 - **Dynamic Path Resolution**: Mekanisme penentuan lokasi data 9router (`NINE_ROUTER_DIR`, `DB_PATH`, `NINEROUTER_URL`) dengan auto-discovery platform (Linux `~/.9router`, Windows `%APPDATA%/9router`, Docker `/app/data`) serta override via env vars (`NINEROUTER_DIR`, `NINEROUTER_DB_PATH`, `NINEROUTER_URL`) dan flag CLI (`--nine-router-dir`, `--db-path`, `--router-url`).
 
-## Dynamic Provider Engine
+## Dynamic Provider Engine & Auto-Sync
 - **Dynamic Provider Auto-Discovery**: Kemampuan menemukan dan menarik kandidat model dari koneksi provider OpenAI-compatible aktif manapun di SQLite 9router tanpa modifikasi kode, dengan fallback endpoint `/models` & `/v1/models`.
-- **Auto-Sync Toggle**: Konfigurasi granular (`custom-providers.json` & Web UI) untuk mengaktifkan atau menonaktifkan partisipasi provider dinamis dalam injeksi combo super dan pembuatan combo per-provider.
+- **Auto-Sync Switch**: Kontrol tunggal di `9router-auto-free` (`custom-providers.json` & Web UI) untuk mengaktifkan atau menonaktifkan partisipasi provider yang terhubung dalam proses scraping/discovery dan injeksi ke combo super (`my9model-*`) maupun combo provider. Tidak ada operasi CRUD kredensial di `9router-auto-free`.
 
 ## Adaptive Cooldown & Heuristic Scoring
 - **Adaptive Cooldown State**: Mekanisme retry bertingkat (Tier 1: 15m, Tier 2: 1h, Tier 3: 6h) untuk model dengan verdict `quota` tersimpan di `candidates-state.json`, mencegah pengujian ulang boros sebelum jendela cooldown usai.

@@ -231,6 +231,12 @@ async function handleApi(req, res, url) {
     const activeConnections = rawConnections.filter(c => c.isActive);
     const catalog = storage.getUnifiedProviderCatalog();
     const customConfig = storage.readCustomProvidersFile ? storage.readCustomProvidersFile() : {};
+    const combos = storage.readAllCombosDetailed ? storage.readAllCombosDetailed() : [];
+
+    const getModelCount = (p) => {
+      const pCombo = combos.find(c => c.name === p.combo || (p.prefixes && p.prefixes.some(pref => c.name === `${pref}-free`)));
+      return pCombo?.models?.length || 0;
+    };
 
     const providerList = catalog.map(p => {
       // Find matching connection
@@ -246,6 +252,9 @@ async function handleApi(req, res, url) {
         return false;
       });
 
+      const isPublic = !matched && ['oa', 'oc', 'openrouter', 'airforce'].includes(p.key);
+      const authType = matched ? (matched.authType || 'apikey') : (isPublic ? 'public' : 'unconnected');
+
       return {
         key: p.key,
         providerKey: p.providerKey || p.key,
@@ -257,8 +266,11 @@ async function handleApi(req, res, url) {
         defaultPrefix: p.defaultPrefix || '',
         isCustom: !!p.isCustom,
         needsAccountId: !!p.needsAccountId,
-        isInstalled: !!matched,
-        isActive: !!matched,
+        isInstalled: !!matched || isPublic,
+        isActive: !!matched || isPublic,
+        isPublic,
+        authType,
+        modelCount: getModelCount(p),
         autoSyncEnabled: (customConfig[matched?.id] || customConfig[p.key] || customConfig[p.providerKey] || {}).enabled !== false,
         connectionId: matched ? matched.id : null,
         connectionName: matched ? matched.name : null
@@ -271,19 +283,25 @@ async function handleApi(req, res, url) {
       .filter(c => !matchedConnectionIds.has(c.id))
       .map(c => {
         const cfg = customConfig[c.id] || customConfig[c.provider] || {};
+        const prefixes = [cfg.prefix || c.data?.providerSpecificData?.prefix || c.provider];
+        const comboName = `${prefixes[0].split('-')[0]}-free`;
+        const pCombo = combos.find(combo => combo.name === comboName);
         return {
           key: c.provider,
           providerKey: c.provider,
           label: c.name ? `${c.name} (${c.provider.split('-')[0]})` : c.provider,
           category: 'Custom / Dynamic Node',
-          combo: `${cfg.prefix || c.data?.providerSpecificData?.prefix || c.provider.split('-')[0]}-free`,
-          prefixes: [cfg.prefix || c.data?.providerSpecificData?.prefix || c.provider],
+          combo: comboName,
+          prefixes,
           defaultBaseUrl: c.data?.providerSpecificData?.baseUrl || '',
           defaultPrefix: cfg.prefix || c.data?.providerSpecificData?.prefix || '',
           isCustom: true,
           needsAccountId: false,
           isInstalled: true,
           isActive: c.isActive,
+          isPublic: false,
+          authType: c.authType || 'apikey',
+          modelCount: pCombo?.models?.length || 0,
           autoSyncEnabled: cfg.enabled !== false,
           connectionId: c.id,
           connectionName: c.name
