@@ -30,6 +30,12 @@ function removeLegacyCronLines(scriptPath) {
 
 function installScheduler(options = {}) {
   console.log('[*] Installing scheduler (systemd timers preferred, cron fallback)...');
+  // ponytail: Windows platform guard - prevent calling crontab/systemctl which errors on Windows cmd.exe
+  if (process.platform === 'win32') {
+    console.log('[!] Windows detected: native systemd/crontab is not available on Windows.');
+    console.log('    To schedule on Windows: use Windows Task Scheduler (taskschd.msc) or run inside WSL/Docker.');
+    return;
+  }
   const scriptPath = options.scriptPath || path.resolve(__dirname, 'sync.js');
   const benchPath = options.benchPath || path.join(path.dirname(scriptPath), 'update-benchmarks.js');
   const logPath = options.logPath || path.join(path.dirname(scriptPath), 'sync.log');
@@ -170,6 +176,11 @@ function getSchedulerStatus() {
     active: false,
     timers: []
   };
+
+  // ponytail: Windows lacks native systemd/crontab; skip child_process calls that fail in cmd.exe
+  if (process.platform === 'win32') {
+    return status;
+  }
 
   // Check systemd user timers
   try {

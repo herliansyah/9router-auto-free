@@ -35,7 +35,11 @@ Otomasi cerdas untuk mengumpulkan **100+ model AI coding gratis** dari berbagai 
 ```bash
 # Menjalankan Web Console
 npx 9router-auto-free --web
-# Atau jika diinstall lokal: npm run web
+# Atau dengan mode verbose (log detail untuk debugging)
+npx 9router-auto-free --web --verbose
+# Atau jika diinstall lokal:
+npm run web
+# node web.js --verbose
 ```
 Akses di browser: `http://localhost:20129`
 

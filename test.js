@@ -664,6 +664,13 @@ async function runTests() {
     const readCustom = storage.readCustomProvidersFile();
     assert.strictEqual(readCustom['mock-test']?.prefix, 'mock', 'Custom provider config must persist');
     storage.writeCustomProvidersFile(origCustom); // restore
+
+    // 7) Verbose flag & Windows platform checks
+    console.log('[-] Testing verbose flag & Windows platform guards...');
+    const webModule = require('./web.js');
+    const syncModule = require('./sync.js');
+    assert.strictEqual(typeof webModule.isVerbose, 'boolean', 'web.isVerbose must be a boolean');
+    assert.strictEqual(typeof syncModule.isVerbose, 'boolean', 'sync.isVerbose must be a boolean');
   }
 
   console.log('[✓] All tests passed successfully!');

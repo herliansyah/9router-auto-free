@@ -31,6 +31,8 @@ const isDryRun = args.includes('--dry-run');
 const isRefreshMode = args.includes('--refresh') || args.includes('--watchdog');
 const isCronSetup = args.includes('--setup-cron') || args.includes('--setup-scheduler');
 const isLiveBenchmarks = args.includes('--live-benchmarks') || args.includes('--update-benchmarks');
+// ponytail: standard verbose flag for transparent terminal diagnostics
+const isVerbose = args.includes('--verbose') || args.includes('-v') || process.env.VERBOSE === '1' || process.env.DEBUG === '1';
 
 // ponytail: single-user local tool, thresholds hardcoded; promote to config file when a second machine appears
 const AGENTIC_MIN_CONTEXT = 100000;      // super-combo agentic floor (supports 128k/256k/1M models)
@@ -904,8 +906,13 @@ async function main() {
   console.log('  Free Models Sync -> 9router Combos               ');
   console.log('  Sources: OpenAgentic + Kilo + OpenRouter + Poolside + Gemini + Ollama + Airforce + Bazaarlink + B.ai');
   console.log('           + Groq + Cerebras + Mistral + Cloudflare AI + NVIDIA NIM + OC');
-  console.log(`  Mode: ${mode}  `);
+  console.log(`  Mode: ${mode}${isVerbose ? ' [VERBOSE]' : ''}  `);
   console.log(`  Time: ${new Date().toISOString()}`);
+  if (isVerbose) {
+    console.log(`  9router Dir: ${storage.NINE_ROUTER_DIR}`);
+    console.log(`  9router DB:  ${storage.DB_PATH}`);
+    console.log(`  9router URL: ${storage.resolveNineRouterUrl()}`);
+  }
   console.log('====================================================\n');
 
   if (isCronSetup) {
@@ -987,5 +994,6 @@ module.exports = {
   idMatchesPrefixes,
   PROVIDERS,
   PROVIDER_BY_KEY,
-  providerByPrefix
+  providerByPrefix,
+  isVerbose
 };
