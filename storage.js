@@ -368,18 +368,22 @@ function getAuthSecret() {
   return '9router-auto-free-secret-fallback';
 }
 
-function verify9routerPassword(inputPassword) {
+function verify9routerPassword(inputPassword, dbPath = resolveDbPath()) {
   if (!inputPassword || typeof inputPassword !== 'string') return false;
   try {
     const Database = getDbClass();
-    const db = new Database(DB_PATH, { readonly: true });
+    const db = new Database(dbPath, { readonly: true });
     const row = db.prepare("SELECT data FROM settings LIMIT 1").get();
     db.close();
     if (!row || !row.data) return false;
     const settings = JSON.parse(row.data);
-    if (!settings.password) return false;
+    const candidate = inputPassword.trim();
+    if (!settings.password) {
+      const defaultPassword = process.env.INITIAL_PASSWORD || '123456';
+      return candidate === defaultPassword;
+    }
     const bcrypt = require('bcryptjs');
-    return bcrypt.compareSync(inputPassword, settings.password);
+    return bcrypt.compareSync(candidate, settings.password);
   } catch (err) {
     console.error(`[!] Password verification error: ${err.message}`);
     return false;
