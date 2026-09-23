@@ -4,6 +4,9 @@
  */
 
 const assert = require('node:assert');
+const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 const storage = require('./storage.js');
 const scheduler = require('./scheduler.js');
 const {
@@ -522,6 +525,22 @@ async function runTests() {
     // 2) Password verification against 9router
     const invalidPwdCheck = storage.verify9routerPassword('definitely-wrong-password-12345');
     assert.strictEqual(invalidPwdCheck, false, 'Wrong password must fail verification');
+
+    // Regression test: default 9router state where settings.password is null / unset
+    const tmpNullDbPath = path.join(os.tmpdir(), `test-null-pwd-${Date.now()}.sqlite`);
+    try {
+      const { DatabaseSync } = require('node:sqlite');
+      const mockDb = new DatabaseSync(tmpNullDbPath);
+      mockDb.exec('CREATE TABLE settings (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL);');
+      mockDb.exec('INSERT INTO settings (id, data) VALUES (1, \'{"requireLogin":true,"password":null}\');');
+      mockDb.close();
+
+      assert.strictEqual(storage.verify9routerPassword('123456', tmpNullDbPath), true, 'Default password 123456 must succeed when settings.password is null');
+      assert.strictEqual(storage.verify9routerPassword('123456\r\n', tmpNullDbPath), true, 'Trimmed default password 123456 must succeed');
+      assert.strictEqual(storage.verify9routerPassword('wrongpwd', tmpNullDbPath), false, 'Wrong password must fail when settings.password is null');
+    } finally {
+      try { fs.unlinkSync(tmpNullDbPath); } catch {}
+    }
 
     // 3) Duplicate provider prevention guard
     console.log('[-] Testing duplicate provider guard...');
