@@ -78,6 +78,104 @@ function readBody(req) {
   });
 }
 
+const PUBLIC_PROVIDER_KEYS = ['oa', 'oc', 'openrouter', 'airforce'];
+
+function getActiveProvidersList(combos = []) {
+  const rawConnections = storage.readAllConnectionsRaw();
+  const activeConnections = rawConnections.filter(c => c.isActive);
+  const customConfig = storage.readCustomProvidersFile ? storage.readCustomProvidersFile() : {};
+
+  const getModelCount = (comboName, prefixes) => {
+    const pCombo = combos.find(c => c.name === comboName || (prefixes && prefixes.some(pref => c.name === `${pref}-free`)));
+    return pCombo?.models?.length || 0;
+  };
+
+  const providers = [];
+
+  // 1. Process 9router Active Connections
+  for (const conn of activeConnections) {
+    const provName = String(conn.provider || '').toLowerCase();
+    const known = PROVIDERS.find(p => {
+      if (p.key.toLowerCase() === provName) return true;
+      if (p.connection && p.connection.toLowerCase() === provName) return true;
+      if (p.prefixes && p.prefixes.some(pref => provName === pref.toLowerCase() || provName.startsWith(pref.toLowerCase() + '-'))) return true;
+      const baseUrl = conn.data?.providerSpecificData?.baseUrl || conn.data?.baseUrl || '';
+      if (p.baseUrl && baseUrl && baseUrl.replace(/\/+$/, '') === p.baseUrl.replace(/\/+$/, '')) return true;
+      const prefix = conn.data?.providerSpecificData?.prefix || '';
+      if (prefix && p.prefixes && p.prefixes.includes(prefix.toLowerCase())) return true;
+      return false;
+    });
+
+    const cfg = customConfig[conn.id] || customConfig[conn.provider] || (known ? customConfig[known.key] : {}) || {};
+    const prefix = cfg.prefix || conn.data?.providerSpecificData?.prefix || (known ? known.prefixes[0] : conn.provider);
+    const comboName = known ? known.combo : `${prefix.split('-')[0]}-free`;
+    const prefixes = known ? known.prefixes : [prefix];
+
+    let category = 'Custom Node';
+    if (known) {
+      if (['groq', 'cerebras'].includes(known.key)) category = 'Fast Inference';
+      else if (['gemini', 'mistral'].includes(known.key)) category = 'Major LLM';
+      else if (known.key === 'openrouter') category = 'Aggregator';
+      else category = 'Free AI';
+    }
+
+    providers.push({
+      key: known ? known.key : conn.provider,
+      providerKey: conn.provider,
+      label: conn.name ? `${conn.name} (${known ? known.label : conn.provider})` : (known ? known.label : conn.provider),
+      category,
+      combo: comboName,
+      prefixes,
+      defaultBaseUrl: conn.data?.providerSpecificData?.baseUrl || (known ? known.baseUrl : '') || '',
+      defaultPrefix: prefix,
+      isCustom: !known,
+      needsAccountId: false,
+      isInstalled: true,
+      isActive: true,
+      isPublic: false,
+      authType: conn.authType || 'apikey',
+      modelCount: getModelCount(comboName, prefixes),
+      autoSyncEnabled: cfg.enabled !== false,
+      connectionId: conn.id,
+      connectionName: conn.name
+    });
+  }
+
+  // 2. Add Built-in Public Providers (if not already connected in 9router)
+  for (const pKey of PUBLIC_PROVIDER_KEYS) {
+    const alreadyConnected = providers.some(p => p.key === pKey);
+    if (alreadyConnected) continue;
+
+    const pDef = PROVIDERS.find(p => p.key === pKey);
+    if (!pDef) continue;
+
+    const cfg = customConfig[pKey] || {};
+    const comboName = pDef.combo || `${pKey}-free`;
+    providers.push({
+      key: pDef.key,
+      providerKey: pDef.key,
+      label: pDef.label,
+      category: pDef.key === 'openrouter' ? 'Aggregator' : 'Free AI',
+      combo: comboName,
+      prefixes: pDef.prefixes || [pKey],
+      defaultBaseUrl: pDef.baseUrl || '',
+      defaultPrefix: pDef.prefixes ? pDef.prefixes[0] : pKey,
+      isCustom: false,
+      needsAccountId: false,
+      isInstalled: true,
+      isActive: true,
+      isPublic: true,
+      authType: 'public',
+      modelCount: getModelCount(comboName, pDef.prefixes),
+      autoSyncEnabled: cfg.enabled !== false,
+      connectionId: null,
+      connectionName: null
+    });
+  }
+
+  return providers;
+}
+
 // ----------------------------------------------------------------------------
 // API Request Handlers
 // ----------------------------------------------------------------------------
@@ -168,23 +266,14 @@ async function handleApi(req, res, url) {
       };
     });
 
-    const activeProvKeys = new Set(rawConnections.filter(c => c.isActive).map(c => String(c.provider || '').toLowerCase()));
-    const customConfig = storage.readCustomProvidersFile ? storage.readCustomProvidersFile() : {};
-    const catalog = storage.getUnifiedProviderCatalog();
-
-    const providerStats = catalog
-      .filter(p => activeProvKeys.has(String(p.key).toLowerCase()) || activeProvKeys.has(String(p.providerKey).toLowerCase()))
-      .map(p => {
-        const pCombo = combos.find(c => c.name === p.combo || (p.prefixes && p.prefixes.some(pref => c.name === `${pref}-free`)));
-        const modelCount = pCombo?.models?.length || 0;
-        return {
-          label: p.label,
-          key: p.key,
-          category: p.category,
-          modelCount,
-          autoSyncEnabled: (customConfig[p.key] || customConfig[p.providerKey] || {}).enabled !== false
-        };
-      });
+    const activeProviders = getActiveProvidersList(combos);
+    const providerStats = activeProviders.map(p => ({
+      label: p.label,
+      key: p.key,
+      category: p.category,
+      modelCount: p.modelCount,
+      autoSyncEnabled: p.autoSyncEnabled
+    }));
 
     let totalCandidatesCount = 0;
     if (candidates && candidates.providers) {
@@ -231,90 +320,11 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { success: true, combos });
   }
 
-  // 5. Providers with Active Status & Duplicate Prevention
+  // 5. Providers with Active Status (Connected in 9router + Built-in Public Sources)
   if (pathname === '/api/providers' && method === 'GET') {
-    const rawConnections = storage.readAllConnectionsRaw();
-    const activeConnections = rawConnections.filter(c => c.isActive);
-    const catalog = storage.getUnifiedProviderCatalog();
-    const customConfig = storage.readCustomProvidersFile ? storage.readCustomProvidersFile() : {};
     const combos = storage.readAllCombosDetailed ? storage.readAllCombosDetailed() : [];
-
-    const getModelCount = (p) => {
-      const pCombo = combos.find(c => c.name === p.combo || (p.prefixes && p.prefixes.some(pref => c.name === `${pref}-free`)));
-      return pCombo?.models?.length || 0;
-    };
-
-    const providerList = catalog.map(p => {
-      // Find matching connection
-      const matched = activeConnections.find(c => {
-        const provName = String(c.provider || '').toLowerCase();
-        const pKey = String(p.providerKey || p.key).toLowerCase();
-        if (provName === pKey || provName === String(p.key).toLowerCase()) return true;
-        if (p.prefixes && p.prefixes.some(pref => provName === pref.toLowerCase() || provName.startsWith(pref.toLowerCase() + '-'))) return true;
-        const baseUrl = c.data?.providerSpecificData?.baseUrl || c.data?.baseUrl || '';
-        if (p.defaultBaseUrl && baseUrl && baseUrl.replace(/\/+$/, '') === p.defaultBaseUrl.replace(/\/+$/, '')) return true;
-        const prefix = c.data?.providerSpecificData?.prefix || '';
-        if (prefix && p.prefixes && p.prefixes.includes(prefix.toLowerCase())) return true;
-        return false;
-      });
-
-      const isPublic = !matched && ['oa', 'oc', 'openrouter', 'airforce'].includes(p.key);
-      const authType = matched ? (matched.authType || 'apikey') : (isPublic ? 'public' : 'unconnected');
-
-      return {
-        key: p.key,
-        providerKey: p.providerKey || p.key,
-        label: p.label,
-        category: p.category || 'Standard',
-        combo: p.combo || (p.key + '-free'),
-        prefixes: p.prefixes || [p.defaultPrefix || p.key],
-        defaultBaseUrl: p.defaultBaseUrl || '',
-        defaultPrefix: p.defaultPrefix || '',
-        isCustom: !!p.isCustom,
-        needsAccountId: !!p.needsAccountId,
-        isInstalled: !!matched || isPublic,
-        isActive: !!matched || isPublic,
-        isPublic,
-        authType,
-        modelCount: getModelCount(p),
-        autoSyncEnabled: (customConfig[matched?.id] || customConfig[p.key] || customConfig[p.providerKey] || {}).enabled !== false,
-        connectionId: matched ? matched.id : null,
-        connectionName: matched ? matched.name : null
-      };
-    });
-
-    // Also include extra connections from 9router sqlite
-    const matchedConnectionIds = new Set(providerList.filter(p => p.connectionId).map(p => p.connectionId));
-    const extraConnections = rawConnections
-      .filter(c => !matchedConnectionIds.has(c.id))
-      .map(c => {
-        const cfg = customConfig[c.id] || customConfig[c.provider] || {};
-        const prefixes = [cfg.prefix || c.data?.providerSpecificData?.prefix || c.provider];
-        const comboName = `${prefixes[0].split('-')[0]}-free`;
-        const pCombo = combos.find(combo => combo.name === comboName);
-        return {
-          key: c.provider,
-          providerKey: c.provider,
-          label: c.name ? `${c.name} (${c.provider.split('-')[0]})` : c.provider,
-          category: 'Custom / Dynamic Node',
-          combo: comboName,
-          prefixes,
-          defaultBaseUrl: c.data?.providerSpecificData?.baseUrl || '',
-          defaultPrefix: cfg.prefix || c.data?.providerSpecificData?.prefix || '',
-          isCustom: true,
-          needsAccountId: false,
-          isInstalled: true,
-          isActive: c.isActive,
-          isPublic: false,
-          authType: c.authType || 'apikey',
-          modelCount: pCombo?.models?.length || 0,
-          autoSyncEnabled: cfg.enabled !== false,
-          connectionId: c.id,
-          connectionName: c.name
-        };
-      });
-
-    return sendJson(res, 200, { success: true, providers: [...providerList, ...extraConnections] });
+    const providers = getActiveProvidersList(combos);
+    return sendJson(res, 200, { success: true, providers });
   }
 
   // 5b. Toggle Auto-Sync on/off for a Provider
@@ -348,16 +358,6 @@ async function handleApi(req, res, url) {
       if (modelsEndpoint !== undefined) customConfig[targetKey].modelsEndpoint = modelsEndpoint;
       storage.writeCustomProvidersFile(customConfig);
       return sendJson(res, 200, { success: true, message: 'Konfigurasi provider berhasil disimpan' });
-    } catch (err) {
-      return sendJson(res, 400, { success: false, error: err.message });
-    }
-  }
-
-  if (pathname === '/api/providers' && method === 'POST') {
-    try {
-      const body = await readBody(req);
-      const result = storage.addProviderConnection(body);
-      return sendJson(res, 200, { success: true, data: result, message: 'Provider berhasil ditambahkan ke 9router!' });
     } catch (err) {
       return sendJson(res, 400, { success: false, error: err.message });
     }

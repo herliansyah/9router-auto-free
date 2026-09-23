@@ -313,18 +313,20 @@ function getDynamicProviders() {
       continue;
     }
 
-    // Lookup default baseUrl from catalog if not in connection data
-    let baseUrl = spec.baseUrl || data.baseUrl || '';
-    if (!baseUrl) {
-      const catalogItem = NINEROUTER_PROVIDER_CATALOG.find(p => p.key === provName || p.providerKey === provName);
-      if (catalogItem?.defaultBaseUrl) {
-        baseUrl = catalogItem.defaultBaseUrl;
-      }
-    }
-
+    // Lookup default baseUrl if not in connection data
+    const KNOWN_PROVIDER_BASE_URLS = {
+      openai: 'https://api.openai.com/v1',
+      anthropic: 'https://api.anthropic.com/v1',
+      deepseek: 'https://api.deepseek.com/v1',
+      together: 'https://api.together.xyz/v1',
+      sambanova: 'https://api.sambanova.ai/v1',
+      fireworks: 'https://api.fireworks.ai/inference/v1',
+      chutes: 'https://api.chutes.ai/v1',
+      siliconflow: 'https://api.siliconflow.cn/v1'
+    };
+    const baseUrl = spec.baseUrl || data.baseUrl || KNOWN_PROVIDER_BASE_URLS[provName] || '';
     const apiKey = data.apiKey || '';
-    const catalogItem = NINEROUTER_PROVIDER_CATALOG.find(p => p.key === provName || p.providerKey === provName);
-    const label = spec.nodeName || conn.name || catalogItem?.label || provName;
+    const label = spec.nodeName || conn.name || provName;
     const config = customConfig[conn.id] || customConfig[provName] || customConfig[rawPrefix] || {};
 
     const enabled = config.enabled !== false;
@@ -449,53 +451,6 @@ function readAllCombosDetailed() {
   }
 }
 
-// Comprehensive 9router Provider Catalog
-const NINEROUTER_PROVIDER_CATALOG = [
-  // Free / Auto-Free Providers
-  { key: 'oa', providerKey: 'oa', label: 'OpenAgentic.id', category: 'Free AI', combo: 'openagentic-free', prefixes: ['openagentic', 'oa'], defaultBaseUrl: 'https://openagentic.id/api/v1', defaultPrefix: 'openagentic', authType: 'apikey' },
-  { key: 'kilo', providerKey: 'kilocode', label: 'Kilo.ai (KiloCode)', category: 'Free AI', combo: 'kilo-free', prefixes: ['kc', 'kilocode'], defaultBaseUrl: 'https://api.kilo.ai/api/gateway', defaultPrefix: 'kc', authType: 'apikey' },
-  { key: 'openrouter', providerKey: 'openrouter', label: 'OpenRouter', category: 'Aggregator', combo: 'openrouter-free', prefixes: ['openrouter'], defaultBaseUrl: 'https://openrouter.ai/api/v1', defaultPrefix: 'openrouter', authType: 'apikey' },
-  { key: 'gemini', providerKey: 'gemini', label: 'Google Gemini', category: 'Major LLM', combo: 'gemini-free', prefixes: ['gemini'], defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta', defaultPrefix: 'gemini', authType: 'apikey' },
-  { key: 'groq', providerKey: 'groq', label: 'Groq', category: 'Fast Inference', combo: 'groq-free', prefixes: ['groq'], defaultBaseUrl: 'https://api.groq.com/openai/v1', defaultPrefix: 'groq', authType: 'apikey' },
-  { key: 'cerebras', providerKey: 'cerebras', label: 'Cerebras', category: 'Fast Inference', combo: 'cerebras-free', prefixes: ['cerebras'], defaultBaseUrl: 'https://api.cerebras.ai/v1', defaultPrefix: 'cerebras', authType: 'apikey' },
-  { key: 'mistral', providerKey: 'mistral', label: 'Mistral AI', category: 'Major LLM', combo: 'mistral-free', prefixes: ['mistral'], defaultBaseUrl: 'https://api.mistral.ai/v1', defaultPrefix: 'mistral', authType: 'apikey' },
-  { key: 'cloudflare', providerKey: 'cloudflare-ai', label: 'Cloudflare Workers AI', category: 'Cloudflare', combo: 'cloudflare-free', prefixes: ['cloudflare-ai', 'cloudflare', 'cf'], defaultBaseUrl: '', defaultPrefix: 'cloudflare-ai', authType: 'apikey', needsAccountId: true },
-  { key: 'bazaarlink', providerKey: 'bazaarlink', label: 'Bazaarlink', category: 'Free AI', combo: 'bazaarlink-free', prefixes: ['bazaarlink', 'bzl'], defaultBaseUrl: 'https://bazaarlink.ai/api/v1', defaultPrefix: 'bazaarlink', authType: 'apikey' },
-  { key: 'poolside', providerKey: 'poolside', label: 'Poolside', category: 'Free AI', combo: 'poolside-free', prefixes: ['poolside'], defaultBaseUrl: 'https://inference.poolside.ai/v1', defaultPrefix: 'poolside', authType: 'apikey' },
-  { key: 'ollama', providerKey: 'ollama', label: 'Ollama Cloud', category: 'Self-Hosted / Cloud', combo: 'ollama-free', prefixes: ['ollama'], defaultBaseUrl: 'https://api.ollama.com/v1', defaultPrefix: 'ollama', authType: 'apikey' },
-  { key: 'airforce', providerKey: 'api-airforce', label: 'API.airforce', category: 'Free AI', combo: 'airforce-free', prefixes: ['api-airforce', 'airforce'], defaultBaseUrl: 'https://api.airforce/v1', defaultPrefix: 'api-airforce', authType: 'apikey' },
-  { key: 'nvidia', providerKey: 'nvidia', label: 'NVIDIA NIM', category: 'Cloud GPU', combo: 'nvidia-free', prefixes: ['nvidia'], defaultBaseUrl: 'https://integrate.api.nvidia.com/v1', defaultPrefix: 'nvidia', authType: 'apikey' },
-  { key: 'bai', providerKey: 'b.ai', label: 'B.ai', category: 'Free AI', combo: 'b.ai-free', prefixes: ['b-ai', 'b.ai', 'bai'], defaultBaseUrl: 'https://api.b.ai/v1', defaultPrefix: 'b-ai', authType: 'apikey' },
-
-  // Commercial & Major 9router Providers
-  { key: 'openai', providerKey: 'openai', label: 'OpenAI', category: 'Major LLM', combo: 'openai-models', prefixes: ['openai', 'oai'], defaultBaseUrl: 'https://api.openai.com/v1', defaultPrefix: 'openai', authType: 'apikey' },
-  { key: 'anthropic', providerKey: 'anthropic', label: 'Anthropic (Claude)', category: 'Major LLM', combo: 'anthropic-models', prefixes: ['anthropic', 'claude'], defaultBaseUrl: 'https://api.anthropic.com/v1', defaultPrefix: 'anthropic', authType: 'apikey' },
-  { key: 'deepseek', providerKey: 'deepseek', label: 'DeepSeek', category: 'Major LLM', combo: 'deepseek-models', prefixes: ['deepseek'], defaultBaseUrl: 'https://api.deepseek.com/v1', defaultPrefix: 'deepseek', authType: 'apikey' },
-  { key: 'siliconflow', providerKey: 'siliconflow', label: 'SiliconFlow (硅基流动)', category: 'Aggregator', combo: 'siliconflow-models', prefixes: ['siliconflow', 'sf'], defaultBaseUrl: 'https://api.siliconflow.cn/v1', defaultPrefix: 'siliconflow', authType: 'apikey' },
-  { key: 'together', providerKey: 'together', label: 'Together AI', category: 'Inference', combo: 'together-models', prefixes: ['together'], defaultBaseUrl: 'https://api.together.xyz/v1', defaultPrefix: 'together', authType: 'apikey' },
-  { key: 'sambanova', providerKey: 'sambanova', label: 'SambaNova Cloud', category: 'Fast Inference', combo: 'sambanova-models', prefixes: ['sambanova'], defaultBaseUrl: 'https://api.sambanova.ai/v1', defaultPrefix: 'sambanova', authType: 'apikey' },
-  { key: 'fireworks', providerKey: 'fireworks', label: 'Fireworks AI', category: 'Inference', combo: 'fireworks-models', prefixes: ['fireworks'], defaultBaseUrl: 'https://api.fireworks.ai/inference/v1', defaultPrefix: 'fireworks', authType: 'apikey' },
-  { key: 'chutes', providerKey: 'chutes', label: 'Chutes AI', category: 'Inference', combo: 'chutes-models', prefixes: ['chutes'], defaultBaseUrl: 'https://api.chutes.ai/v1', defaultPrefix: 'chutes', authType: 'apikey' },
-  { key: 'novita', providerKey: 'novita', label: 'Novita AI', category: 'Inference', combo: 'novita-models', prefixes: ['novita'], defaultBaseUrl: 'https://api.novita.ai/v3/openai', defaultPrefix: 'novita', authType: 'apikey' },
-  { key: 'nebius', providerKey: 'nebius', label: 'Nebius AI Studio', category: 'Inference', combo: 'nebius-models', prefixes: ['nebius'], defaultBaseUrl: 'https://api.studio.nebius.ai/v1', defaultPrefix: 'nebius', authType: 'apikey' },
-  { key: 'hyperbolic', providerKey: 'hyperbolic', label: 'Hyperbolic', category: 'Inference', combo: 'hyperbolic-models', prefixes: ['hyperbolic'], defaultBaseUrl: 'https://api.hyperbolic.xyz/v1', defaultPrefix: 'hyperbolic', authType: 'apikey' },
-  { key: 'qwen', providerKey: 'qwen', label: 'Qwen (DashScope / Alibaba)', category: 'Major LLM', combo: 'qwen-models', prefixes: ['qwen', 'dashscope'], defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultPrefix: 'qwen', authType: 'apikey' },
-  { key: 'kimi', providerKey: 'kimi', label: 'Moonshot AI (Kimi)', category: 'Major LLM', combo: 'kimi-models', prefixes: ['kimi', 'moonshot'], defaultBaseUrl: 'https://api.moonshot.cn/v1', defaultPrefix: 'kimi', authType: 'apikey' },
-  { key: 'minimax', providerKey: 'minimax', label: 'MiniMax AI', category: 'Major LLM', combo: 'minimax-models', prefixes: ['minimax'], defaultBaseUrl: 'https://api.minimax.chat/v1', defaultPrefix: 'minimax', authType: 'apikey' },
-  { key: 'glm', providerKey: 'glm', label: 'Zhipu AI (GLM)', category: 'Major LLM', combo: 'glm-models', prefixes: ['glm', 'zhipu'], defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4', defaultPrefix: 'glm', authType: 'apikey' },
-  { key: 'vercel-ai-gateway', providerKey: 'vercel-ai-gateway', label: 'Vercel AI Gateway', category: 'Aggregator', combo: 'vercel-models', prefixes: ['vercel-ai-gateway', 'vercel', 'vck'], defaultBaseUrl: 'https://ai-gateway.vercel.sh/v1', defaultPrefix: 'vercel', authType: 'apikey' },
-  { key: 'cohere', providerKey: 'cohere', label: 'Cohere', category: 'Major LLM', combo: 'cohere-models', prefixes: ['cohere'], defaultBaseUrl: 'https://api.cohere.com/v2', defaultPrefix: 'cohere', authType: 'apikey' },
-  { key: 'perplexity', providerKey: 'perplexity', label: 'Perplexity', category: 'Search & LLM', combo: 'perplexity-models', prefixes: ['perplexity'], defaultBaseUrl: 'https://api.perplexity.ai', defaultPrefix: 'perplexity', authType: 'apikey' },
-  { key: 'xai', providerKey: 'xai', label: 'xAI (Grok)', category: 'Major LLM', combo: 'xai-models', prefixes: ['xai', 'grok'], defaultBaseUrl: 'https://api.x.ai/v1', defaultPrefix: 'xai', authType: 'apikey' },
-
-  // Custom OpenAI Compatible Node
-  { key: 'openai-compatible', providerKey: 'openai-compatible', label: 'Custom OpenAI-Compatible Node', category: 'Custom Node', combo: 'custom-models', prefixes: ['custom'], defaultBaseUrl: '', defaultPrefix: '', authType: 'apikey', isCustom: true }
-];
-
-function getUnifiedProviderCatalog() {
-  return NINEROUTER_PROVIDER_CATALOG;
-}
-
 function readAllConnectionsRaw() {
   try {
     const Database = getDbClass();
@@ -515,86 +470,6 @@ function readAllConnectionsRaw() {
   } catch (err) {
     return [];
   }
-}
-
-function addProviderConnection(payload) {
-  const { provider, name, apiKey, baseUrl, accountId, customPrefix } = payload;
-  if (!provider) throw new Error('Provider identifier is required');
-
-  const Database = getDbClass();
-  const db = new Database(DB_PATH);
-
-  // Check if provider is already installed and active
-  const existingRows = db.prepare("SELECT * FROM providerConnections WHERE isActive = 1").all();
-  for (const row of existingRows) {
-    let data = {};
-    try { data = JSON.parse(row.data || '{}'); } catch {}
-    const p = String(row.provider || '').toLowerCase();
-    const targetProv = String(provider).toLowerCase();
-
-    // Direct provider name match
-    if (p === targetProv) {
-      db.close();
-      throw new Error(`Provider '${provider}' sudah terpasang dan aktif di 9router!`);
-    }
-
-    // Custom openai-compatible prefix / baseUrl match
-    const specPrefix = data?.providerSpecificData?.prefix || '';
-    const specBaseUrl = data?.providerSpecificData?.baseUrl || '';
-    if (customPrefix && specPrefix.toLowerCase() === customPrefix.toLowerCase()) {
-      db.close();
-      throw new Error(`Provider dengan prefix '${customPrefix}' sudah terpasang dan aktif!`);
-    }
-    if (baseUrl && specBaseUrl && specBaseUrl.replace(/\/+$/, '') === baseUrl.replace(/\/+$/, '')) {
-      db.close();
-      throw new Error(`Provider dengan Base URL '${baseUrl}' sudah terpasang dan aktif!`);
-    }
-  }
-
-  const newId = crypto.randomUUID();
-  const now = new Date().toISOString();
-  let providerCol = provider;
-  let dataObj = {
-    apiKey: apiKey || '',
-    testStatus: 'active',
-    providerSpecificData: {
-      connectionProxyEnabled: false,
-      connectionProxyUrl: '',
-      connectionNoProxy: ''
-    }
-  };
-
-  if (accountId) {
-    dataObj.providerSpecificData.accountId = accountId;
-  }
-  if (baseUrl) {
-    dataObj.providerSpecificData.baseUrl = baseUrl;
-  }
-  if (customPrefix) {
-    dataObj.providerSpecificData.prefix = customPrefix;
-  }
-
-  // If custom/openai-compatible provider
-  if (provider.startsWith('openai-compatible') || customPrefix) {
-    providerCol = `openai-compatible-chat-${crypto.randomUUID()}`;
-    dataObj.providerSpecificData.apiType = 'chat';
-    dataObj.providerSpecificData.nodeName = name || provider;
-  }
-
-  db.prepare(`
-    INSERT INTO providerConnections (id, provider, authType, name, email, priority, isActive, data, createdAt, updatedAt)
-    VALUES (?, ?, 'apikey', ?, NULL, 1, 1, ?, ?, ?)
-  `).run(
-    newId,
-    providerCol,
-    name || 'prod',
-    JSON.stringify(dataObj),
-    now,
-    now
-  );
-
-  db.close();
-  return { success: true, id: newId, provider: providerCol };
 }
 
 function readExclusionsFile() {
@@ -650,14 +525,11 @@ module.exports = {
   verify9routerPassword,
   createSessionToken,
   verifySessionToken,
-  addProviderConnection,
   readExclusionsFile,
   writeExclusionsFile,
   readPrioritiesFile,
   writePrioritiesFile,
   readCandidatesStateFile,
-  getUnifiedProviderCatalog,
-  NINEROUTER_PROVIDER_CATALOG,
   resolveNineRouterDir,
   resolveDbPath,
   resolveNineRouterUrl,
