@@ -27,7 +27,7 @@ Otomasi cerdas untuk mengumpulkan **100+ model AI coding gratis** dari berbagai 
 
 - **Autentikasi Terintegrasi**: Login menggunakan password yang sama dengan dashboard 9router Anda.
 - **Top 5 Leaderboard**: Menampilkan live ranking model gratis dengan kemampuan coding terbaik & latensinya.
-- **Provider Catalog & Auto-Sync**: Kelola koneksi provider dan aktifkan/nonaktifkan auto-discovery per-provider.
+- **Provider Monitoring & Auto-Sync Switch**: Pantau koneksi provider yang aktif di 9router (OAuth & API Key) dan kelola sakelar Auto-Sync per provider. Seluruh kredensial dikelola terpusat di 9router.
 - **Visual Exclusions & Priorities**: Kelola `exclusions.json` dan `priorities.json` via antarmuka visual atau raw JSON editor.
 - **Streaming Terminal CLI**: Jalankan *Sync*, *Dry Run*, *Watchdog Refresh*, dan *Scheduler Setup* dengan live log streaming (SSE).
 - **Dukungan Multi-Bahasa**: Switch instan antara **Bahasa Indonesia 🇮🇩** dan **English 🇬🇧**.

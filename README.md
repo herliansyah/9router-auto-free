@@ -27,7 +27,7 @@ Automated intelligent system that aggregates **100+ free AI coding models** from
 
 - **Unified Authentication**: Login using the same password as your 9router dashboard.
 - **Top 5 Leaderboard**: Real-time ranking of top free coding models with benchmark scores & latencies.
-- **Provider Catalog & Auto-Sync**: Manage provider connections and toggle auto-discovery per provider.
+- **Provider Monitoring & Auto-Sync Switch**: Monitor active provider connections from 9router (OAuth & API Key) and toggle Auto-Sync per provider. All credentials remain securely managed inside 9router.
 - **Visual Exclusions & Priorities**: Manage `exclusions.json` and `priorities.json` with tag-based UI or raw JSON editor.
 - **Real-Time Streaming CLI Console**: Execute *Sync*, *Dry Run*, *Watchdog Refresh*, and *Scheduler Setup* with live SSE log streaming.
 - **Full Bilingual Support**: Instant toggle between **English 🇬🇧** and **Bahasa Indonesia 🇮🇩**.

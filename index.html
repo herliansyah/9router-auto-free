@@ -379,21 +379,32 @@
     <div id="view-providers" class="tab-view hidden space-y-4">
       <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 class="text-lg font-bold text-white">Manajemen Provider 9router</h2>
-          <p class="text-xs text-zinc-400">Daftar semua provider yang didukung 9router (Free AI, Major LLM, Aggregators, Custom Node). Provider aktif tidak bisa ditambahkan ganda.</p>
+          <h2 class="text-lg font-bold text-white">Monitoring & Auto-Sync Provider</h2>
+          <p class="text-xs text-zinc-400">Pantau provider yang aktif di 9router dan sumber model publik. Seluruh akun, kredensial (API Key & OAuth), dan endpoint dikelola di 9router.</p>
         </div>
-        <button onclick="openAddProviderModal()" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          <span>+ Tambah Provider</span>
-        </button>
+        <a id="btnOpenNineRouter" href="http://127.0.0.1:20128" target="_blank" rel="noopener noreferrer" class="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-dark-border transition flex items-center space-x-1.5 shadow-sm">
+          <span>⚙️ Buka 9router Console</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </a>
+      </div>
+
+      <!-- Info Banner: Ketentuan Pengelolaan Provider -->
+      <div class="p-4 rounded-xl bg-zinc-900/70 border border-emerald-500/20 text-xs text-zinc-300 flex items-start space-x-3">
+        <span class="text-lg">ℹ️</span>
+        <div class="space-y-1">
+          <div class="font-bold text-white">Ketentuan Pengelolaan Provider (9router vs 9router-auto-free):</div>
+          <p class="text-zinc-400 leading-relaxed">
+            Semua penambahan akun, autentikasi OAuth (Kilo.ai, Antigravity, GitHub Copilot, dll.), pergantian API Key, maupun penghapusan koneksi <strong>dikelola penuh oleh 9router</strong> (Web Port 20128 atau terminal <code class="text-emerald-400 font-mono">9router login</code>). Di sini Anda cukup mengaktifkan atau menonaktifkan <strong>Auto-Sync</strong> untuk menentukan apakah model gratis dari provider tersebut diikutsertakan ke dalam combo.
+          </p>
+        </div>
       </div>
 
       <!-- Filters and Search -->
       <div class="flex items-center justify-between gap-3 flex-wrap">
         <div class="flex items-center space-x-1.5 bg-dark-card p-1 rounded-xl border border-dark-border text-xs">
           <button onclick="setProviderFilter('all')" id="pfilter-all" class="pfilter-btn px-3 py-1 rounded-lg font-semibold bg-zinc-800 text-white">Semua</button>
-          <button onclick="setProviderFilter('installed')" id="pfilter-installed" class="pfilter-btn px-3 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Terpasang</button>
-          <button onclick="setProviderFilter('available')" id="pfilter-available" class="pfilter-btn px-3 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Belum Terpasang</button>
+          <button onclick="setProviderFilter('installed')" id="pfilter-installed" class="pfilter-btn px-3 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Terhubung</button>
+          <button onclick="setProviderFilter('available')" id="pfilter-available" class="pfilter-btn px-3 py-1 rounded-lg font-semibold text-zinc-400 hover:text-white">Belum Terhubung</button>
         </div>
 
         <div class="w-full sm:w-64">
@@ -409,11 +420,11 @@
               <tr>
                 <th class="px-5 py-3">Provider</th>
                 <th class="px-5 py-3">Kategori</th>
-                <th class="px-5 py-3">Prefix / Alias</th>
-                <th class="px-5 py-3">Endpoint Base URL</th>
-                <th class="px-5 py-3">Status di 9router</th>
-                <th class="px-5 py-3 text-center">Auto-Sync Free</th>
-                <th class="px-5 py-3 text-right">Aksi</th>
+                <th class="px-5 py-3">Tipe Autentikasi</th>
+                <th class="px-5 py-3">Prefix / Endpoint</th>
+                <th class="px-5 py-3 text-center">Model Gratis</th>
+                <th class="px-5 py-3 text-center">Auto-Sync</th>
+                <th class="px-5 py-3 text-right">Kelola Kredensial</th>
               </tr>
             </thead>
             <tbody id="providersTable" class="divide-y divide-dark-border text-zinc-300">
@@ -574,6 +585,47 @@
           <p>
             Hasil akhirnya disuntikkan secara otomatis ke dalam <strong>Combo 9router</strong> (seperti <code class="text-emerald-400 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">my9model-free</code>), sehingga Anda cukup memakai satu nama model di IDE tanpa repot mencari atau menggonta-ganti API key gratisan.
           </p>
+        </div>
+      </div>
+
+      <!-- Section: Ketentuan Integrasi Provider -->
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+        <h3 class="text-base font-bold text-white flex items-center space-x-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          <span>Ketentuan Pengelolaan Provider: 9router vs 9router-auto-free</span>
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="p-4 rounded-xl bg-zinc-900/60 border border-purple-500/30 space-y-2">
+            <div class="font-bold text-purple-300 font-mono flex items-center space-x-1.5">
+              <span>🏰</span><span>9router Core (Otoritas Kredensial & Akun)</span>
+            </div>
+            <p class="text-zinc-300 leading-relaxed">
+              Semua pengelolaan akun dan koneksi dilakukan di 9router:
+            </p>
+            <ul class="list-disc list-inside text-zinc-400 space-y-1">
+              <li>Login OAuth browser (Kilo.ai, Antigravity, GitHub Copilot, Claude Code, dll.).</li>
+              <li>Input dan penggantian API Key (Groq, OpenRouter, Gemini, Cerebras, dll.).</li>
+              <li>Konfigurasi Custom OpenAI-Compatible Node & Base URL.</li>
+              <li>Penghapusan koneksi provider yang sudah tidak dipakai.</li>
+            </ul>
+            <div class="text-zinc-500 italic pt-1">👉 Akses via Web <code class="text-zinc-400 font-mono">http://127.0.0.1:20128</code> atau CLI <code class="text-zinc-400 font-mono">9router login</code>.</div>
+          </div>
+
+          <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/30 space-y-2">
+            <div class="font-bold text-emerald-300 font-mono flex items-center space-x-1.5">
+              <span>⚡</span><span>9router-auto-free (Optimizer & Auto-Sync Switch)</span>
+            </div>
+            <p class="text-zinc-300 leading-relaxed">
+              Bertindak sebagai <em>read-only consumer</em> cerdas:
+            </p>
+            <ul class="list-disc list-inside text-zinc-400 space-y-1">
+              <li>Mendeteksi koneksi aktif di SQLite 9router secara otomatis.</li>
+              <li>Menemukan model-model gratis dari provider tersebut dan mengujinya.</li>
+              <li>Menyediakan sakelar <strong>Auto-Sync (Aktif / Non-Aktif)</strong> per provider.</li>
+              <li>Menyuntikkan hasil model yang sehat ke combo <code class="text-emerald-400 font-mono">my9model-free</code>.</li>
+            </ul>
+            <div class="text-zinc-500 italic pt-1">👉 Tidak ada input/edit API key di sini — cukup atur sakelar Auto-Sync.</div>
+          </div>
         </div>
       </div>
 
@@ -875,62 +927,7 @@ aider --model openai/my9model-free</pre>
 
   </main>
 
-  <!-- ADD PROVIDER MODAL -->
-  <div id="addProviderModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-dark-card border border-dark-border w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-dark-border pb-3">
-        <h3 class="text-base font-bold text-white">Tambah Provider ke 9router</h3>
-        <button onclick="closeAddProviderModal()" class="text-zinc-400 hover:text-white">&times;</button>
-      </div>
 
-      <form onsubmit="handleAddProviderSubmit(event)" class="space-y-4 text-xs">
-        <div>
-          <label class="block font-semibold text-zinc-300 mb-1">Pilih Provider</label>
-          <select id="modalProviderSelect" onchange="handleModalProviderChange()" required
-            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2.5 text-white focus:outline-none focus:border-emerald-500">
-            <!-- Populated via JS -->
-          </select>
-        </div>
-
-        <div>
-          <label class="block font-semibold text-zinc-300 mb-1">Connection Name</label>
-          <input id="modalConnName" type="text" required value="prod"
-            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
-        </div>
-
-        <div>
-          <label class="block font-semibold text-zinc-300 mb-1">API Key / Token</label>
-          <input id="modalApiKey" type="password" required placeholder="Masukkan API key..."
-            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
-        </div>
-
-        <div id="modalBaseUrlGroup">
-          <label class="block font-semibold text-zinc-300 mb-1">Base URL (Opsional / OpenAI Compatible)</label>
-          <input id="modalBaseUrl" type="text" placeholder="https://api.example.com/v1"
-            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
-        </div>
-
-        <div id="modalAccountIdGroup" class="hidden">
-          <label class="block font-semibold text-zinc-300 mb-1">Cloudflare Account ID</label>
-          <input id="modalAccountId" type="text" placeholder="Cloudflare Account ID..."
-            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
-        </div>
-
-        <div id="modalPrefixGroup" class="hidden">
-          <label class="block font-semibold text-zinc-300 mb-1">Custom Model Prefix</label>
-          <input id="modalCustomPrefix" type="text" placeholder="e.g. b-ai"
-            class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
-        </div>
-
-        <div id="modalError" class="hidden p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400"></div>
-
-        <div class="flex justify-end space-x-2 pt-2 border-t border-dark-border">
-          <button type="button" onclick="closeAddProviderModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition">Batal</button>
-          <button type="submit" id="modalSubmitBtn" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold transition">Simpan ke 9router</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <!-- CLIENT SCRIPT -->
   <script>
@@ -1651,9 +1648,12 @@ aider --model openai/my9model-free</pre>
         document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd' : 'Cron') : 'Inactive';
         document.getElementById('statSchedulerDetail').textContent = s.schedulerActive ? 'Active (00:05 & :35)' : 'Inactive';
         document.getElementById('schedulerBadge').textContent = s.schedulerActive ? 'Scheduler: ' + s.schedulerType : 'Scheduler: Inactive';
-        if (s.nineRouterDir) document.getElementById('statNineRouterDir').textContent = s.nineRouterDir;
-        if (s.dbPath) document.getElementById('statDbPath').textContent = s.dbPath;
-        if (s.nineRouterUrl) document.getElementById('statNineRouterUrl').textContent = s.nineRouterUrl;
+        if (s.nineRouterUrl) {
+          window.currentNineRouterUrl = s.nineRouterUrl;
+          const btn = document.getElementById('btnOpenNineRouter');
+          if (btn) btn.href = s.nineRouterUrl;
+          document.getElementById('statNineRouterUrl').textContent = s.nineRouterUrl;
+        }
 
         // Render Distribution Health Bar
         const dist = data.distribution || {};
@@ -1842,6 +1842,7 @@ aider --model openai/my9model-free</pre>
     function renderProvidersTable() {
       const tbody = document.getElementById('providersTable');
       const search = (document.getElementById('providerSearchInput')?.value || '').toLowerCase().trim();
+      const nineRouterUrl = window.currentNineRouterUrl || 'http://127.0.0.1:20128';
 
       let list = globalProviders.filter(p => {
         if (providerFilter === 'installed' && !p.isInstalled) return false;
@@ -1857,7 +1858,7 @@ aider --model openai/my9model-free</pre>
       });
 
       if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-zinc-500">Tidak ada provider yang cocok dengan filter / pencarian.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-zinc-500">Tidak ada provider yang cocok dengan filter / pencarian.</td></tr>';
         return;
       }
 
@@ -1866,14 +1867,19 @@ aider --model openai/my9model-free</pre>
         const row = document.createElement('tr');
         row.className = 'hover:bg-zinc-900/40 transition border-b border-dark-border/40';
 
-        const statusBadge = p.isInstalled
-          ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢 Terpasang</span>'
-          : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">⚪ Belum Terpasang</span>';
+        // Auth type badge
+        let authBadge = '';
+        if (p.authType === 'oauth') {
+          authBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">🔐 OAuth (9router)</span>';
+        } else if (p.authType === 'apikey') {
+          authBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🔑 API Key (9router)</span>';
+        } else if (p.isPublic) {
+          authBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">🌐 Public Scraper</span>';
+        } else {
+          authBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">⚪ Belum Terhubung</span>';
+        }
 
-        const actionBtn = p.isInstalled
-          ? '<button disabled title="Provider sudah aktif di 9router" class="text-xs px-3 py-1 rounded-lg bg-zinc-800/80 text-zinc-500 cursor-not-allowed font-medium border border-zinc-700/50">Sudah Ada</button>'
-          : `<button onclick="openAddSpecificProvider('${p.key}')" class="text-xs px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-zinc-950 font-bold transition shadow-sm flex items-center space-x-1 ml-auto"><span>+ Pasang</span></button>`;
-
+        // Category color
         let catColor = 'bg-zinc-800 text-zinc-300';
         if (p.category === 'Free AI') catColor = 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20';
         else if (p.category === 'Major LLM') catColor = 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/20';
@@ -1881,20 +1887,46 @@ aider --model openai/my9model-free</pre>
         else if (p.category === 'Fast Inference') catColor = 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
         else if (p.category === 'Custom Node') catColor = 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/20';
 
-        const autoSyncBadge = p.isInstalled
+        // Model Count
+        const count = Number(p.modelCount || 0);
+        const countHtml = count > 0
+          ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${count} model</span>`
+          : `<span class="text-zinc-500 font-mono text-[11px]">0 model</span>`;
+
+        // Auto Sync Toggle
+        const autoSyncBadge = (p.isInstalled || p.isPublic)
           ? (p.autoSyncEnabled !== false
               ? `<button onclick="toggleProviderSync('${p.connectionId || p.key}', false)" title="Klik untuk menonaktifkan auto-sync untuk provider ini" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 transition flex items-center space-x-1 mx-auto"><span>⚡ Aktif</span></button>`
               : `<button onclick="toggleProviderSync('${p.connectionId || p.key}', true)" title="Klik untuk mengaktifkan auto-sync untuk provider ini" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-emerald-500/20 hover:text-emerald-300 transition flex items-center space-x-1 mx-auto"><span>⚪ Non-Aktif</span></button>`)
-          : '<span class="text-zinc-600 font-mono text-[11px]">-</span>';
+          : '<span class="text-zinc-600 font-mono text-[11px]" title="Hubungkan dulu provider ini di 9router">-</span>';
+
+        // Action Link
+        let actionHtml = '';
+        if (p.isPublic) {
+          actionHtml = '<span class="text-[11px] text-zinc-500 italic">Bawaan Publik</span>';
+        } else if (p.isInstalled) {
+          actionHtml = `<a href="${nineRouterUrl}" target="_blank" rel="noopener noreferrer" title="Buka 9router untuk ganti API key, OAuth, atau hapus" class="inline-flex items-center text-[11px] font-semibold text-zinc-400 hover:text-emerald-400 transition space-x-1"><span>Kelola di 9router</span><span>↗</span></a>`;
+        } else {
+          actionHtml = `<a href="${nineRouterUrl}" target="_blank" rel="noopener noreferrer" title="Buka 9router untuk menghubungkan provider ini" class="inline-flex items-center text-[11px] font-semibold text-emerald-400/80 hover:text-emerald-300 transition space-x-1"><span>+ Hubungkan</span><span>↗</span></a>`;
+        }
 
         row.innerHTML = `
-          <td class="px-5 py-3.5 font-bold text-white">${p.label}</td>
+          <td class="px-5 py-3.5 font-bold text-white">
+            <div class="flex items-center space-x-1.5">
+              <span>${p.label}</span>
+              ${p.isCustom ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">Custom</span>' : ''}
+            </div>
+            ${p.connectionName ? `<div class="text-[10px] text-zinc-500 font-normal">Koneksi: ${p.connectionName}</div>` : ''}
+          </td>
           <td class="px-5 py-3.5"><span class="px-2 py-0.5 rounded-md text-[10px] font-semibold ${catColor}">${p.category || 'Standard'}</span></td>
-          <td class="px-5 py-3.5 font-mono text-zinc-300">${(p.prefixes || []).join(', ')}</td>
-          <td class="px-5 py-3.5 font-mono text-zinc-400 truncate max-w-[200px]" title="${p.defaultBaseUrl || '-'}">${p.defaultBaseUrl || '<span class="text-zinc-600">Default 9router</span>'}</td>
-          <td class="px-5 py-3.5">${statusBadge}</td>
+          <td class="px-5 py-3.5">${authBadge}</td>
+          <td class="px-5 py-3.5">
+            <span class="font-mono text-zinc-300 font-semibold">${(p.prefixes || []).join(', ')}</span>
+            <div class="font-mono text-zinc-500 text-[10px] truncate max-w-[180px]" title="${p.defaultBaseUrl || '-'}">${p.defaultBaseUrl || '<span class="text-zinc-600">Default 9router</span>'}</div>
+          </td>
+          <td class="px-5 py-3.5 text-center">${countHtml}</td>
           <td class="px-5 py-3.5 text-center">${autoSyncBadge}</td>
-          <td class="px-5 py-3.5 text-right">${actionBtn}</td>
+          <td class="px-5 py-3.5 text-right">${actionHtml}</td>
         `;
         tbody.appendChild(row);
       });
@@ -1915,122 +1947,6 @@ aider --model openai/my9model-free</pre>
         }
       } catch (err) {
         alert('Gagal: ' + err.message);
-      }
-    }
-
-    function openAddProviderModal() {
-      const select = document.getElementById('modalProviderSelect');
-      select.innerHTML = '';
-
-      // Group providers by category
-      const categories = {};
-      globalProviders.forEach(p => {
-        const cat = p.category || 'Other';
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(p);
-      });
-
-      for (const [catName, provs] of Object.entries(categories)) {
-        const grp = document.createElement('optgroup');
-        grp.label = catName;
-        provs.forEach(p => {
-          const opt = document.createElement('option');
-          opt.value = p.key;
-          opt.textContent = p.label + (p.isInstalled ? ' (Sudah Terpasang)' : '');
-          opt.disabled = p.isInstalled;
-          grp.appendChild(opt);
-        });
-        select.appendChild(grp);
-      }
-
-      const firstAvailable = globalProviders.find(p => !p.isInstalled);
-      if (firstAvailable) select.value = firstAvailable.key;
-
-      handleModalProviderChange();
-      document.getElementById('modalError').classList.add('hidden');
-      document.getElementById('addProviderModal').classList.remove('hidden');
-    }
-
-    function openAddSpecificProvider(key) {
-      openAddProviderModal();
-      document.getElementById('modalProviderSelect').value = key;
-      handleModalProviderChange();
-    }
-
-    function closeAddProviderModal() {
-      document.getElementById('addProviderModal').classList.add('hidden');
-    }
-
-    function handleModalProviderChange() {
-      const key = document.getElementById('modalProviderSelect').value;
-      const prov = globalProviders.find(p => p.key === key) || {};
-
-      const cfGroup = document.getElementById('modalAccountIdGroup');
-      const prefixGroup = document.getElementById('modalPrefixGroup');
-      const baseUrlInput = document.getElementById('modalBaseUrl');
-      const prefixInput = document.getElementById('modalCustomPrefix');
-      const nameInput = document.getElementById('modalConnName');
-
-      if (prov.needsAccountId || key === 'cloudflare') {
-        cfGroup.classList.remove('hidden');
-      } else {
-        cfGroup.classList.add('hidden');
-      }
-
-      if (prov.isCustom || key === 'openai-compatible') {
-        prefixGroup.classList.remove('hidden');
-      } else {
-        prefixGroup.classList.remove('hidden'); // allow prefix customization
-      }
-
-      baseUrlInput.value = prov.defaultBaseUrl || '';
-      prefixInput.value = prov.defaultPrefix || (prov.prefixes && prov.prefixes[0]) || '';
-      nameInput.value = 'prod';
-    }
-
-    async function handleAddProviderSubmit(e) {
-      e.preventDefault();
-      const key = document.getElementById('modalProviderSelect').value;
-      const name = document.getElementById('modalConnName').value;
-      const apiKey = document.getElementById('modalApiKey').value;
-      const baseUrl = document.getElementById('modalBaseUrl').value;
-      const accountId = document.getElementById('modalAccountId').value;
-      const customPrefix = document.getElementById('modalCustomPrefix').value;
-      const errEl = document.getElementById('modalError');
-      const btn = document.getElementById('modalSubmitBtn');
-
-      errEl.classList.add('hidden');
-      btn.disabled = true;
-      btn.textContent = 'Menyimpan...';
-
-      try {
-        const res = await fetch('/api/providers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            provider: key,
-            name,
-            apiKey,
-            baseUrl: baseUrl || undefined,
-            accountId: accountId || undefined,
-            customPrefix: customPrefix || undefined
-          })
-        });
-        const data = await res.json();
-        if (data.success) {
-          closeAddProviderModal();
-          loadProviders();
-          loadDashboard();
-        } else {
-          errEl.textContent = data.error || 'Gagal menambahkan provider';
-          errEl.classList.remove('hidden');
-        }
-      } catch (err) {
-        errEl.textContent = 'Network error: ' + err.message;
-        errEl.classList.remove('hidden');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Simpan ke 9router';
       }
     }
 

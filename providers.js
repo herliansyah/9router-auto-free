@@ -158,8 +158,9 @@ function scanConnectionCredentials(record) {
 
 function kiloConnectionCredentials(record) {
   const parsed = storage.readProviderConnection(record.connection);
-  if (parsed && parsed.accessToken) {
-    return { accessToken: parsed.accessToken, apiKey: parsed.accessToken, prefix: 'kc', baseUrl: record.baseUrl, gatewayUrl: record.baseUrl };
+  const token = parsed?.accessToken || parsed?.apiKey || null;
+  if (token) {
+    return { accessToken: token, apiKey: token, prefix: 'kc', baseUrl: record.baseUrl, gatewayUrl: record.baseUrl };
   }
   return { accessToken: null, apiKey: null, prefix: 'kc', baseUrl: record.baseUrl, gatewayUrl: record.baseUrl };
 }
