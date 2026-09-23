@@ -56,7 +56,9 @@
   },
   "homepage": "https://github.com/herliansyah/9router-auto-free#readme",
   "dependencies": {
-    "bcryptjs": "^3.0.3",
+    "bcryptjs": "^3.0.3"
+  },
+  "optionalDependencies": {
     "better-sqlite3": "^12.6.2"
   }
 }

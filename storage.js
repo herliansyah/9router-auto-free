@@ -57,19 +57,60 @@ const DB_PATH = resolveDbPath();
 const BETTER_SQLITE_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', 'better-sqlite3');
 const CLIENT_PATH = path.join(HOME, '.npm-global', 'lib', 'node_modules', '9router', 'src', 'cli', 'api', 'client.js');
 
-// ponytail: shared better-sqlite3 loader helper (checks package dep first, then 9router runtime, then global paths)
+// ponytail: sqlite driver loader - prefers native node:sqlite (Node >= 22.5, zero native compile) with cross-platform better-sqlite3 fallbacks
 function getDbClass() {
   try {
-    return require('better-sqlite3');
+    const { DatabaseSync } = require('node:sqlite');
+    if (typeof DatabaseSync === 'function') {
+      return class NodeSqliteAdapter {
+        constructor(filePath, options = {}) {
+          const opts = {};
+          if (options.readonly !== undefined) opts.readOnly = Boolean(options.readonly);
+          if (options.readOnly !== undefined) opts.readOnly = Boolean(options.readOnly);
+          this._db = new DatabaseSync(filePath, opts);
+        }
+        prepare(sql) {
+          const stmt = this._db.prepare(sql);
+          return {
+            get(...args) {
+              const params = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+              return stmt.get(...params);
+            },
+            all(...args) {
+              const params = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+              return stmt.all(...params);
+            },
+            run(...args) {
+              const params = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+              return stmt.run(...params);
+            }
+          };
+        }
+        exec(sql) {
+          return this._db.exec(sql);
+        }
+        close() {
+          return this._db.close();
+        }
+      };
+    }
   } catch {}
-  try {
-    return require(path.join(NINE_ROUTER_DIR, 'runtime', 'node_modules', 'better-sqlite3'));
-  } catch {}
-  try {
-    return require(BETTER_SQLITE_PATH);
-  } catch {
-    return require('better-sqlite3');
+
+  const candidates = [
+    () => require('better-sqlite3'),
+    () => require(path.join(NINE_ROUTER_DIR, 'runtime', 'node_modules', 'better-sqlite3')),
+    () => process.platform === 'win32' && require(path.join(process.env.APPDATA || path.join(HOME, 'AppData', 'Roaming'), 'npm', 'node_modules', 'better-sqlite3')),
+    () => require(BETTER_SQLITE_PATH),
+  ];
+
+  for (const load of candidates) {
+    try {
+      const mod = load();
+      if (typeof mod === 'function') return mod;
+    } catch {}
   }
+
+  throw new Error('No functional SQLite driver found. Node.js >= 22.5 is recommended (includes node:sqlite), or install better-sqlite3.');
 }
 
 // Read 9router internal CLI auth token for API calls
