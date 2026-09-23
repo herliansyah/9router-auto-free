@@ -57,6 +57,12 @@ saat istilah baru dinamai atau makna lama berubah.
   sepenuhnya oleh **9router Core** (`~/.9router/db/data.sqlite`). `9router-auto-free`
   murni bertindak sebagai *read-only consumer* dari koneksi aktif
   (`providerConnections WHERE isActive = 1`) ditambah sumber publik tanpa akun.
+- **Active Provider Connection**: Koneksi provider aktif yang tersimpan di 9router
+  Core (`providerConnections WHERE isActive = 1`). Merupakan satu-satunya sumber
+  kredensial; tidak ada registrasi kredensial di `9router-auto-free`.
+- **Public Zero-Auth Source**: Sumber model publik tanpa akun (`oa`, `oc`,
+  `openrouter`, `airforce`) yang aktif secara default untuk pemakaian instan out-of-the-box.
+  Tabel Provider di Dashboard hanya menampilkan kedua entitas fungsional ini (tanpa katalog statis pasif).
 
 ## Storage & Path Resolution
 - **Dynamic Path Resolution**: Mekanisme penentuan lokasi data 9router (`NINE_ROUTER_DIR`, `DB_PATH`, `NINEROUTER_URL`) dengan auto-discovery platform (Linux `~/.9router`, Windows `%APPDATA%/9router`, Docker `/app/data`) serta override via env vars (`NINEROUTER_DIR`, `NINEROUTER_DB_PATH`, `NINEROUTER_URL`) dan flag CLI (`--nine-router-dir`, `--db-path`, `--router-url`).

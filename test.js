@@ -542,17 +542,13 @@ async function runTests() {
       try { fs.unlinkSync(tmpNullDbPath); } catch {}
     }
 
-    // 3) Duplicate provider prevention guard
-    console.log('[-] Testing duplicate provider guard...');
-    let threwDuplicate = false;
-    try {
-      // Groq is already active in 9router sqlite
-      storage.addProviderConnection({ provider: 'groq', name: 'prod', apiKey: 'gsk_test' });
-    } catch (err) {
-      threwDuplicate = true;
-      assert.ok(err.message.includes('sudah terpasang'), 'Error message should indicate provider already exists');
-    }
-    assert.ok(threwDuplicate, 'Adding existing active provider must throw duplicate error');
+    // 3) Active provider listing verification
+    console.log('[-] Testing active provider listing & raw connections...');
+    const rawConns = storage.readAllConnectionsRaw();
+    assert.ok(Array.isArray(rawConns), 'readAllConnectionsRaw must return an array');
+    const groqConn = rawConns.find(c => String(c.provider || '').toLowerCase() === 'groq');
+    assert.ok(groqConn, 'Groq active connection should be present in 9router db');
+    assert.strictEqual(groqConn.isActive, true, 'Groq connection must be active');
 
     // 4) Scheduler status check
     const schedStatus = scheduler.getSchedulerStatus();
@@ -614,6 +610,24 @@ async function runTests() {
           });
           assert.strictEqual(authDashRes.status, 200, 'Authenticated dashboard must return 200');
           assert.strictEqual(authDashRes.data.success, true, 'Authenticated dashboard success must be true');
+
+          // Check /api/providers returns active & public providers only (no static 30 catalog bloat)
+          const providersRes = await new Promise(res => {
+            http.get(`http://127.0.0.1:${testPort}/api/providers`, { headers: { Cookie: cookie } }, r => {
+              let d = '';
+              r.on('data', c => d += c);
+              r.on('end', () => res({ status: r.statusCode, data: JSON.parse(d) }));
+            });
+          });
+          assert.strictEqual(providersRes.status, 200, 'GET /api/providers must return 200');
+          assert.strictEqual(providersRes.data.success, true, 'GET /api/providers success must be true');
+          const provList = providersRes.data.providers;
+          assert.ok(Array.isArray(provList), 'providers must be an array');
+          assert.ok(provList.length > 0, 'providers list should contain at least default public providers');
+          for (const p of provList) {
+            assert.ok(p.isInstalled || p.isPublic, `Provider ${p.key} must be installed or public`);
+          }
+          assert.strictEqual(provList.some(p => p.key === 'anthropic'), false, 'Unconnected catalog items like Anthropic must NOT appear');
 
           // Check /api/providers/toggle-sync endpoint
           const toggleRes = await new Promise(res => {
