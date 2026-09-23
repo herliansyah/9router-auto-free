@@ -53,7 +53,7 @@
             <span class="font-bold text-base tracking-tight text-white">9router</span>
             <span class="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">auto-free</span>
           </div>
-          <p class="text-[11px] text-zinc-400 hidden sm:block">Automated Scraper & Injector for 9router</p>
+          <p class="text-[11px] text-zinc-400 hidden sm:block" data-i18n="header_sub">Automated Scraper & Injector for 9router</p>
         </div>
       </div>
 
@@ -73,7 +73,7 @@
         <div id="authNav" class="hidden flex items-center space-x-3">
           <div class="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-zinc-900/80 border border-dark-border text-xs text-zinc-300">
             <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span id="schedulerBadge">Checking scheduler...</span>
+            <span id="schedulerBadge" data-i18n="scheduler_badge_checking">Checking scheduler...</span>
           </div>
           <button onclick="logout()" class="text-xs px-3 py-1.5 rounded-lg border border-dark-border hover:bg-zinc-800 text-zinc-300 hover:text-white transition" data-i18n="logout">
             Logout
@@ -90,18 +90,18 @@
         <div class="h-12 w-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
         </div>
-        <h2 class="text-xl font-bold text-white">Login Dashboard 9router</h2>
-        <p class="text-sm text-zinc-400 mt-1">Masukkan password yang sama dengan dashboard 9router Anda.</p>
+        <h2 class="text-xl font-bold text-white" data-i18n="login_title">Login Dashboard 9router</h2>
+        <p class="text-sm text-zinc-400 mt-1" data-i18n="login_desc">Masukkan password yang sama dengan dashboard 9router Anda.</p>
       </div>
 
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5">Password 9router</label>
-          <input id="passwordInput" type="password" required placeholder="Default: 123456" 
+          <label class="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-1.5" data-i18n="login_pwd_label">Password 9router</label>
+          <input id="passwordInput" type="password" required placeholder="Default: 123456" data-i18n-ph="login_pwd_ph"
             class="w-full bg-dark-input border border-dark-border rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
         </div>
         <div id="loginError" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2.5 text-center"></div>
-        <button type="submit" id="loginBtn"
+        <button type="submit" id="loginBtn" data-i18n="login_btn"
           class="w-full bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-zinc-950 font-bold py-2.5 rounded-xl text-sm transition shadow-lg shadow-emerald-500/20 flex items-center justify-center">
           Masuk ke Auto-Free Console
         </button>
@@ -344,15 +344,15 @@
       <div class="bg-zinc-950/70 border border-dark-border rounded-xl p-3.5 text-[11px] text-zinc-400 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center space-x-2">
           <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span class="font-semibold text-zinc-300">9router Dir:</span>
+          <span class="font-semibold text-zinc-300" data-i18n="diag_dir">9router Dir:</span>
           <span class="font-mono text-zinc-400 truncate max-w-[200px]" id="statNineRouterDir">~/.9router</span>
         </div>
         <div class="flex items-center space-x-2">
-          <span class="font-semibold text-zinc-300">SQLite DB:</span>
+          <span class="font-semibold text-zinc-300" data-i18n="diag_db">SQLite DB:</span>
           <span class="font-mono text-zinc-400 truncate max-w-[260px]" id="statDbPath">db/data.sqlite</span>
         </div>
         <div class="flex items-center space-x-2">
-          <span class="font-semibold text-zinc-300">API:</span>
+          <span class="font-semibold text-zinc-300" data-i18n="diag_api">API:</span>
           <span class="font-mono text-emerald-400" id="statNineRouterUrl">http://127.0.0.1:20128</span>
         </div>
       </div>
@@ -379,11 +379,11 @@
     <div id="view-providers" class="tab-view hidden space-y-4">
       <div class="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 class="text-lg font-bold text-white">Monitoring & Auto-Sync Provider</h2>
-          <p class="text-xs text-zinc-400">Pantau provider yang aktif di 9router dan sumber model publik. Seluruh akun, kredensial (API Key & OAuth), dan endpoint dikelola di 9router.</p>
+          <h2 class="text-lg font-bold text-white" data-i18n="prov_title">Monitoring & Auto-Sync Provider</h2>
+          <p class="text-xs text-zinc-400" data-i18n="prov_desc">Pantau provider yang aktif di 9router dan sumber model publik. Seluruh akun, kredensial (API Key & OAuth), dan endpoint dikelola di 9router.</p>
         </div>
         <a id="btnOpenNineRouter" href="http://127.0.0.1:20128" target="_blank" rel="noopener noreferrer" class="text-xs font-bold px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-dark-border transition flex items-center space-x-1.5 shadow-sm">
-          <span>⚙️ Buka 9router Console</span>
+          <span data-i18n="prov_btn_open_console">⚙️ Buka 9router Console</span>
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
         </a>
       </div>
@@ -392,8 +392,8 @@
       <div class="p-4 rounded-xl bg-zinc-900/70 border border-emerald-500/20 text-xs text-zinc-300 flex items-start space-x-3">
         <span class="text-lg">ℹ️</span>
         <div class="space-y-1">
-          <div class="font-bold text-white">Ketentuan Pengelolaan Provider (9router vs 9router-auto-free):</div>
-          <p class="text-zinc-400 leading-relaxed">
+          <div class="font-bold text-white" data-i18n="prov_banner_title">Ketentuan Pengelolaan Provider (9router vs 9router-auto-free):</div>
+          <p class="text-zinc-400 leading-relaxed" data-i18n="prov_banner_desc">
             Semua penambahan akun, autentikasi OAuth (Kilo.ai, Antigravity, GitHub Copilot, dll.), pergantian API Key, maupun penghapusan koneksi <strong>dikelola penuh oleh 9router</strong> (Web Port 20128 atau terminal <code class="text-emerald-400 font-mono">9router login</code>). Di sini Anda cukup mengaktifkan atau menonaktifkan <strong>Auto-Sync</strong> untuk menentukan apakah model gratis dari provider tersebut diikutsertakan ke dalam combo.
           </p>
         </div>
@@ -407,7 +407,7 @@
         </div>
 
         <div class="w-full sm:w-72">
-          <input id="providerSearchInput" oninput="renderProvidersTable()" type="text" placeholder="Cari provider / prefix..."
+          <input id="providerSearchInput" oninput="renderProvidersTable()" type="text" placeholder="Cari provider / prefix..." data-i18n-ph="prov_search_ph"
             class="w-full bg-dark-input border border-dark-border rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
         </div>
       </div>
@@ -417,13 +417,13 @@
           <table class="w-full text-left text-xs">
             <thead class="bg-zinc-900/80 border-b border-dark-border text-zinc-400 uppercase font-semibold">
               <tr>
-                <th class="px-5 py-3">Provider</th>
-                <th class="px-5 py-3">Kategori</th>
-                <th class="px-5 py-3">Tipe Autentikasi</th>
-                <th class="px-5 py-3">Prefix / Endpoint</th>
-                <th class="px-5 py-3 text-center">Model Gratis</th>
-                <th class="px-5 py-3 text-center">Auto-Sync</th>
-                <th class="px-5 py-3 text-right">Kelola Kredensial</th>
+                <th class="px-5 py-3" data-i18n="prov_th_logo">Provider</th>
+                <th class="px-5 py-3" data-i18n="prov_th_cat">Kategori</th>
+                <th class="px-5 py-3" data-i18n="prov_th_auth">Tipe Autentikasi</th>
+                <th class="px-5 py-3" data-i18n="prov_th_prefix">Prefix / Endpoint</th>
+                <th class="px-5 py-3 text-center" data-i18n="prov_th_models">Model Gratis</th>
+                <th class="px-5 py-3 text-center" data-i18n="prov_th_sync">Auto-Sync</th>
+                <th class="px-5 py-3 text-right" data-i18n="prov_th_actions">Kelola Kredensial</th>
               </tr>
             </thead>
             <tbody id="providersTable" class="divide-y divide-dark-border text-zinc-300">
@@ -438,10 +438,10 @@
     <div id="view-exclusions" class="tab-view hidden space-y-4">
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-bold text-white">Exclusion Rules (<span class="font-mono text-emerald-400">exclusions.json</span>)</h2>
-          <p class="text-xs text-zinc-400">Model atau provider yang dimasukkan di sini akan dilewati saat sinkronisasi.</p>
+          <h2 class="text-lg font-bold text-white"><span data-i18n="excl_title">Aturan Pengecualian</span> (<span class="font-mono text-emerald-400">exclusions.json</span>)</h2>
+          <p class="text-xs text-zinc-400" data-i18n="excl_desc">Model atau provider yang dimasukkan di sini akan dilewati saat sinkronisasi.</p>
         </div>
-        <button onclick="saveExclusions()" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition">
+        <button onclick="saveExclusions()" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition" data-i18n="excl_save_btn">
           Simpan Perubahan
         </button>
       </div>
@@ -449,17 +449,17 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Visual Manager -->
         <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-4">
-          <h3 class="text-sm font-bold text-white">Visual Tag Manager</h3>
+          <h3 class="text-sm font-bold text-white" data-i18n="excl_visual_title">Visual Tag Manager</h3>
           
           <div class="flex gap-2">
-            <input id="newExclusionInput" type="text" placeholder="Contoh: provider:kilo atau model: gpt-3.5" 
+            <input id="newExclusionInput" type="text" placeholder="Contoh: provider:kilo atau model: gpt-3.5" data-i18n-ph="excl_input_ph"
               class="flex-1 bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
-            <button onclick="addExclusionTag()" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold rounded-xl text-white border border-dark-border transition">
+            <button onclick="addExclusionTag()" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold rounded-xl text-white border border-dark-border transition" data-i18n="excl_add_btn">
               + Tambah
             </button>
           </div>
 
-          <div class="text-[11px] text-zinc-400">
+          <div class="text-[11px] text-zinc-400" data-i18n="excl_help_text">
             Gunakan format <code class="text-emerald-400">provider:nama</code> untuk memblokir seluruh provider, atau nama model untuk memblokir model tertentu.
           </div>
 
@@ -471,8 +471,8 @@
         <!-- Raw JSON Editor -->
         <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-3">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-bold text-white">Raw JSON Editor</h3>
-            <button onclick="formatExclusionsJson()" class="text-[11px] text-zinc-400 hover:text-emerald-400">Format JSON</button>
+            <h3 class="text-sm font-bold text-white" data-i18n="excl_raw_title">Raw JSON Editor</h3>
+            <button onclick="formatExclusionsJson()" class="text-[11px] text-zinc-400 hover:text-emerald-400" data-i18n="btn_format_json">Format JSON</button>
           </div>
           <textarea id="exclusionsJsonEditor" rows="12" class="w-full font-mono bg-zinc-950 border border-dark-border rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"></textarea>
         </div>
@@ -483,10 +483,10 @@
     <div id="view-priorities" class="tab-view hidden space-y-4">
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-lg font-bold text-white">Model Priorities (<span class="font-mono text-emerald-400">priorities.json</span>)</h2>
-          <p class="text-xs text-zinc-400">Model dalam urutan prioritas tertinggi yang akan dipromosikan ke urutan teratas super-combo.</p>
+          <h2 class="text-lg font-bold text-white"><span data-i18n="prio_title">Prioritas Model</span> (<span class="font-mono text-emerald-400">priorities.json</span>)</h2>
+          <p class="text-xs text-zinc-400" data-i18n="prio_desc">Model dalam urutan prioritas tertinggi yang akan dipromosikan ke urutan teratas super-combo.</p>
         </div>
-        <button onclick="savePriorities()" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition">
+        <button onclick="savePriorities()" class="text-xs font-bold px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition" data-i18n="prio_save_btn">
           Simpan Perubahan
         </button>
       </div>
@@ -494,12 +494,12 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Visual Manager -->
         <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-4">
-          <h3 class="text-sm font-bold text-white">Visual Priority List (Top-Down)</h3>
+          <h3 class="text-sm font-bold text-white" data-i18n="prio_visual_title">Visual Priority List (Top-Down)</h3>
           
           <div class="flex gap-2">
-            <input id="newPriorityInput" type="text" placeholder="Contoh: openagentic/claude-3-7-sonnet" 
+            <input id="newPriorityInput" type="text" placeholder="Contoh: openagentic/claude-3-7-sonnet" data-i18n-ph="prio_input_ph"
               class="flex-1 bg-dark-input border border-dark-border rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500">
-            <button onclick="addPriorityTag()" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold rounded-xl text-white border border-dark-border transition">
+            <button onclick="addPriorityTag()" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold rounded-xl text-white border border-dark-border transition" data-i18n="prio_add_btn">
               + Tambah
             </button>
           </div>
@@ -512,8 +512,8 @@
         <!-- Raw JSON Editor -->
         <div class="bg-dark-card border border-dark-border rounded-2xl p-5 space-y-3">
           <div class="flex items-center justify-between">
-            <h3 class="text-sm font-bold text-white">Raw JSON Editor</h3>
-            <button onclick="formatPrioritiesJson()" class="text-[11px] text-zinc-400 hover:text-emerald-400">Format JSON</button>
+            <h3 class="text-sm font-bold text-white" data-i18n="prio_raw_title">Raw JSON Editor</h3>
+            <button onclick="formatPrioritiesJson()" class="text-[11px] text-zinc-400 hover:text-emerald-400" data-i18n="btn_format_json">Format JSON</button>
           </div>
           <textarea id="prioritiesJsonEditor" rows="12" class="w-full font-mono bg-zinc-950 border border-dark-border rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"></textarea>
         </div>
@@ -528,10 +528,10 @@
           <p class="text-xs text-zinc-400" data-i18n="cli_desc">Output real-time stdout/stderr dari eksekusi sync, refresh, dan benchmarks.</p>
         </div>
         <div class="flex items-center space-x-2">
-          <button onclick="clearConsole()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition">
+          <button onclick="clearConsole()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition" data-i18n="cli_btn_clear">
             Clear
           </button>
-          <button onclick="loadLatestLogs()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition">
+          <button onclick="loadLatestLogs()" class="text-xs px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-dark-border transition" data-i18n="cli_btn_load_log">
             Load sync.log
           </button>
         </div>
@@ -539,11 +539,11 @@
 
       <!-- Action Buttons Bar -->
       <div class="flex flex-wrap gap-2 p-3 bg-dark-card border border-dark-border rounded-xl">
-        <button onclick="triggerCliAction('sync')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition">Full Sync (node sync.js)</button>
-        <button onclick="triggerCliAction('dry-run')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-yellow-500 hover:bg-yellow-600 text-zinc-950 transition">Dry Run (--dry-run)</button>
-        <button onclick="triggerCliAction('refresh')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-zinc-950 transition">Watchdog Refresh (--refresh)</button>
-        <button onclick="triggerCliAction('benchmarks')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-500 hover:bg-purple-600 text-white transition">Update Benchmarks</button>
-        <button onclick="triggerCliAction('setup-cron')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-700 hover:bg-zinc-600 text-white transition">Setup Scheduler (--setup-cron)</button>
+        <button onclick="triggerCliAction('sync')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-zinc-950 transition" data-i18n="cli_btn_sync">Full Sync (node sync.js)</button>
+        <button onclick="triggerCliAction('dry-run')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-yellow-500 hover:bg-yellow-600 text-zinc-950 transition" data-i18n="cli_btn_dry_run">Dry Run (--dry-run)</button>
+        <button onclick="triggerCliAction('refresh')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 hover:bg-cyan-600 text-zinc-950 transition" data-i18n="cli_btn_refresh">Watchdog Refresh (--refresh)</button>
+        <button onclick="triggerCliAction('benchmarks')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-500 hover:bg-purple-600 text-white transition" data-i18n="cli_btn_benchmarks">Update Benchmarks</button>
+        <button onclick="triggerCliAction('setup-cron')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-700 hover:bg-zinc-600 text-white transition" data-i18n="cli_btn_setup_cron">Setup Scheduler (--setup-cron)</button>
       </div>
 
       <!-- Terminal Output Window -->
@@ -553,358 +553,17 @@
             <span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>
             <span class="h-2.5 w-2.5 rounded-full bg-yellow-500"></span>
             <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-            <span class="ml-2 font-mono text-zinc-300" id="terminalTitle">idle</span>
+            <span class="ml-2 font-mono text-zinc-300" id="terminalTitle" data-i18n="cli_idle">idle</span>
           </div>
-          <span id="terminalStatus" class="font-mono text-[11px] text-zinc-500">READY</span>
+          <span id="terminalStatus" class="font-mono text-[11px] text-zinc-500" data-i18n="cli_ready">READY</span>
         </div>
-        <pre id="terminalOutput" class="font-mono text-xs text-emerald-400 whitespace-pre-wrap overflow-y-auto max-h-[500px] min-h-[300px] leading-relaxed p-1">9router-auto-free console siap. Pilih aksi di atas untuk menjalankan.</pre>
+        <pre id="terminalOutput" class="font-mono text-xs text-emerald-400 whitespace-pre-wrap overflow-y-auto max-h-[500px] min-h-[300px] leading-relaxed p-1" data-i18n="cli_term_ph">9router-auto-free console siap. Pilih aksi di atas untuk menjalankan.</pre>
       </div>
     </div>
 
     <!-- TAB 7: DOCUMENTATION & USER GUIDE -->
     <div id="view-docs" class="tab-view hidden space-y-6">
-      
-      <!-- Hero Intro -->
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 sm:p-8 space-y-4">
-        <div class="flex items-center space-x-3">
-          <div class="h-10 w-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg">
-            📖
-          </div>
-          <div>
-            <h2 class="text-xl font-bold text-white">Panduan Penggunaan 9router Auto-Free</h2>
-            <p class="text-xs text-zinc-400">Semua hal yang perlu Anda ketahui: fungsi, cara kerja, dan tutorial integrasi ke IDE.</p>
-          </div>
-        </div>
-
-        <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/20 text-xs text-zinc-300 space-y-2 leading-relaxed">
-          <p class="font-semibold text-white">💡 Apa itu 9router Auto-Free?</p>
-          <p>
-            <strong>9router Auto-Free</strong> adalah sistem otomasi cerdas yang mengumpulkan ratusan <strong>model AI gratis</strong> dari berbagai provider terkemuka (OpenAgentic, Kilo.ai, OpenRouter, Google Gemini, Groq, Mistral, Cerebras, Ollama, dll.), menguji model-model tersebut secara langsung lewat <strong>Live Pre-Test</strong>, menyaring model rusak/berbayar/kuota habis, lalu mengurutkannya berdasarkan <strong>skor kapabilitas coding riil</strong> serta latensi tercepat.
-          </p>
-          <p>
-            Hasil akhirnya disuntikkan secara otomatis ke dalam <strong>Combo 9router</strong> (seperti <code class="text-emerald-400 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">my9model-free</code>), sehingga Anda cukup memakai satu nama model di IDE tanpa repot mencari atau menggonta-ganti API key gratisan.
-          </p>
-        </div>
-      </div>
-
-      <!-- Section: Ketentuan Integrasi Provider -->
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
-        <h3 class="text-base font-bold text-white flex items-center space-x-2">
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span>Ketentuan Pengelolaan Provider: 9router vs 9router-auto-free</span>
-        </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          <div class="p-4 rounded-xl bg-zinc-900/60 border border-purple-500/30 space-y-2">
-            <div class="font-bold text-purple-300 font-mono flex items-center space-x-1.5">
-              <span>🏰</span><span>9router Core (Otoritas Kredensial & Akun)</span>
-            </div>
-            <p class="text-zinc-300 leading-relaxed">
-              Semua pengelolaan akun dan koneksi dilakukan di 9router:
-            </p>
-            <ul class="list-disc list-inside text-zinc-400 space-y-1">
-              <li>Login OAuth browser (Kilo.ai, Antigravity, GitHub Copilot, Claude Code, dll.).</li>
-              <li>Input dan penggantian API Key (Groq, OpenRouter, Gemini, Cerebras, dll.).</li>
-              <li>Konfigurasi Custom OpenAI-Compatible Node & Base URL.</li>
-              <li>Penghapusan koneksi provider yang sudah tidak dipakai.</li>
-            </ul>
-            <div class="text-zinc-500 italic pt-1">👉 Akses via Web <code class="text-zinc-400 font-mono">http://127.0.0.1:20128</code> atau CLI <code class="text-zinc-400 font-mono">9router login</code>.</div>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/30 space-y-2">
-            <div class="font-bold text-emerald-300 font-mono flex items-center space-x-1.5">
-              <span>⚡</span><span>9router-auto-free (Optimizer & Auto-Sync Switch)</span>
-            </div>
-            <p class="text-zinc-300 leading-relaxed">
-              Bertindak sebagai <em>read-only consumer</em> cerdas:
-            </p>
-            <ul class="list-disc list-inside text-zinc-400 space-y-1">
-              <li>Mendeteksi koneksi aktif di SQLite 9router secara otomatis.</li>
-              <li>Menemukan model-model gratis dari provider tersebut dan mengujinya.</li>
-              <li>Menyediakan sakelar <strong>Auto-Sync (Aktif / Non-Aktif)</strong> per provider.</li>
-              <li>Menyuntikkan hasil model yang sehat ke combo <code class="text-emerald-400 font-mono">my9model-free</code>.</li>
-            </ul>
-            <div class="text-zinc-500 italic pt-1">👉 Tidak ada input/edit API key di sini — cukup atur sakelar Auto-Sync.</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section: Cara Kerja 6 Tahap -->
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
-        <h3 class="text-base font-bold text-white flex items-center space-x-2">
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span>Bagaimana Cara Kerjanya? (6 Tahap Otomatis)</span>
-        </h3>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
-            <div class="font-bold text-emerald-400 font-mono">1. Scrape & Kumpul Kandidat</div>
-            <p class="text-zinc-400">Mengambil daftar model gratis dari 15+ sumber provider terdaftar (OpenAgentic, Kilo, Gemini, OpenRouter, Groq, dll.).</p>
-          </div>
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
-            <div class="font-bold text-yellow-400 font-mono">2. Filter Exclusions</div>
-            <p class="text-zinc-400">Menyaring dan membuang model non-coding (TTS, embed, video, model terlalu kecil/nano) dan provider yang di-blacklist.</p>
-          </div>
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
-            <div class="font-bold text-cyan-400 font-mono">3. Live Pre-Test Paralel</div>
-            <p class="text-zinc-400">Setiap kandidat dites langsung melalui endpoint internal 9router untuk mengukur latensi dan status HTTP asli.</p>
-          </div>
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
-            <div class="font-bold text-purple-400 font-mono">4. Vonis & Auto-Cooldown</div>
-            <p class="text-zinc-400">Model 200 diterima; model kuota habis (429) diparkirkan di <code>my9model-cooldown</code>; model berbayar/mati dibuang.</p>
-          </div>
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
-            <div class="font-bold text-rose-400 font-mono">5. Coding Quality Ranking</div>
-            <p class="text-zinc-400">Model diurutkan berdasarkan skor benchmark coding empiris (EvalPlus, SWE-bench), dikurangi penalti error-rate, dan latensi.</p>
-          </div>
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
-            <div class="font-bold text-indigo-400 font-mono">6. Injeksi Database 9router</div>
-            <p class="text-zinc-400">Daftar model langsung ditulis ke database SQLite 9router. IDE Anda langsung otomatis menikmati daftar model terbaru.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section: Combo Yang Tersedia -->
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
-        <h3 class="text-base font-bold text-white flex items-center space-x-2">
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span>Daftar Combos & Rekomendasi Penggunaan</span>
-        </h3>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-          <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/30 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-emerald-400 font-mono text-sm">my9model-free</span>
-              <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold text-[10px]">Super Combo Utama</span>
-            </div>
-            <p class="text-zinc-300">
-              Kombinasi seluruh model gratis aktif dari semua provider. Urutan teratas adalah model dengan kemampuan coding terbaik dan latensi tercepat.
-            </p>
-            <div class="text-zinc-500 italic">👉 Pilihan terbaik untuk penggunaan umum harian di IDE.</div>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/60 border border-indigo-500/30 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-indigo-400 font-mono text-sm">my9model-smart</span>
-              <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold text-[10px]">Penalaran Tinggi / Reasoning</span>
-            </div>
-            <p class="text-zinc-300">
-              Khusus model thinking/reasoning (misal Claude 3.7 Sonnet Thinking, Qwen Coder, DeepSeek R1) atau model dengan benchmark coding tertinggi.
-            </p>
-            <div class="text-zinc-500 italic">👉 Cocok untuk tugas arsitektur rumit, refactor besar, dan debug bug sulit.</div>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/60 border border-amber-500/30 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-amber-400 font-mono text-sm">my9model-fast</span>
-              <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold text-[10px]">Super Cepat / Low Latency</span>
-            </div>
-            <p class="text-zinc-300">
-              Model non-thinking berkecepatan kilat dengan latensi sangat rendah dari provider berkecepatan tinggi (Groq, Cerebras, Kilo, dll.).
-            </p>
-            <div class="text-zinc-500 italic">👉 Cocok untuk inline code completion, autocomplete, atau respons instan.</div>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/60 border border-rose-500/30 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="font-bold text-rose-400 font-mono text-sm">my9model-cooldown</span>
-              <span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold text-[10px]">Parkiran Rate-Limit (429)</span>
-            </div>
-            <p class="text-zinc-300">
-              Tempat isolasi sementara bagi model yang kuota hariannya habis (HTTP 429). Watchdog intra-hari akan otomatis memindahkannya kembali ke combo utama begitu kuota reset.
-            </p>
-            <div class="text-zinc-500 italic">👉 Mencegah IDE Anda error karena request terlempar ke model kuota-habis.</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section: Tutorial Integrasi IDE -->
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-5">
-        <div>
-          <h3 class="text-base font-bold text-white flex items-center space-x-2">
-            <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-            <span>Cara Menghubungkan ke IDE & AI Coding Tools</span>
-          </h3>
-          <p class="text-xs text-zinc-400 mt-1">9router menyediakan antarmuka standar <strong>OpenAI-Compatible</strong> di port <code>20128</code>.</p>
-        </div>
-
-        <!-- Global Connection Parameters -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-zinc-900/80 border border-dark-border text-xs">
-          <div>
-            <span class="text-zinc-500 uppercase text-[10px] font-bold block">OpenAI Base URL</span>
-            <code class="text-emerald-400 font-mono font-semibold">http://localhost:20128/v1</code>
-          </div>
-          <div>
-            <span class="text-zinc-500 uppercase text-[10px] font-bold block">API Key</span>
-            <code class="text-zinc-300 font-mono">API Key dari Dashboard 9router</code>
-          </div>
-          <div>
-            <span class="text-zinc-500 uppercase text-[10px] font-bold block">Pilihan Model ID</span>
-            <code class="text-yellow-400 font-mono">my9model-free</code>
-          </div>
-        </div>
-
-        <!-- Tool Setup Guides -->
-        <div class="space-y-3 text-xs">
-          
-          <!-- Cursor IDE -->
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
-            <div class="font-bold text-white flex items-center space-x-2">
-              <span class="text-emerald-400">💻 Cursor IDE</span>
-            </div>
-            <ol class="list-decimal list-inside text-zinc-300 space-y-1 pl-1 leading-relaxed">
-              <li>Buka <strong>Cursor Settings</strong> (ikon gerigi) &rarr; pilih tab <strong>Models</strong>.</li>
-              <li>Klik <strong>Add model</strong> &rarr; tambahkan <code class="text-emerald-400 font-mono">my9model-free</code>, <code class="text-indigo-400 font-mono">my9model-smart</code>, dan <code class="text-amber-400 font-mono">my9model-fast</code>.</li>
-              <li>Gulir ke bawah ke bagian <strong>OpenAI API Key</strong>, aktifkan dan masukkan:
-                <div class="my-1.5 p-2 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-zinc-300">
-                  Base URL: http://localhost:20128/v1<br>
-                  API Key: &lt;api-key-9router-anda&gt;
-                </div>
-              </li>
-              <li>Pilih <code class="text-emerald-400 font-mono">my9model-free</code> di panel chat Cursor!</li>
-            </ol>
-          </div>
-
-          <!-- Claude Code CLI -->
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
-            <div class="font-bold text-white flex items-center space-x-2">
-              <span class="text-emerald-400">⚡ Claude Code CLI</span>
-            </div>
-            <p class="text-zinc-300">Cukup set environment variables di terminal Anda:</p>
-            <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">
-export ANTHROPIC_BASE_URL="http://localhost:20128"
-export ANTHROPIC_API_KEY="your-9router-api-key"
-export ANTHROPIC_MODEL="my9model-free"
-
-# Jalankan Claude Code
-claude</pre>
-          </div>
-
-          <!-- VS Code Extensions -->
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
-            <div class="font-bold text-white flex items-center space-x-2">
-              <span class="text-emerald-400">🧩 VS Code (Roo Code / Cline / Continue)</span>
-            </div>
-            <ol class="list-decimal list-inside text-zinc-300 space-y-1 pl-1 leading-relaxed">
-              <li>Di pengaturan extension, pilih Provider: <strong>OpenAI Compatible</strong>.</li>
-              <li>Masukkan Base URL: <code class="text-emerald-400 font-mono">http://localhost:20128/v1</code>.</li>
-              <li>Masukkan API Key 9router Anda.</li>
-              <li>Masukkan Model ID: <code class="text-emerald-400 font-mono">my9model-free</code>.</li>
-            </ol>
-          </div>
-
-          <!-- Aider / OpenCode / LibreChat -->
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
-            <div class="font-bold text-white flex items-center space-x-2">
-              <span class="text-emerald-400">🤖 Aider / OpenCode / Terminal Chat</span>
-            </div>
-            <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">
-export OPENAI_API_BASE="http://localhost:20128/v1"
-export OPENAI_API_KEY="your-9router-api-key"
-
-aider --model openai/my9model-free</pre>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Section: Panduan Tab & Fitur Web -->
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
-        <h3 class="text-base font-bold text-white flex items-center space-x-2">
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span>Panduan Fitur Web Dashboard</span>
-        </h3>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <span class="font-bold text-white">📊 Overview</span>
-            <p class="text-zinc-400">Ringkasan status: total combos, provider terkoneksi, jumlah kandidat model, dan status scheduler aktif.</p>
-          </div>
-          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <span class="font-bold text-white">📦 Combos Inspector</span>
-            <p class="text-zinc-400">Tinjau daftar model aktif di dalam super-combos maupun combo spesifik per provider secara mendetail.</p>
-          </div>
-          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <span class="font-bold text-white">🔌 Providers Manager</span>
-            <p class="text-zinc-400">Lihat status provider di 9router dan tambahkan provider baru (OpenAI, Anthropic, DeepSeek, Groq, dll.) atau Custom Node dengan pencegahan duplikasi.</p>
-          </div>
-          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <span class="font-bold text-white">🚫 Exclusions (exclusions.json)</span>
-            <p class="text-zinc-400">Blokir provider atau nama model tertentu yang tidak ingin Anda sertakan saat sinkronisasi.</p>
-          </div>
-          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <span class="font-bold text-white">⭐ Priorities (priorities.json)</span>
-            <p class="text-zinc-400">Atur urutan model favorit Anda agar selalu diposisikan di ranking paling atas combo.</p>
-          </div>
-          <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <span class="font-bold text-white">💻 CLI Console & Live Terminal</span>
-            <p class="text-zinc-400">Jalankan Full Sync, Dry Run, Watchdog Refresh, dan Update Benchmark secara manual dengan live streaming output log.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section: FAQ -->
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
-        <h3 class="text-base font-bold text-white flex items-center space-x-2">
-          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-          <span>Pertanyaan Umum (FAQ)</span>
-        </h3>
-
-        <div class="space-y-3 text-xs">
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <div class="font-bold text-white">Q: Mengapa port web console ini 20129 padahal 9router di 20128?</div>
-            <p class="text-zinc-300 leading-relaxed">
-              Port <strong>20128</strong> digunakan oleh server Next.js & API endpoint utama 9router. Oleh karena itu, Web Console Auto-Free berjalan di port <strong>20129</strong> agar dapat berjalan berdampingan tanpa konflik port.
-            </p>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <div class="font-bold text-white">Q: Bagaimana jika kuota salah satu model gratis habis di tengah hari?</div>
-            <p class="text-zinc-300 leading-relaxed">
-              9router secara otomatis akan melakukan fallback (mengalihkan request) ke model urutan berikutnya di dalam combo. Selain itu, fitur <strong>Watchdog</strong> yang berjalan tiap jam akan mendeteksi HTTP 429 dan memindahkan model tersebut ke <code>my9model-cooldown</code> agar tidak dipanggil lagi sampai kuotanya reset.
-            </p>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <div class="font-bold text-white">Q: Apakah password dashboard ini aman?</div>
-            <p class="text-zinc-300 leading-relaxed">
-              Sangat aman. Dashboard ini memverifikasi password langsung menggunakan pencocokan hash bcrypt dari database SQLite 9router Anda sendiri. Tidak ada password atau kredensial yang dikirim ke server luar.
-            </p>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
-            <div class="font-bold text-white">Q: Bagaimana jika lokasi instalasi 9router saya bukan default (Custom Dir / Docker / Windows)?</div>
-            <p class="text-zinc-300 leading-relaxed">
-              Aplikasi ini otomatis mendeteksi lokasi 9router di <strong>Linux/macOS (<code class="text-emerald-400">~/.9router</code>)</strong>, <strong>Windows (<code class="text-emerald-400">%APPDATA%/9router</code>)</strong>, dan <strong>Docker (<code class="text-emerald-400">/app/data</code>)</strong>. Jika Anda menggunakan lokasi kustom lain, Anda bisa menentukannya melalui:
-            </p>
-            <ul class="list-disc list-inside text-zinc-400 space-y-1 font-mono text-[11px] pl-1">
-              <li>Environment Variable: <code class="text-emerald-400">export NINEROUTER_DIR="/custom/path"</code></li>
-              <li>Database Path: <code class="text-emerald-400">export NINEROUTER_DB_PATH="/custom/path/db/data.sqlite"</code></li>
-              <li>URL / Port Custom: <code class="text-emerald-400">export NINEROUTER_URL="http://127.0.0.1:20128"</code></li>
-              <li>CLI Flag: <code class="text-emerald-400">node web.js --nine-router-dir="/custom/path"</code></li>
-            </ul>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
-            <div class="font-bold text-white">Q: Apakah provider baru di luar list bawaan bisa langsung disinkronkan tanpa ubah kode?</div>
-            <p class="text-zinc-300 leading-relaxed">
-              <strong>Bisa langsung 100%!</strong> Sistem memiliki <em>Generic Dynamic Provider Engine</em>. Semua provider OpenAI-compatible baru (DeepSeek, SiliconFlow, Together AI, Fireworks, Ollama, Custom Node, dll.) yang Anda pasang di 9router akan otomatis ditarik daftar modelnya, diuji via live pre-test, dan diinjeksi ke combo super serta combo provider. Anda juga dapat mengatur tombol toggle <strong>Auto-Sync Free</strong> untuk mengaktifkan/menonaktifkan sync per provider secara instan.
-            </p>
-          </div>
-
-          <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
-            <div class="font-bold text-white">Q: Bagaimana cara setup penjadwalan otomatis (scheduler) jika saya menginstall dari NPM?</div>
-            <p class="text-zinc-300 leading-relaxed">
-              Ada 2 cara yang sangat praktis:
-            </p>
-            <ul class="list-disc list-inside text-zinc-400 space-y-1 font-mono text-[11px] pl-1">
-              <li><strong>Via Web UI (1-Klik):</strong> Buka tab <span class="text-white font-sans font-semibold">💻 CLI Ops</span> lalu klik tombol <span class="text-emerald-400 font-sans font-semibold">Setup Scheduler</span>.</li>
-              <li><strong>Via NPX:</strong> Jalankan <code class="text-emerald-400">npx 9router-auto-free --setup-cron</code> di terminal.</li>
-              <li><strong>Via Global NPM:</strong> Jalankan <code class="text-emerald-400">9router-auto-free --setup-cron</code> di terminal.</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
+      <!-- Populated dynamically via renderDocsTab(currentLang) -->
     </div>
 
     <!-- FOOTER -->
@@ -934,6 +593,7 @@ aider --model openai/my9model-free</pre>
     // --- MULTI-LANGUAGE (i18n) ENGINE ---
     const TRANSLATIONS = {
       id: {
+        header_sub: "Automated Scraper & Injector for 9router",
         logout: "Logout",
         login_title: "Login Dashboard 9router",
         login_desc: "Masukkan password yang sama dengan dashboard 9router Anda.",
@@ -942,6 +602,9 @@ aider --model openai/my9model-free</pre>
         login_btn: "Masuk ke Auto-Free Console",
         login_verifying: "Memverifikasi...",
         login_error: "Password salah",
+        scheduler_badge_checking: "Memeriksa scheduler...",
+        scheduler_badge_prefix: "Scheduler: ",
+        scheduler_badge_inactive: "Scheduler: Non-Aktif",
         nav_overview: "Overview",
         nav_combos: "Combos",
         nav_providers: "Providers",
@@ -958,7 +621,7 @@ aider --model openai/my9model-free</pre>
         sync_checking: "Sync: Memeriksa...",
         sync_none: "Sync: Belum ada",
         stat_super_combos: "Super Combos",
-        stat_managed: "4 Managed",
+        stat_managed: "4 Terkelola",
         stat_connected_prov: "Connected Providers",
         stat_auto_sync_on: "Auto-Sync ON",
         stat_sqlite_connected: "Terkoneksi di SQLite 9router",
@@ -970,12 +633,16 @@ aider --model openai/my9model-free</pre>
         scheduler_inactive_sub: "Non-Aktif",
         dist_title: "Distribusi Kesehatan Model",
         dist_sub: "(Status live pre-test terakhir)",
+        dist_active: "Aktif",
+        dist_smart: "Smart",
+        dist_fast: "Fast",
+        dist_cooldown: "Cooldown",
         top5_title: "Top 5 Free Coding Models",
         top5_view_all: "Lihat Semua →",
         top5_loading: "Memuat leaderboard model gratis...",
         top5_empty: "Belum ada model yang disinkronkan. Klik Full Sync di atas!",
         ide_title: "Gunakan di IDE Anda",
-        copied: "✓ Copied!",
+        copied: "✓ Disalin!",
         prov_pool_title: "Active Provider Pool",
         prov_pool_manage: "Kelola →",
         prov_pool_loading: "Memuat provider pool...",
@@ -993,58 +660,86 @@ aider --model openai/my9model-free</pre>
         diag_dir: "9router Dir:",
         diag_db: "SQLite DB:",
         diag_api: "API:",
+        last_sync_prefix: "Last Sync: ",
+        score_label: "Score: ",
+        score_standard: "Score: Standar",
         combos_title: "Daftar Combos di 9router",
         combos_desc: "Combos yang dikelola oleh 9router-auto-free dan provider-specific combos.",
         combos_refresh: "Refresh Data",
         combos_loading: "Memuat data combos...",
         combos_empty: "Tidak ada model di combo ini.",
-        prov_title: "Provider Catalog & Koneksi",
-        prov_desc: "Daftar provider 9router yang didukung untuk scraping model AI gratis. Tambahkan koneksi baru dengan aman tanpa duplikasi.",
-        prov_add_btn: "+ Tambah Provider Baru",
-        prov_refresh_btn: "Refresh List",
+        combos_load_fail: "Gagal memuat combos: ",
+        models_unit: "model",
+        test_btn: "⚡ Test",
+        prov_title: "Monitoring & Auto-Sync Provider",
+        prov_desc: "Pantau provider yang aktif di 9router dan sumber model publik. Seluruh akun, kredensial (API Key & OAuth), dan endpoint dikelola di 9router.",
+        prov_btn_open_console: "⚙️ Buka 9router Console",
+        prov_banner_title: "Ketentuan Pengelolaan Provider (9router vs 9router-auto-free):",
+        prov_banner_desc: "Semua penambahan akun, autentikasi OAuth (Kilo.ai, Antigravity, GitHub Copilot, dll.), pergantian API Key, maupun penghapusan koneksi dikelola penuh oleh 9router (Web Port 20128 atau terminal 9router login). Di sini Anda cukup mengaktifkan atau menonaktifkan Auto-Sync untuk menentukan apakah model gratis dari provider tersebut diikutsertakan ke dalam combo.",
+        prov_search_ph: "Cari provider / prefix...",
         prov_th_logo: "Provider",
-        prov_th_conn: "Connection & Prefix",
         prov_th_cat: "Kategori",
+        prov_th_auth: "Tipe Autentikasi",
+        prov_th_prefix: "Prefix / Endpoint",
         prov_th_models: "Model Gratis",
-        prov_th_sync: "Auto-Sync Free",
-        prov_th_actions: "Status",
-        prov_status_active: "Terkoneksi",
-        prov_status_inactive: "Belum Ada",
-        prov_btn_connect: "+ Hubungkan",
-        prov_toggle_on: "⚡ Aktif",
-        prov_toggle_off: "⚪ Non-Aktif",
-        excl_title: "Manajer Exclusions (exclusions.json)",
-        excl_desc: "Kelola daftar hitam (blacklist) model non-coding atau provider yang ingin dilewati saat sinkronisasi.",
-        excl_models_title: "Model Terkecualikan (Excluded Models)",
-        excl_prov_title: "Provider Terkecualikan (Excluded Providers)",
-        excl_json_title: "Raw JSON Editor",
-        excl_add_model_ph: "Tambah model (mis: tts-1, embed)...",
-        excl_add_prov_ph: "Tambah provider (mis: api-airforce)...",
-        excl_add_btn: "Tambah",
-        excl_save_btn: "Simpan Exclusions",
-        prio_title: "Manajer Prioritas Model (priorities.json)",
-        prio_desc: "Tentukan urutan model favorit Anda di combo my9model-free. Model yang cocok ditempatkan paling atas.",
-        prio_list_title: "Daftar Prioritas Urutan Model",
-        prio_json_title: "Raw JSON Editor",
-        prio_add_ph: "Tambah pola model (mis: 0x-alpha, hy3, laguna)...",
-        prio_add_btn: "Tambah ke Prioritas",
-        prio_save_btn: "Simpan Priorities",
+        prov_th_sync: "Auto-Sync",
+        prov_th_actions: "Kelola Kredensial",
+        prov_count_summary: "{total} provider aktif ({connected} terhubung di 9router, {public} bawaan publik)",
+        prov_empty_title: "Belum Ada Provider Aktif",
+        prov_empty_desc: "Tidak ditemukan koneksi aktif di 9router Core. Hubungkan provider (Google Gemini, Groq, Kilo.ai, dll.) lewat console 9router.",
+        prov_empty_search: "Tidak ada provider yang cocok dengan kata kunci \"{search}\".",
+        prov_auth_public: "🌐 Bawaan Publik",
+        prov_auth_oauth: "🔐 OAuth (9router)",
+        prov_auth_api_key: "🔑 API Key (9router)",
+        prov_toggle_active: "⚡ Aktif",
+        prov_toggle_inactive: "⚪ Non-Aktif",
+        prov_action_public: "Bawaan Publik",
+        prov_action_manage: "Kelola di 9router",
+        prov_conn_prefix: "Koneksi: ",
+        prov_default_url: "Default 9router",
+        excl_title: "Aturan Pengecualian",
+        excl_desc: "Model atau provider yang dimasukkan di sini akan dilewati saat sinkronisasi.",
+        excl_save_btn: "Simpan Perubahan",
+        excl_visual_title: "Visual Tag Manager",
+        excl_input_ph: "Contoh: provider:kilo atau model: gpt-3.5",
+        excl_add_btn: "+ Tambah",
+        excl_help_text: "Gunakan format <code class=\"text-emerald-400\">provider:nama</code> untuk memblokir seluruh provider, atau nama model untuk memblokir model tertentu.",
+        excl_empty: "Belum ada exclusion rules.",
+        excl_raw_title: "Raw JSON Editor",
+        btn_format_json: "Format JSON",
+        prio_title: "Prioritas Model",
+        prio_desc: "Model dalam urutan prioritas tertinggi yang akan dipromosikan ke urutan teratas super-combo.",
+        prio_save_btn: "Simpan Perubahan",
+        prio_visual_title: "Daftar Prioritas Visual (Atas ke Bawah)",
+        prio_input_ph: "Contoh: openagentic/claude-3-7-sonnet",
+        prio_add_btn: "+ Tambah",
+        prio_empty: "Belum ada prioritas kustom.",
+        prio_raw_title: "Raw JSON Editor",
         cli_title: "CLI Execution & Log Stream",
         cli_desc: "Output real-time stdout/stderr dari eksekusi sync, refresh, dan benchmarks.",
+        cli_btn_clear: "Clear",
+        cli_btn_load_log: "Load sync.log",
+        cli_btn_sync: "Full Sync (node sync.js)",
+        cli_btn_dry_run: "Dry Run (--dry-run)",
+        cli_btn_refresh: "Watchdog Refresh (--refresh)",
+        cli_btn_benchmarks: "Update Benchmarks",
+        cli_btn_setup_cron: "Setup Scheduler (--setup-cron)",
         cli_ready: "READY",
         cli_running: "RUNNING",
         cli_idle: "idle",
         cli_term_ph: "9router-auto-free console siap. Pilih aksi di atas untuk menjalankan.",
-        modal_title: "Tambah Provider ke 9router",
-        modal_select_label: "Pilih Provider",
-        modal_conn_name_label: "Connection Name",
-        modal_api_key_label: "API Key / Token",
-        modal_api_key_ph: "Masukkan API key...",
-        modal_base_url_label: "Base URL (Opsional / OpenAI Compatible)",
-        modal_cancel_btn: "Batal",
-        modal_submit_btn: "Simpan ke 9router"
+        cli_running_cmd: "[*] Menjalankan: ",
+        cli_exit_code: "[✓] Selesai dengan status exit: ",
+        alert_exclusions_saved: "Exclusions berhasil disimpan!",
+        alert_priorities_saved: "Priorities berhasil disimpan!",
+        alert_cli_running: "Ada proses yang sedang berjalan. Tunggu hingga selesai.",
+        alert_sync_toggle_failed: "Gagal mengubah status sync: ",
+        alert_logs_failed: "Gagal memuat log: ",
+        alert_invalid_json: "JSON tidak valid: ",
+        alert_error_prefix: "Gagal: "
       },
       en: {
+        header_sub: "Automated Scraper & Injector for 9router",
         logout: "Logout",
         login_title: "Login to 9router Dashboard",
         login_desc: "Enter the same password as your 9router dashboard.",
@@ -1053,6 +748,9 @@ aider --model openai/my9model-free</pre>
         login_btn: "Sign in to Auto-Free Console",
         login_verifying: "Verifying...",
         login_error: "Invalid password",
+        scheduler_badge_checking: "Checking scheduler...",
+        scheduler_badge_prefix: "Scheduler: ",
+        scheduler_badge_inactive: "Scheduler: Inactive",
         nav_overview: "Overview",
         nav_combos: "Combos",
         nav_providers: "Providers",
@@ -1081,6 +779,10 @@ aider --model openai/my9model-free</pre>
         scheduler_inactive_sub: "Inactive",
         dist_title: "Model Health Distribution",
         dist_sub: "(Latest live pre-test status)",
+        dist_active: "Active",
+        dist_smart: "Smart",
+        dist_fast: "Fast",
+        dist_cooldown: "Cooldown",
         top5_title: "Top 5 Free Coding Models",
         top5_view_all: "View All →",
         top5_loading: "Loading free models leaderboard...",
@@ -1104,56 +806,83 @@ aider --model openai/my9model-free</pre>
         diag_dir: "9router Dir:",
         diag_db: "SQLite DB:",
         diag_api: "API:",
+        last_sync_prefix: "Last Sync: ",
+        score_label: "Score: ",
+        score_standard: "Score: Standard",
         combos_title: "9router Combos List",
         combos_desc: "Combos managed by 9router-auto-free and provider-specific combos.",
         combos_refresh: "Refresh Data",
         combos_loading: "Loading combos data...",
         combos_empty: "No models in this combo.",
-        prov_title: "Provider Catalog & Connections",
-        prov_desc: "9router supported providers for automated free model discovery. Add new connections safely without duplicates.",
-        prov_add_btn: "+ Add New Provider",
-        prov_refresh_btn: "Refresh List",
+        combos_load_fail: "Failed to load combos: ",
+        models_unit: "models",
+        test_btn: "⚡ Test",
+        prov_title: "Provider Monitoring & Auto-Sync",
+        prov_desc: "Monitor active providers in 9router and public sources. All accounts, credentials (API Keys & OAuth), and endpoints are managed in 9router.",
+        prov_btn_open_console: "⚙️ Open 9router Console",
+        prov_banner_title: "Provider Management Terms (9router vs 9router-auto-free):",
+        prov_banner_desc: "All account additions, OAuth authentications (Kilo.ai, Antigravity, GitHub Copilot, etc.), API key modifications, and connection deletions are <strong>fully managed by 9router</strong> (Web Port 20128 or CLI <code class=\"text-emerald-400 font-mono\">9router login</code>). Here you simply toggle <strong>Auto-Sync</strong> to decide whether free models from the provider participate in combos.",
+        prov_search_ph: "Search provider / prefix...",
         prov_th_logo: "Provider",
-        prov_th_conn: "Connection & Prefix",
         prov_th_cat: "Category",
+        prov_th_auth: "Auth Type",
+        prov_th_prefix: "Prefix / Endpoint",
         prov_th_models: "Free Models",
-        prov_th_sync: "Auto-Sync Free",
-        prov_th_actions: "Status",
-        prov_status_active: "Connected",
-        prov_status_inactive: "Not Connected",
-        prov_btn_connect: "+ Connect",
-        prov_toggle_on: "⚡ Active",
-        prov_toggle_off: "⚪ Inactive",
-        excl_title: "Exclusions Manager (exclusions.json)",
-        excl_desc: "Manage blacklists for non-coding models or providers to exclude during synchronization.",
-        excl_models_title: "Excluded Models",
-        excl_prov_title: "Excluded Providers",
-        excl_json_title: "Raw JSON Editor",
-        excl_add_model_ph: "Add model (e.g. tts-1, embed)...",
-        excl_add_prov_ph: "Add provider (e.g. api-airforce)...",
-        excl_add_btn: "Add",
-        excl_save_btn: "Save Exclusions",
-        prio_title: "Model Priorities Manager (priorities.json)",
-        prio_desc: "Customize preferred model ordering in my9model-free combo. Matches are ranked at the top.",
-        prio_list_title: "Priority Model Sequence",
-        prio_json_title: "Raw JSON Editor",
-        prio_add_ph: "Add model pattern (e.g. 0x-alpha, hy3, laguna)...",
-        prio_add_btn: "Add to Priorities",
-        prio_save_btn: "Save Priorities",
+        prov_th_sync: "Auto-Sync",
+        prov_th_actions: "Manage Credentials",
+        prov_count_summary: "{total} active providers ({connected} connected in 9router, {public} public sources)",
+        prov_empty_title: "No Active Providers Yet",
+        prov_empty_desc: "No active connections found in 9router Core. Connect providers (Google Gemini, Groq, Kilo.ai, etc.) via 9router console.",
+        prov_empty_search: "No providers match the search term \"{search}\".",
+        prov_auth_public: "🌐 Public Built-in",
+        prov_auth_oauth: "🔐 OAuth (9router)",
+        prov_auth_api_key: "🔑 API Key (9router)",
+        prov_toggle_active: "⚡ Active",
+        prov_toggle_inactive: "⚪ Inactive",
+        prov_action_public: "Public Built-in",
+        prov_action_manage: "Manage in 9router",
+        prov_conn_prefix: "Connection: ",
+        prov_default_url: "Default 9router",
+        excl_title: "Exclusion Rules",
+        excl_desc: "Models or providers listed here will be skipped during synchronization.",
+        excl_save_btn: "Save Changes",
+        excl_visual_title: "Visual Tag Manager",
+        excl_input_ph: "e.g.: provider:kilo or model: gpt-3.5",
+        excl_add_btn: "+ Add",
+        excl_help_text: "Use <code class=\"text-emerald-400\">provider:name</code> format to blacklist an entire provider, or a model ID pattern to exclude specific models.",
+        excl_empty: "No exclusion rules defined yet.",
+        excl_raw_title: "Raw JSON Editor",
+        btn_format_json: "Format JSON",
+        prio_title: "Model Priorities",
+        prio_desc: "Models ordered by highest priority will be promoted to the top of super-combos.",
+        prio_save_btn: "Save Changes",
+        prio_visual_title: "Visual Priority List (Top-Down)",
+        prio_input_ph: "e.g.: openagentic/claude-3-7-sonnet",
+        prio_add_btn: "+ Add",
+        prio_empty: "No custom priorities defined yet.",
+        prio_raw_title: "Raw JSON Editor",
         cli_title: "CLI Execution & Log Stream",
-        cli_desc: "Real-time stdout/stderr output from sync, refresh, and benchmark runs.",
+        cli_desc: "Real-time stdout/stderr output from sync, refresh, and benchmark executions.",
+        cli_btn_clear: "Clear",
+        cli_btn_load_log: "Load sync.log",
+        cli_btn_sync: "Full Sync (node sync.js)",
+        cli_btn_dry_run: "Dry Run (--dry-run)",
+        cli_btn_refresh: "Watchdog Refresh (--refresh)",
+        cli_btn_benchmarks: "Update Benchmarks",
+        cli_btn_setup_cron: "Setup Scheduler (--setup-cron)",
         cli_ready: "READY",
         cli_running: "RUNNING",
         cli_idle: "idle",
         cli_term_ph: "9router-auto-free console ready. Select an action above to execute.",
-        modal_title: "Add Provider to 9router",
-        modal_select_label: "Select Provider",
-        modal_conn_name_label: "Connection Name",
-        modal_api_key_label: "API Key / Token",
-        modal_api_key_ph: "Enter API key...",
-        modal_base_url_label: "Base URL (Optional / OpenAI Compatible)",
-        modal_cancel_btn: "Cancel",
-        modal_submit_btn: "Save to 9router"
+        cli_running_cmd: "[*] Executing: ",
+        cli_exit_code: "[✓] Completed with exit code: ",
+        alert_exclusions_saved: "Exclusions saved successfully!",
+        alert_priorities_saved: "Priorities saved successfully!",
+        alert_cli_running: "A process is already running. Please wait until it completes.",
+        alert_sync_toggle_failed: "Failed to toggle sync status: ",
+        alert_logs_failed: "Failed to load log: ",
+        alert_invalid_json: "Invalid JSON: ",
+        alert_error_prefix: "Error: "
       }
     };
 
@@ -1186,11 +915,52 @@ aider --model openai/my9model-free</pre>
             <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/20 text-xs text-zinc-300 space-y-2 leading-relaxed">
               <p class="font-semibold text-white">💡 What is 9router Auto-Free?</p>
               <p>
-                <strong>9router Auto-Free</strong> is an intelligent automation system that collects hundreds of <strong>free AI models</strong> from top providers (OpenAgentic, Kilo.ai, OpenRouter, Google Gemini, Groq, Mistral, Cerebras, Ollama, etc.), verifies them in real time via <strong>Live Pre-Tests</strong>, filters out dead/broken/rate-limited models, and ranks them by <strong>empirical coding benchmarks</strong> and lowest latency.
+                <strong>9router Auto-Free</strong> is an intelligent automation system that aggregates hundreds of <strong>free AI models</strong> from top providers (OpenAgentic, Kilo.ai, OpenRouter, Google Gemini, Groq, Mistral, Cerebras, Ollama, etc.), verifies them in real time via <strong>Live Pre-Tests</strong>, filters out dead/broken/rate-limited models, and ranks them by <strong>empirical coding benchmarks</strong> and lowest latency.
               </p>
               <p>
                 The resulting curated models are automatically injected into <strong>9router Combos</strong> (such as <code class="text-emerald-400 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">my9model-free</code>), allowing you to point Cursor, Claude Code, Cline, or VS Code to a single model name without managing dozens of free API keys.
               </p>
+            </div>
+          </div>
+
+          <!-- Section: Provider Management Terms (ADR-0001) -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Provider Management Terms: 9router vs 9router-auto-free</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-purple-500/30 space-y-2">
+                <div class="font-bold text-purple-300 font-mono flex items-center space-x-1.5">
+                  <span>🏰</span><span>9router Core (Credential & Account Authority)</span>
+                </div>
+                <p class="text-zinc-300 leading-relaxed">
+                  All account and connection lifecycle management is strictly handled inside 9router:
+                </p>
+                <ul class="list-disc list-inside text-zinc-400 space-y-1">
+                  <li>Browser OAuth authentication (Kilo.ai, Antigravity, GitHub Copilot, Claude Code, etc.).</li>
+                  <li>Input and update of API keys (Groq, OpenRouter, Gemini, Cerebras, etc.).</li>
+                  <li>Custom OpenAI-Compatible node and endpoint configuration.</li>
+                  <li>Deletion of unused provider connections.</li>
+                </ul>
+                <div class="text-zinc-500 italic pt-1">👉 Access via Web <code class="text-zinc-400 font-mono">http://127.0.0.1:20128</code> or CLI <code class="text-zinc-400 font-mono">9router login</code>.</div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/30 space-y-2">
+                <div class="font-bold text-emerald-300 font-mono flex items-center space-x-1.5">
+                  <span>⚡</span><span>9router-auto-free (Optimizer & Auto-Sync Switch)</span>
+                </div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Acts strictly as an intelligent, read-only consumer:
+                </p>
+                <ul class="list-disc list-inside text-zinc-400 space-y-1">
+                  <li>Automatically detects active connections in 9router SQLite (<code class="text-emerald-400 font-mono">isActive = 1</code>).</li>
+                  <li>Discovers free candidate models from connected providers and tests them.</li>
+                  <li>Provides an instant <strong>Auto-Sync (Active / Inactive)</strong> toggle per provider.</li>
+                  <li>Injects validated healthy models into the <code class="text-emerald-400 font-mono">my9model-free</code> combo.</li>
+                </ul>
+                <div class="text-zinc-500 italic pt-1">👉 No API keys are stored or edited here — simply configure Auto-Sync participation.</div>
+              </div>
             </div>
           </div>
 
@@ -1307,6 +1077,167 @@ aider --model openai/my9model-free</pre>
                 <code class="text-yellow-400 font-mono">my9model-free</code>
               </div>
             </div>
+
+            <!-- Tool Setup Guides -->
+            <div class="space-y-3 text-xs">
+              
+              <!-- Cursor IDE -->
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+                <div class="font-bold text-white flex items-center space-x-2">
+                  <span class="text-emerald-400">💻 Cursor IDE</span>
+                </div>
+                <ol class="list-decimal list-inside text-zinc-300 space-y-1 pl-1 leading-relaxed">
+                  <li>Open <strong>Cursor Settings</strong> (gear icon) &rarr; select the <strong>Models</strong> tab.</li>
+                  <li>Click <strong>Add model</strong> &rarr; add <code class="text-emerald-400 font-mono">my9model-free</code>, <code class="text-indigo-400 font-mono">my9model-smart</code>, and <code class="text-amber-400 font-mono">my9model-fast</code>.</li>
+                  <li>Scroll down to the <strong>OpenAI API Key</strong> section, enable it and enter:
+                    <div class="my-1.5 p-2 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-zinc-300">
+                      Base URL: http://localhost:20128/v1<br>
+                      API Key: &lt;your-9router-api-key&gt;
+                    </div>
+                  </li>
+                  <li>Select <code class="text-emerald-400 font-mono">my9model-free</code> in the Cursor chat dropdown!</li>
+                </ol>
+              </div>
+
+              <!-- Claude Code CLI -->
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+                <div class="font-bold text-white flex items-center space-x-2">
+                  <span class="text-emerald-400">⚡ Claude Code CLI</span>
+                </div>
+                <p class="text-zinc-300">Set environment variables in your terminal:</p>
+                <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+export ANTHROPIC_BASE_URL="http://localhost:20128"
+export ANTHROPIC_API_KEY="your-9router-api-key"
+export ANTHROPIC_MODEL="my9model-free"
+
+# Run Claude Code
+claude</pre>
+              </div>
+
+              <!-- VS Code Extensions -->
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+                <div class="font-bold text-white flex items-center space-x-2">
+                  <span class="text-emerald-400">🧩 VS Code (Roo Code / Cline / Continue)</span>
+                </div>
+                <ol class="list-decimal list-inside text-zinc-300 space-y-1 pl-1 leading-relaxed">
+                  <li>In the extension settings, select Provider: <strong>OpenAI Compatible</strong>.</li>
+                  <li>Enter Base URL: <code class="text-emerald-400 font-mono">http://localhost:20128/v1</code>.</li>
+                  <li>Enter your 9router API key.</li>
+                  <li>Enter Model ID: <code class="text-emerald-400 font-mono">my9model-free</code>.</li>
+                </ol>
+              </div>
+
+              <!-- Aider / OpenCode / LibreChat -->
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+                <div class="font-bold text-white flex items-center space-x-2">
+                  <span class="text-emerald-400">🤖 Aider / OpenCode / Terminal Chat</span>
+                </div>
+                <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+export OPENAI_API_BASE="http://localhost:20128/v1"
+export OPENAI_API_KEY="your-9router-api-key"
+
+aider --model openai/my9model-free</pre>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Section: Dashboard Feature Guide -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Web Dashboard Feature Overview</span>
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">📊 Overview</span>
+                <p class="text-zinc-400">Status summary: total combos, connected providers, validated model candidate counts, and scheduler status.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">📦 Combos Inspector</span>
+                <p class="text-zinc-400">Inspect active model members in super-combos and provider-specific combos in full detail.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">🔌 Providers Manager</span>
+                <p class="text-zinc-400">Monitor active 9router connections and public sources, with instant Auto-Sync participation toggle.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">🚫 Exclusions (exclusions.json)</span>
+                <p class="text-zinc-400">Blacklist specific providers or model ID patterns that you want skipped during synchronization.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">⭐ Priorities (priorities.json)</span>
+                <p class="text-zinc-400">Pin and prioritize your favorite model patterns to always stay at the top of the combos.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">💻 CLI Console & Live Terminal</span>
+                <p class="text-zinc-400">Trigger Full Sync, Dry Run, Watchdog Refresh, and Update Benchmarks with live SSE log streaming.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: FAQ -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Frequently Asked Questions (FAQ)</span>
+            </h3>
+
+            <div class="space-y-3 text-xs">
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <div class="font-bold text-white">Q: Why does this web console run on port 20129 while 9router is at 20128?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Port <strong>20128</strong> is used by 9router's Next.js core server and OpenAI API router. Auto-Free Web Console runs on port <strong>20129</strong> to operate side-by-side without port conflicts.
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <div class="font-bold text-white">Q: What happens if a free model runs out of quota mid-day?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  9router automatically fails over to the next candidate model in the combo. In addition, the hourly <strong>Watchdog</strong> detects HTTP 429 status and isolates the model into <code>my9model-cooldown</code> until its daily quota resets.
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <div class="font-bold text-white">Q: Is the dashboard password secure?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Completely secure. The dashboard directly verifies passwords using bcrypt hash matching against your own local 9router SQLite database. No credentials ever leave your machine.
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-white">Q: What if my 9router installation uses custom paths (Docker / Windows / Custom Dir)?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  The application automatically discovers default paths on <strong>Linux/macOS (<code class="text-emerald-400">~/.9router</code>)</strong>, <strong>Windows (<code class="text-emerald-400">%APPDATA%/9router</code>)</strong>, and <strong>Docker (<code class="text-emerald-400">/app/data</code>)</strong>. You can override any path via:
+                </p>
+                <ul class="list-disc list-inside text-zinc-400 space-y-1 font-mono text-[11px] pl-1">
+                  <li>Environment Variable: <code class="text-emerald-400">export NINEROUTER_DIR="/custom/path"</code></li>
+                  <li>Database Path: <code class="text-emerald-400">export NINEROUTER_DB_PATH="/custom/path/db/data.sqlite"</code></li>
+                  <li>Custom URL / Port: <code class="text-emerald-400">export NINEROUTER_URL="http://127.0.0.1:20128"</code></li>
+                  <li>CLI Flag: <code class="text-emerald-400">node web.js --nine-router-dir="/custom/path"</code></li>
+                </ul>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <div class="font-bold text-white">Q: Can new custom providers be synced automatically without altering code?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  <strong>100% Yes!</strong> The system features a <em>Generic Dynamic Provider Engine</em>. Any OpenAI-compatible provider (DeepSeek, SiliconFlow, Together AI, Fireworks, Ollama, Custom Node, etc.) connected in 9router will be automatically discovered, pre-tested, and injected into super and provider combos. You can also toggle <strong>Auto-Sync</strong> per provider instantly.
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-white">Q: How do I setup automated scheduling if installed from NPM?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  You have 3 easy options:
+                </p>
+                <ul class="list-disc list-inside text-zinc-400 space-y-1 font-mono text-[11px] pl-1">
+                  <li><strong>Via Web UI (1-Click):</strong> Open the <span class="text-white font-sans font-semibold">💻 CLI Ops</span> tab and click <span class="text-emerald-400 font-sans font-semibold">Setup Scheduler</span>.</li>
+                  <li><strong>Via NPX:</strong> Run <code class="text-emerald-400">npx 9router-auto-free --setup-cron</code> in your terminal.</li>
+                  <li><strong>Via Global NPM:</strong> Run <code class="text-emerald-400">9router-auto-free --setup-cron</code> in your terminal.</li>
+                </ul>
+              </div>
+            </div>
           </div>
         `;
       } else {
@@ -1331,6 +1262,47 @@ aider --model openai/my9model-free</pre>
               <p>
                 Hasil akhirnya disuntikkan secara otomatis ke dalam <strong>Combo 9router</strong> (seperti <code class="text-emerald-400 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">my9model-free</code>), sehingga Anda cukup memakai satu nama model di IDE tanpa repot mencari atau menggonta-ganti API key gratisan.
               </p>
+            </div>
+          </div>
+
+          <!-- Section: Ketentuan Integrasi Provider (ADR-0001) -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Ketentuan Pengelolaan Provider: 9router vs 9router-auto-free</span>
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-purple-500/30 space-y-2">
+                <div class="font-bold text-purple-300 font-mono flex items-center space-x-1.5">
+                  <span>🏰</span><span>9router Core (Otoritas Kredensial & Akun)</span>
+                </div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Semua pengelolaan akun dan koneksi dilakukan di 9router:
+                </p>
+                <ul class="list-disc list-inside text-zinc-400 space-y-1">
+                  <li>Login OAuth browser (Kilo.ai, Antigravity, GitHub Copilot, Claude Code, dll.).</li>
+                  <li>Input dan penggantian API Key (Groq, OpenRouter, Gemini, Cerebras, dll.).</li>
+                  <li>Konfigurasi Custom OpenAI-Compatible Node & Base URL.</li>
+                  <li>Penghapusan koneksi provider yang sudah tidak dipakai.</li>
+                </ul>
+                <div class="text-zinc-500 italic pt-1">👉 Akses via Web <code class="text-zinc-400 font-mono">http://127.0.0.1:20128</code> atau CLI <code class="text-zinc-400 font-mono">9router login</code>.</div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/60 border border-emerald-500/30 space-y-2">
+                <div class="font-bold text-emerald-300 font-mono flex items-center space-x-1.5">
+                  <span>⚡</span><span>9router-auto-free (Optimizer & Auto-Sync Switch)</span>
+                </div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Bertindak sebagai <em>read-only consumer</em> cerdas:
+                </p>
+                <ul class="list-disc list-inside text-zinc-400 space-y-1">
+                  <li>Mendeteksi koneksi aktif di SQLite 9router secara otomatis (<code class="text-emerald-400 font-mono">isActive = 1</code>).</li>
+                  <li>Menemukan model-model gratis dari provider tersebut dan mengujinya.</li>
+                  <li>Menyediakan sakelar <strong>Auto-Sync (Aktif / Non-Aktif)</strong> per provider.</li>
+                  <li>Menyuntikkan hasil model yang sehat ke combo <code class="text-emerald-400 font-mono">my9model-free</code>.</li>
+                </ul>
+                <div class="text-zinc-500 italic pt-1">👉 Tidak ada input/edit API key di sini — cukup atur sakelar Auto-Sync.</div>
+              </div>
             </div>
           </div>
 
@@ -1433,6 +1405,7 @@ aider --model openai/my9model-free</pre>
               <p class="text-xs text-zinc-400 mt-1">9router menyediakan antarmuka standar <strong>OpenAI-Compatible</strong> di port <code>20128</code>.</p>
             </div>
 
+            <!-- Global Connection Parameters -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-xl bg-zinc-900/80 border border-dark-border text-xs">
               <div>
                 <span class="text-zinc-500 uppercase text-[10px] font-bold block">OpenAI Base URL</span>
@@ -1445,6 +1418,167 @@ aider --model openai/my9model-free</pre>
               <div>
                 <span class="text-zinc-500 uppercase text-[10px] font-bold block">Pilihan Model ID</span>
                 <code class="text-yellow-400 font-mono">my9model-free</code>
+              </div>
+            </div>
+
+            <!-- Tool Setup Guides -->
+            <div class="space-y-3 text-xs">
+              
+              <!-- Cursor IDE -->
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+                <div class="font-bold text-white flex items-center space-x-2">
+                  <span class="text-emerald-400">💻 Cursor IDE</span>
+                </div>
+                <ol class="list-decimal list-inside text-zinc-300 space-y-1 pl-1 leading-relaxed">
+                  <li>Buka <strong>Cursor Settings</strong> (ikon gerigi) &rarr; pilih tab <strong>Models</strong>.</li>
+                  <li>Klik <strong>Add model</strong> &rarr; tambahkan <code class="text-emerald-400 font-mono">my9model-free</code>, <code class="text-indigo-400 font-mono">my9model-smart</code>, dan <code class="text-amber-400 font-mono">my9model-fast</code>.</li>
+                  <li>Gulir ke bawah ke bagian <strong>OpenAI API Key</strong>, aktifkan dan masukkan:
+                    <div class="my-1.5 p-2 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-zinc-300">
+                      Base URL: http://localhost:20128/v1<br>
+                      API Key: &lt;api-key-9router-anda&gt;
+                    </div>
+                  </li>
+                  <li>Pilih <code class="text-emerald-400 font-mono">my9model-free</code> di panel chat Cursor!</li>
+                </ol>
+              </div>
+
+              <!-- Claude Code CLI -->
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+                <div class="font-bold text-white flex items-center space-x-2">
+                  <span class="text-emerald-400">⚡ Claude Code CLI</span>
+                </div>
+                <p class="text-zinc-300">Cukup set environment variables di terminal Anda:</p>
+                <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+export ANTHROPIC_BASE_URL="http://localhost:20128"
+export ANTHROPIC_API_KEY="your-9router-api-key"
+export ANTHROPIC_MODEL="my9model-free"
+
+# Jalankan Claude Code
+claude</pre>
+              </div>
+
+              <!-- VS Code Extensions -->
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+                <div class="font-bold text-white flex items-center space-x-2">
+                  <span class="text-emerald-400">🧩 VS Code (Roo Code / Cline / Continue)</span>
+                </div>
+                <ol class="list-decimal list-inside text-zinc-300 space-y-1 pl-1 leading-relaxed">
+                  <li>Di pengaturan extension, pilih Provider: <strong>OpenAI Compatible</strong>.</li>
+                  <li>Masukkan Base URL: <code class="text-emerald-400 font-mono">http://localhost:20128/v1</code>.</li>
+                  <li>Masukkan API Key 9router Anda.</li>
+                  <li>Masukkan Model ID: <code class="text-emerald-400 font-mono">my9model-free</code>.</li>
+                </ol>
+              </div>
+
+              <!-- Aider / OpenCode / LibreChat -->
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-2">
+                <div class="font-bold text-white flex items-center space-x-2">
+                  <span class="text-emerald-400">🤖 Aider / OpenCode / Terminal Chat</span>
+                </div>
+                <pre class="p-3 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-[11px] text-emerald-400 overflow-x-auto">
+export OPENAI_API_BASE="http://localhost:20128/v1"
+export OPENAI_API_KEY="your-9router-api-key"
+
+aider --model openai/my9model-free</pre>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Section: Panduan Tab & Fitur Web -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Panduan Fitur Web Dashboard</span>
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">📊 Overview</span>
+                <p class="text-zinc-400">Ringkasan status: total combos, provider terkoneksi, jumlah kandidat model, dan status scheduler aktif.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">📦 Combos Inspector</span>
+                <p class="text-zinc-400">Tinjau daftar model aktif di dalam super-combos maupun combo spesifik per provider secara mendetail.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">🔌 Providers Manager</span>
+                <p class="text-zinc-400">Pantau koneksi aktif di 9router dan sumber model publik, serta sakelar Auto-Sync per provider.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">🚫 Exclusions (exclusions.json)</span>
+                <p class="text-zinc-400">Blokir provider atau nama model tertentu yang tidak ingin Anda sertakan saat sinkronisasi.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">⭐ Priorities (priorities.json)</span>
+                <p class="text-zinc-400">Atur urutan model favorit Anda agar selalu diposisikan di ranking paling atas combo.</p>
+              </div>
+              <div class="p-3.5 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <span class="font-bold text-white">💻 CLI Console & Live Terminal</span>
+                <p class="text-zinc-400">Jalankan Full Sync, Dry Run, Watchdog Refresh, dan Update Benchmark secara manual dengan live streaming output log.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: FAQ -->
+          <div class="bg-dark-card border border-dark-border rounded-2xl p-6 space-y-4">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+              <span>Pertanyaan Umum (FAQ)</span>
+            </h3>
+
+            <div class="space-y-3 text-xs">
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <div class="font-bold text-white">Q: Mengapa port web console ini 20129 padahal 9router di 20128?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Port <strong>20128</strong> digunakan oleh server Next.js & API endpoint utama 9router. Oleh karena itu, Web Console Auto-Free berjalan di port <strong>20129</strong> agar dapat berjalan berdampingan tanpa konflik port.
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <div class="font-bold text-white">Q: Bagaimana jika kuota salah satu model gratis habis di tengah hari?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  9router secara otomatis akan melakukan fallback (mengalihkan request) ke model urutan berikutnya di dalam combo. Selain itu, fitur <strong>Watchdog</strong> yang berjalan tiap jam akan mendeteksi HTTP 429 dan memindahkan model tersebut ke <code>my9model-cooldown</code> agar tidak dipanggil lagi sampai kuotanya reset.
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <div class="font-bold text-white">Q: Apakah password dashboard ini aman?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Sangat aman. Dashboard ini memverifikasi password langsung menggunakan pencocokan hash bcrypt dari database SQLite 9router Anda sendiri. Tidak ada password atau kredensial yang dikirim ke server luar.
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-white">Q: Bagaimana jika lokasi instalasi 9router saya bukan default (Custom Dir / Docker / Windows)?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Aplikasi ini otomatis mendeteksi lokasi 9router di <strong>Linux/macOS (<code class="text-emerald-400">~/.9router</code>)</strong>, <strong>Windows (<code class="text-emerald-400">%APPDATA%/9router</code>)</strong>, dan <strong>Docker (<code class="text-emerald-400">/app/data</code>)</strong>. Jika Anda menggunakan lokasi kustom lain, Anda bisa menentukannya melalui:
+                </p>
+                <ul class="list-disc list-inside text-zinc-400 space-y-1 font-mono text-[11px] pl-1">
+                  <li>Environment Variable: <code class="text-emerald-400">export NINEROUTER_DIR="/custom/path"</code></li>
+                  <li>Database Path: <code class="text-emerald-400">export NINEROUTER_DB_PATH="/custom/path/db/data.sqlite"</code></li>
+                  <li>URL / Port Custom: <code class="text-emerald-400">export NINEROUTER_URL="http://127.0.0.1:20128"</code></li>
+                  <li>CLI Flag: <code class="text-emerald-400">node web.js --nine-router-dir="/custom/path"</code></li>
+                </ul>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1">
+                <div class="font-bold text-white">Q: Apakah provider baru di luar list bawaan bisa langsung disinkronkan tanpa ubah kode?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  <strong>Bisa langsung 100%!</strong> Sistem memiliki <em>Generic Dynamic Provider Engine</em>. Semua provider OpenAI-compatible baru (DeepSeek, SiliconFlow, Together AI, Fireworks, Ollama, Custom Node, dll.) yang Anda pasang di 9router akan otomatis ditarik daftar modelnya, diuji via live pre-test, dan diinjeksi ke combo super serta combo provider. Anda juga dapat mengatur tombol toggle <strong>Auto-Sync Free</strong> untuk mengaktifkan/menonaktifkan sync per provider secara instan.
+                </p>
+              </div>
+
+              <div class="p-4 rounded-xl bg-zinc-900/40 border border-dark-border space-y-1.5">
+                <div class="font-bold text-white">Q: Bagaimana cara setup penjadwalan otomatis (scheduler) jika saya menginstall dari NPM?</div>
+                <p class="text-zinc-300 leading-relaxed">
+                  Ada 2 cara yang sangat praktis:
+                </p>
+                <ul class="list-disc list-inside text-zinc-400 space-y-1 font-mono text-[11px] pl-1">
+                  <li><strong>Via Web UI (1-Klik):</strong> Buka tab <span class="text-white font-sans font-semibold">💻 CLI Ops</span> lalu klik tombol <span class="text-emerald-400 font-sans font-semibold">Setup Scheduler</span>.</li>
+                  <li><strong>Via NPX:</strong> Jalankan <code class="text-emerald-400">npx 9router-auto-free --setup-cron</code> di terminal.</li>
+                  <li><strong>Via Global NPM:</strong> Jalankan <code class="text-emerald-400">9router-auto-free --setup-cron</code> di terminal.</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -1482,9 +1616,13 @@ aider --model openai/my9model-free</pre>
 
       // Re-render active tab content & docs
       renderDocsTab(currentLang);
-      loadDashboard();
-      if (!document.getElementById('view-combos').classList.contains('hidden')) loadCombos();
-      if (!document.getElementById('view-providers').classList.contains('hidden')) loadProviders();
+      if (!document.getElementById('appView').classList.contains('hidden')) {
+        loadDashboard();
+        if (!document.getElementById('view-combos').classList.contains('hidden')) loadCombos();
+        if (!document.getElementById('view-providers').classList.contains('hidden')) renderProvidersTable();
+        if (!document.getElementById('view-exclusions').classList.contains('hidden')) renderExclusionTags();
+        if (!document.getElementById('view-priorities').classList.contains('hidden')) renderPriorityList();
+      }
     }
 
     let globalProviders = [];
@@ -1517,7 +1655,7 @@ aider --model openai/my9model-free</pre>
       const btn = document.getElementById('loginBtn');
       errEl.classList.add('hidden');
       btn.disabled = true;
-      btn.textContent = 'Memverifikasi...';
+      btn.textContent = t('login_verifying');
 
       try {
         const res = await fetch('/api/auth/login', {
@@ -1528,9 +1666,9 @@ aider --model openai/my9model-free</pre>
         const data = await res.json();
         if (data.success) {
           setLanguage(currentLang);
-      checkAuth();
+          checkAuth();
         } else {
-          errEl.textContent = data.error || 'Password salah';
+          errEl.textContent = data.error || t('login_error');
           errEl.classList.remove('hidden');
         }
       } catch (err) {
@@ -1538,7 +1676,7 @@ aider --model openai/my9model-free</pre>
         errEl.classList.remove('hidden');
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Masuk ke Auto-Free Console';
+        btn.textContent = t('login_btn');
       }
     }
 
@@ -1568,6 +1706,7 @@ aider --model openai/my9model-free</pre>
       if (tabId === 'providers') loadProviders();
       if (tabId === 'exclusions') loadExclusions();
       if (tabId === 'priorities') loadPriorities();
+      if (tabId === 'docs') renderDocsTab(currentLang);
     }
 
     let currentIdeSnippet = 'claude';
@@ -1601,7 +1740,7 @@ aider --model openai/my9model-free</pre>
       navigator.clipboard.writeText(text);
       const btn = document.getElementById('copySnippetBtn');
       const orig = btn.innerHTML;
-      btn.innerHTML = '<span>✓ Copied!</span>';
+      btn.innerHTML = `<span>${t('copied')}</span>`;
       btn.classList.add('bg-emerald-500', 'text-zinc-950');
       setTimeout(() => {
         btn.innerHTML = orig;
@@ -1638,15 +1777,15 @@ aider --model openai/my9model-free</pre>
           ? syncDate.toLocaleTimeString(currentLang === 'id' ? 'id-ID' : 'en-US', { hour: '2-digit', minute: '2-digit' })
           : null;
 
-        const syncDisplayText = timeStr ? `Last Sync: ${timeStr}` : 'Last Sync: -';
+        const syncDisplayText = timeStr ? `${t('last_sync_prefix')}${timeStr}` : `${t('last_sync_prefix')}-`;
 
         document.getElementById('statCandidatesSync').textContent = syncDisplayText;
         if (document.getElementById('bannerLastSyncText')) {
           document.getElementById('bannerLastSyncText').textContent = syncDisplayText;
         }
-        document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd' : 'Cron') : 'Inactive';
-        document.getElementById('statSchedulerDetail').textContent = s.schedulerActive ? 'Active (00:05 & :35)' : 'Inactive';
-        document.getElementById('schedulerBadge').textContent = s.schedulerActive ? 'Scheduler: ' + s.schedulerType : 'Scheduler: Inactive';
+        document.getElementById('statScheduler').textContent = s.schedulerActive ? (s.schedulerType === 'systemd' ? 'Systemd' : 'Cron') : (currentLang === 'id' ? 'Non-Aktif' : 'Inactive');
+        document.getElementById('statSchedulerDetail').textContent = s.schedulerActive ? t('scheduler_active_sub') : t('scheduler_inactive_sub');
+        document.getElementById('schedulerBadge').textContent = s.schedulerActive ? t('scheduler_badge_prefix') + s.schedulerType : t('scheduler_badge_inactive');
         if (s.nineRouterUrl) {
           window.currentNineRouterUrl = s.nineRouterUrl;
           const btn = document.getElementById('btnOpenNineRouter');
@@ -1661,10 +1800,10 @@ aider --model openai/my9model-free</pre>
         const fast = dist.fastCount || 0;
         const cooldown = dist.cooldownCount || 0;
 
-        document.getElementById('distActiveLabel').textContent = `Active: ${active}`;
-        document.getElementById('distSmartLabel').textContent = `Smart: ${smart}`;
-        document.getElementById('distFastLabel').textContent = `Fast: ${fast}`;
-        document.getElementById('distCooldownLabel').textContent = `Cooldown: ${cooldown}`;
+        document.getElementById('distActiveLabel').textContent = `${t('dist_active')}: ${active}`;
+        document.getElementById('distSmartLabel').textContent = `${t('dist_smart')}: ${smart}`;
+        document.getElementById('distFastLabel').textContent = `${t('dist_fast')}: ${fast}`;
+        document.getElementById('distCooldownLabel').textContent = `${t('dist_cooldown')}: ${cooldown}`;
 
         const total = (smart + fast + cooldown) || 1;
         document.getElementById('distSmartBar').style.width = ((smart / total) * 100) + '%';
@@ -1685,8 +1824,8 @@ aider --model openai/my9model-free</pre>
               : '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center space-x-1"><span>⚡</span><span>Fast</span></span>';
 
             const scoreDisplay = m.score > 0
-              ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Score: ${m.score}</span>`
-              : `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono text-zinc-500 bg-zinc-800">Score: Standard</span>`;
+              ? `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">${t('score_label')}${m.score}</span>`
+              : `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono text-zinc-500 bg-zinc-800">${t('score_standard')}</span>`;
 
             return `
               <div class="flex items-center justify-between p-3 rounded-xl bg-zinc-900/50 hover:bg-zinc-800/60 border border-dark-border/70 transition group">
@@ -1708,7 +1847,7 @@ aider --model openai/my9model-free</pre>
             `;
           }).join('');
         } else {
-          topEl.innerHTML = '<div class="text-xs text-zinc-500 p-4 text-center">Belum ada model yang disinkronkan. Klik <strong>Sync Sekarang</strong> di atas!</div>';
+          topEl.innerHTML = `<div class="text-xs text-zinc-500 p-4 text-center">${t('top5_empty')}</div>`;
         }
 
         // Render Active Providers Pool Mini List
@@ -1722,7 +1861,7 @@ aider --model openai/my9model-free</pre>
             </div>
           `).join('');
         } else {
-          provEl.innerHTML = '<span class="text-xs text-zinc-500 italic p-1">Belum ada provider yang terhubung di 9router.</span>';
+          provEl.innerHTML = `<span class="text-xs text-zinc-500 italic p-1">${t('prov_pool_empty')}</span>`;
         }
       } catch (err) {
         console.error(err);
@@ -1732,7 +1871,7 @@ aider --model openai/my9model-free</pre>
     // --- Tab 2: Combos ---
     async function loadCombos() {
       const container = document.getElementById('combosList');
-      container.innerHTML = '<div class="text-xs text-zinc-400 p-4">Memuat data combos...</div>';
+      container.innerHTML = `<div class="text-xs text-zinc-400 p-4">${t('combos_loading')}</div>`;
       try {
         const res = await fetch('/api/combos');
         const data = await res.json();
@@ -1751,13 +1890,13 @@ aider --model openai/my9model-free</pre>
                 <span class="text-zinc-300 truncate max-w-[70%]">${idx + 1}. ${m}</span>
                 <div class="flex items-center space-x-1">
                   <button onclick="testSingleModel('${m}', this)" class="text-[10px] px-2 py-0.5 rounded bg-zinc-800 hover:bg-emerald-600 hover:text-zinc-950 text-zinc-300 transition font-sans flex items-center space-x-1">
-                    <span>⚡ Test</span>
+                    <span>${t('test_btn')}</span>
                   </button>
                 </div>
               </div>
             `).join('');
           } else {
-            modelsHtml = '<div class="text-xs text-zinc-500 italic p-2">Tidak ada model di combo ini.</div>';
+            modelsHtml = `<div class="text-xs text-zinc-500 italic p-2">${t('combos_empty')}</div>`;
           }
 
           card.innerHTML = `
@@ -1766,7 +1905,7 @@ aider --model openai/my9model-free</pre>
                 <span class="font-bold text-sm text-white font-mono">${c.name}</span>
                 ${isSuper ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">Super Combo</span>' : ''}
               </div>
-              <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300">${c.models.length} models</span>
+              <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-zinc-800 text-zinc-300">${c.models.length} ${t('models_unit')}</span>
             </div>
             <div class="max-h-60 overflow-y-auto space-y-1 pr-1">
               ${modelsHtml}
@@ -1775,7 +1914,7 @@ aider --model openai/my9model-free</pre>
           container.appendChild(card);
         });
       } catch (err) {
-        container.innerHTML = '<div class="text-xs text-rose-400 p-4">Gagal memuat combos: ' + err.message + '</div>';
+        container.innerHTML = `<div class="text-xs text-rose-400 p-4">${t('combos_load_fail')}${err.message}</div>`;
       }
     }
 
@@ -1809,7 +1948,7 @@ aider --model openai/my9model-free</pre>
     // --- Tab 3: Providers ---
     async function loadProviders() {
       const tbody = document.getElementById('providersTable');
-      tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-zinc-500">Memuat provider aktif...</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-zinc-500">${t('prov_pool_loading')}</td></tr>`;
       try {
         const res = await fetch('/api/providers');
         const data = await res.json();
@@ -1818,7 +1957,7 @@ aider --model openai/my9model-free</pre>
         globalProviders = data.providers;
         renderProvidersTable();
       } catch (err) {
-        tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-rose-400">Gagal: ' + err.message + '</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-rose-400">${t('alert_error_prefix')}${err.message}</td></tr>`;
       }
     }
 
@@ -1842,7 +1981,10 @@ aider --model openai/my9model-free</pre>
       if (countLabel) {
         const connectedCount = globalProviders.filter(p => !p.isPublic).length;
         const publicCount = globalProviders.filter(p => p.isPublic).length;
-        countLabel.textContent = `${list.length} provider aktif (${connectedCount} terhubung di 9router, ${publicCount} bawaan publik)`;
+        countLabel.textContent = t('prov_count_summary')
+          .replace('{total}', list.length)
+          .replace('{connected}', connectedCount)
+          .replace('{public}', publicCount);
       }
 
       if (globalProviders.length === 0) {
@@ -1851,13 +1993,13 @@ aider --model openai/my9model-free</pre>
             <td colspan="7" class="p-10 text-center">
               <div class="max-w-md mx-auto space-y-3">
                 <div class="text-3xl">🔌</div>
-                <div class="text-sm font-bold text-white">Belum Ada Provider Aktif</div>
+                <div class="text-sm font-bold text-white">${t('prov_empty_title')}</div>
                 <p class="text-xs text-zinc-400 leading-relaxed">
-                  Tidak ditemukan koneksi aktif di 9router Core. Hubungkan provider (Google Gemini, Groq, Kilo.ai, dll.) lewat console 9router.
+                  ${t('prov_empty_desc')}
                 </p>
                 <div class="pt-2">
                   <a href="${nineRouterUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-zinc-950 font-bold text-xs hover:bg-emerald-400 transition shadow-sm">
-                    <span>Buka 9router Console</span>
+                    <span>${t('prov_btn_open_console')}</span>
                     <span>↗</span>
                   </a>
                 </div>
@@ -1868,7 +2010,7 @@ aider --model openai/my9model-free</pre>
       }
 
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-zinc-500">Tidak ada provider yang cocok dengan kata kunci "${search}".</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-zinc-500">${t('prov_empty_search').replace('{search}', search)}</td></tr>`;
         return;
       }
 
@@ -1880,11 +2022,11 @@ aider --model openai/my9model-free</pre>
         // Auth type badge
         let authBadge = '';
         if (p.isPublic) {
-          authBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">🌐 Bawaan Publik</span>';
+          authBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">${t('prov_auth_public')}</span>`;
         } else if (p.authType === 'oauth') {
-          authBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">🔐 OAuth (9router)</span>';
+          authBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20">${t('prov_auth_oauth')}</span>`;
         } else {
-          authBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🔑 API Key (9router)</span>';
+          authBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${t('prov_auth_api_key')}</span>`;
         }
 
         // Category color
@@ -1898,18 +2040,18 @@ aider --model openai/my9model-free</pre>
         // Model Count
         const count = Number(p.modelCount || 0);
         const countHtml = count > 0
-          ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${count} model</span>`
-          : `<span class="text-zinc-500 font-mono text-[11px]">0 model</span>`;
+          ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${count} ${t('models_unit')}</span>`
+          : `<span class="text-zinc-500 font-mono text-[11px]">0 ${t('models_unit')}</span>`;
 
         // Auto Sync Toggle
         const autoSyncBadge = p.autoSyncEnabled !== false
-          ? `<button onclick="toggleProviderSync('${p.connectionId || p.key}', false)" title="Klik untuk menonaktifkan auto-sync untuk provider ini" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 transition flex items-center space-x-1 mx-auto"><span>⚡ Aktif</span></button>`
-          : `<button onclick="toggleProviderSync('${p.connectionId || p.key}', true)" title="Klik untuk mengaktifkan auto-sync untuk provider ini" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-emerald-500/20 hover:text-emerald-300 transition flex items-center space-x-1 mx-auto"><span>⚪ Non-Aktif</span></button>`;
+          ? `<button onclick="toggleProviderSync('${p.connectionId || p.key}', false)" title="${currentLang === 'id' ? 'Klik untuk menonaktifkan auto-sync untuk provider ini' : 'Click to disable auto-sync for this provider'}" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-rose-500/20 hover:text-rose-300 hover:border-rose-500/30 transition flex items-center space-x-1 mx-auto"><span>${t('prov_toggle_active')}</span></button>`
+          : `<button onclick="toggleProviderSync('${p.connectionId || p.key}', true)" title="${currentLang === 'id' ? 'Klik untuk mengaktifkan auto-sync untuk provider ini' : 'Click to enable auto-sync for this provider'}" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700 hover:bg-emerald-500/20 hover:text-emerald-300 transition flex items-center space-x-1 mx-auto"><span>${t('prov_toggle_inactive')}</span></button>`;
 
         // Action Link
         const actionHtml = p.isPublic
-          ? '<span class="text-[11px] text-zinc-500 italic">Bawaan Publik</span>'
-          : `<a href="${nineRouterUrl}" target="_blank" rel="noopener noreferrer" title="Buka 9router untuk ganti API key, OAuth, atau hapus" class="inline-flex items-center text-[11px] font-semibold text-zinc-400 hover:text-emerald-400 transition space-x-1"><span>Kelola di 9router</span><span>↗</span></a>`;
+          ? `<span class="text-[11px] text-zinc-500 italic">${t('prov_action_public')}</span>`
+          : `<a href="${nineRouterUrl}" target="_blank" rel="noopener noreferrer" title="${currentLang === 'id' ? 'Buka 9router untuk ganti API key, OAuth, atau hapus' : 'Open 9router to manage API key, OAuth, or remove connection'}" class="inline-flex items-center text-[11px] font-semibold text-zinc-400 hover:text-emerald-400 transition space-x-1"><span>${t('prov_action_manage')}</span><span>↗</span></a>`;
 
         row.innerHTML = `
           <td class="px-5 py-3.5 font-bold text-white">
@@ -1917,13 +2059,13 @@ aider --model openai/my9model-free</pre>
               <span>${p.label}</span>
               ${p.isCustom ? '<span class="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">Custom</span>' : ''}
             </div>
-            ${p.connectionName ? `<div class="text-[10px] text-zinc-500 font-normal">Koneksi: ${p.connectionName}</div>` : ''}
+            ${p.connectionName ? `<div class="text-[10px] text-zinc-500 font-normal">${t('prov_conn_prefix')}${p.connectionName}</div>` : ''}
           </td>
           <td class="px-5 py-3.5"><span class="px-2 py-0.5 rounded-md text-[10px] font-semibold ${catColor}">${p.category || 'Standard'}</span></td>
           <td class="px-5 py-3.5">${authBadge}</td>
           <td class="px-5 py-3.5">
             <span class="font-mono text-zinc-300 font-semibold">${(p.prefixes || []).join(', ')}</span>
-            <div class="font-mono text-zinc-500 text-[10px] truncate max-w-[180px]" title="${p.defaultBaseUrl || '-'}">${p.defaultBaseUrl || '<span class="text-zinc-600">Default 9router</span>'}</div>
+            <div class="font-mono text-zinc-500 text-[10px] truncate max-w-[180px]" title="${p.defaultBaseUrl || '-'}">${p.defaultBaseUrl || `<span class="text-zinc-600">${t('prov_default_url')}</span>`}</div>
           </td>
           <td class="px-5 py-3.5 text-center">${countHtml}</td>
           <td class="px-5 py-3.5 text-center">${autoSyncBadge}</td>
@@ -1944,10 +2086,10 @@ aider --model openai/my9model-free</pre>
         if (data.success) {
           loadProviders();
         } else {
-          alert('Gagal mengubah status sync: ' + (data.error || 'Unknown error'));
+          alert(t('alert_sync_toggle_failed') + (data.error || 'Unknown error'));
         }
       } catch (err) {
-        alert('Gagal: ' + err.message);
+        alert(t('alert_error_prefix') + err.message);
       }
     }
 
@@ -1982,7 +2124,7 @@ aider --model openai/my9model-free</pre>
       }
 
       if (list.length === 0) {
-        container.innerHTML = '<span class="text-xs text-zinc-500 italic">Belum ada exclusion rules.</span>';
+        container.innerHTML = `<span class="text-xs text-zinc-500 italic">${t('excl_empty')}</span>`;
         return;
       }
 
@@ -2007,7 +2149,6 @@ aider --model openai/my9model-free</pre>
       if (Array.isArray(currentExclusions)) {
         if (!currentExclusions.includes(val)) currentExclusions.push(val);
       } else if (typeof currentExclusions === 'object' && currentExclusions !== null) {
-        // dynamic check of the values or structure
         const isProv = val.startsWith('provider:');
         if (isProv) {
           const provName = val.replace(/^provider:/, '');
@@ -2034,10 +2175,6 @@ aider --model openai/my9model-free</pre>
       if (Array.isArray(currentExclusions)) {
         currentExclusions.splice(idx, 1);
       } else if (typeof currentExclusions === 'object' && currentExclusions !== null) {
-        // Since we combined them in renderExclusionTags:
-        // const models = (currentExclusions.excludedModels || []).map(m => String(m));
-        // const provs = (currentExclusions.excludedProviders || []).map(p => 'provider:' + p);
-        // list = [...models, ...provs];
         const modelsCount = (currentExclusions.excludedModels || []).length;
         if (idx < modelsCount) {
           currentExclusions.excludedModels.splice(idx, 1);
@@ -2056,7 +2193,7 @@ aider --model openai/my9model-free</pre>
         document.getElementById('exclusionsJsonEditor').value = JSON.stringify(parsed, null, 2);
         renderExclusionTags();
       } catch (err) {
-        alert('Invalid JSON: ' + err.message);
+        alert(t('alert_invalid_json') + err.message);
       }
     }
 
@@ -2071,13 +2208,13 @@ aider --model openai/my9model-free</pre>
         });
         const data = await res.json();
         if (data.success) {
-          alert('Exclusions berhasil disimpan!');
+          alert(t('alert_exclusions_saved'));
           loadExclusions();
         } else {
-          alert('Error: ' + data.error);
+          alert(t('alert_error_prefix') + data.error);
         }
       } catch (err) {
-        alert('Error: ' + err.message);
+        alert(t('alert_error_prefix') + err.message);
       }
     }
 
@@ -2103,7 +2240,7 @@ aider --model openai/my9model-free</pre>
       container.innerHTML = '';
 
       if (!Array.isArray(currentPriorities) || currentPriorities.length === 0) {
-        container.innerHTML = '<span class="text-xs text-zinc-500 italic">Belum ada prioritas kustom.</span>';
+        container.innerHTML = `<span class="text-xs text-zinc-500 italic">${t('prio_empty')}</span>`;
         return;
       }
 
@@ -2161,7 +2298,7 @@ aider --model openai/my9model-free</pre>
         document.getElementById('prioritiesJsonEditor').value = JSON.stringify(parsed, null, 2);
         renderPriorityList();
       } catch (err) {
-        alert('Invalid JSON: ' + err.message);
+        alert(t('alert_invalid_json') + err.message);
       }
     }
 
@@ -2176,13 +2313,13 @@ aider --model openai/my9model-free</pre>
         });
         const data = await res.json();
         if (data.success) {
-          alert('Priorities berhasil disimpan!');
+          alert(t('alert_priorities_saved'));
           loadPriorities();
         } else {
-          alert('Error: ' + data.error);
+          alert(t('alert_error_prefix') + data.error);
         }
       } catch (err) {
-        alert('Error: ' + err.message);
+        alert(t('alert_error_prefix') + err.message);
       }
     }
 
@@ -2190,7 +2327,7 @@ aider --model openai/my9model-free</pre>
     function triggerCliAction(action) {
       switchTab('cli');
       if (activeSse) {
-        alert('Ada proses yang sedang berjalan. Tunggu hingga selesai.');
+        alert(t('alert_cli_running'));
         return;
       }
 
@@ -2200,7 +2337,7 @@ aider --model openai/my9model-free</pre>
 
       term.textContent = '';
       title.textContent = action;
-      status.textContent = 'RUNNING';
+      status.textContent = t('cli_running');
       status.className = 'font-mono text-[11px] text-yellow-400 animate-pulse';
 
       const sse = new EventSource('/api/actions/stream?action=' + action);
@@ -2208,7 +2345,7 @@ aider --model openai/my9model-free</pre>
 
       sse.addEventListener('start', e => {
         const d = JSON.parse(e.data);
-        term.textContent += `[*] Menjalankan: ${d.command}\n------------------------------------------------------------\n`;
+        term.textContent += `${t('cli_running_cmd')}${d.command}\n------------------------------------------------------------\n`;
       });
 
       sse.addEventListener('log', e => {
@@ -2219,7 +2356,7 @@ aider --model openai/my9model-free</pre>
 
       sse.addEventListener('done', e => {
         const d = JSON.parse(e.data);
-        term.textContent += `\n------------------------------------------------------------\n[✓] Selesai dengan status exit: ${d.code}\n`;
+        term.textContent += `\n------------------------------------------------------------\n${t('cli_exit_code')}${d.code}\n`;
         status.textContent = d.success ? 'SUCCESS' : 'FAILED (code ' + d.code + ')';
         status.className = d.success ? 'font-mono text-[11px] text-emerald-400' : 'font-mono text-[11px] text-rose-400';
         sse.close();
@@ -2241,7 +2378,7 @@ aider --model openai/my9model-free</pre>
 
     function clearConsole() {
       document.getElementById('terminalOutput').textContent = '';
-      document.getElementById('terminalStatus').textContent = 'READY';
+      document.getElementById('terminalStatus').textContent = t('cli_ready');
       document.getElementById('terminalStatus').className = 'font-mono text-[11px] text-zinc-500';
     }
 
@@ -2253,11 +2390,12 @@ aider --model openai/my9model-free</pre>
         document.getElementById('terminalTitle').textContent = 'sync.log';
         document.getElementById('terminalOutput').textContent = data.logs;
       } catch (err) {
-        alert('Gagal memuat log: ' + err.message);
+        alert(t('alert_logs_failed') + err.message);
       }
     }
 
     // Init
+    setLanguage(currentLang);
     checkAuth();
   </script>
 </body>

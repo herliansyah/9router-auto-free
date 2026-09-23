@@ -78,3 +78,8 @@ saat istilah baru dinamai atau makna lama berubah.
 
 ## CLI Diagnostics & Verbose Logging
 - **Unified Verbose Flag**: Dukungan flag `--verbose` / `-v` dan environment variable `VERBOSE=1` / `DEBUG=1` lintas runtime (`sync.js`, `web.js`). Menampilkan HTTP access logging dengan pewarnaan status dan latensi, detail stack trace error API (4xx/5xx), mirroring output live stream child-process CLI ke terminal konsol, serta guarded scheduler check di platform Windows (`win32`).
+
+## Bilingual Web UI & In-App Interactive Guide
+- **Zero-Dependency Vanilla i18n Engine**: Engine translasi bilingual (ID/EN) berbasis kamus `TRANSLATIONS` + atribut deklaratif `data-i18n` / `data-i18n-ph` + helper teks dinamis `t(key)` + early boot hook `setLanguage(currentLang)`. Mematuhi aturan Ponytail senior dev: zero-dependency, native DOM, dan state bahasa persisten di `localStorage['9router_lang']`.
+- **100% Mirror Documentation Parity**: Tab panduan interaktif `#view-docs` (`renderDocsTab()`) menyajikan paritas 100% simetris antara Bahasa Indonesia dan English untuk seluruh bab arsitektur: pengenalan sistem, ketetapan otoritas kredensial (ADR-0001), integrasi 4 IDE (Claude Code, Cursor, Cline, Aider), 6 fitur unggulan, dan 6 FAQ mendalam.
+
